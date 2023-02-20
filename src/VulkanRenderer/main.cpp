@@ -3,11 +3,11 @@
 #include <iostream>
 #include <stdexcept>
 
-#include "VulkanRenderer/HelloTriangleApp.h"
+#include "VulkanRenderer/Renderer.h"
 
 int main()
 {
-    HelloTriangleApp app;
+    App app;
 
     try
     {

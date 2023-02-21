@@ -35,7 +35,9 @@ public:
 	);
 
 	void createImageViews(const VkDevice& logicalDevice);
+	void createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass);
 
+	void destroyFramebuffers(const VkDevice& logicalDevice);
 	void destroySwapchain(const VkDevice& logicalDevice);
 	void destroyImageViews(const VkDevice& logicalDevice);
 
@@ -56,6 +58,9 @@ public:
 		VkPresentModeKHR& presentMode,
 		VkExtent2D& extent
 	);
+
+	const VkExtent2D& getExtent() const;
+	const VkFormat& getImageFormat() const;
 
 	// Used in isDeviceSuitable function.
 	bool isSwapchainAdequated(
@@ -78,4 +83,6 @@ private:
 	std::optional<SwapchainSupportedProperties> m_supportedProperties;
 	VkFormat m_imageFormat;
 	VkExtent2D m_extent;
+
+	std::vector<VkFramebuffer> m_framebuffers;
 };

@@ -17,6 +17,9 @@
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
 #include "VulkanRenderer/Swapchain/SwapchainManager.h"
+#include "VulkanRenderer/ShaderManager/ShaderManager.h"
+#include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
+#include "VulkanRenderer/Commands/CommandManager.h"
 
 void App::run()
 {
@@ -313,11 +316,6 @@ void App::createLogicalDevice()
     m_qfHandles.setQueueHandles(m_device.logicalDevice, m_qfIndices);
 }
 
-void createGraphicsPipeline()
-{
-
-}
-
 void App::initVulkan()
 {
     createVkInstance();
@@ -332,7 +330,31 @@ void App::initVulkan()
 
     m_swapchainM.createImageViews(m_device.logicalDevice);
 
-    createGraphicsPipeline();
+    m_renderPassM.createRenderPass(
+        m_device.logicalDevice,
+        m_swapchainM.getImageFormat()
+    );
+
+    m_graphicsPipelineM.createGraphicsPipeline(
+        m_device.logicalDevice,
+        m_swapchainM.getExtent(),
+        m_renderPassM.getRenderPass()
+    );
+
+    m_swapchainM.createFramebuffers(
+        m_device.logicalDevice,
+        m_renderPassM.getRenderPass()
+    );
+
+    m_commandM.createCommandPool(
+        m_device.logicalDevice,
+        m_qfIndices
+    );
+
+    m_commandM.createCommandBuffer(
+        m_device.logicalDevice
+    );
+
 }
 void App::mainLoop()
 {
@@ -344,6 +366,20 @@ void App::mainLoop()
 
 void App::cleanup()
 {
+    // Command Pool
+    m_commandM.destroyCommandPool(m_device.logicalDevice);
+
+    // Graphics Pipeline
+    m_graphicsPipelineM.destroyGraphicsPipeline(m_device.logicalDevice);
+
+    // Pipeline Layout
+    m_graphicsPipelineM.destroyPipelineLayout(m_device.logicalDevice);
+
+    // Framebuffers
+    m_swapchainM.destroyFramebuffers(m_device.logicalDevice);
+
+    // Render pass
+    m_renderPassM.destroyRenderPass(m_device.logicalDevice);
 
     // Swapchain
     m_swapchainM.destroySwapchain(m_device.logicalDevice);

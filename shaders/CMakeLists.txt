@@ -1,8 +1,6 @@
 find_package(Vulkan COMPONENTS glslc)
 find_program(glslc_executable NAMES glslc HINTS Vulkan::glslc)
 
-set(SHADERS_BINARY_DIR "${PROJECT_BIN_DIR}/shaders")
-
 file (GLOB SHADERS
    ${SHADER_DIR}/*.vert
    ${SHADER_DIR}/*.frag

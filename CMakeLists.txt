@@ -11,6 +11,7 @@ set(PROJECT_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_OUTPUT_DIR})
 set(PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set(SHADER_DIR "${CMAKE_SOURCE_DIR}/shaders")
+set(SHADERS_BINARY_DIR "${PROJECT_BIN_DIR}/shaders")
 set(PROJECT_LIBRARIES_DIR "${CMAKE_SOURCE_DIR}/libs")
 
 
@@ -53,6 +54,8 @@ find_package(Threads REQUIRED)
 
 # - Compilation of shaders
 add_subdirectory(${SHADER_DIR})
+# To get the full path of the compiled shaders in the c++ code.
+add_definitions(-DSHADERS_BINARY_DIR="${SHADERS_BINARY_DIR}")
 
 #################################Executable####################################
 

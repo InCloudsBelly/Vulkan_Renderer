@@ -101,6 +101,12 @@ void SwapchainManager::createSwapchain(
 	vkGetSwapchainImagesKHR(logicalDevice, m_swapchain, &imageCount, m_images.data());
 }
 
+void SwapchainManager::destroyFramebuffers(const VkDevice& logicalDevice)
+{
+	for (auto& framebuffer : m_framebuffers)
+		vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
+}
+
 void SwapchainManager::destroySwapchain(const VkDevice& logicalDevice)
 {
 	vkDestroySwapchainKHR(logicalDevice, m_swapchain, nullptr);
@@ -150,6 +156,29 @@ void SwapchainManager::createImageViews(const VkDevice& logicalDevice)
 
 		if (status != VK_SUCCESS)
 			throw std::runtime_error("Failed to create image views!");
+	}
+}
+
+void SwapchainManager::createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass)
+{
+	m_framebuffers.resize(m_imageViews.size());
+
+	for (size_t i = 0; i < m_imageViews.size(); i++)
+	{
+		VkImageView attachments[] = { m_imageViews[i] };
+
+		VkFramebufferCreateInfo framebufferInfo{};
+		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		framebufferInfo.renderPass = renderPass;
+		framebufferInfo.attachmentCount = 1;
+		framebufferInfo.pAttachments = attachments;
+		framebufferInfo.width = m_extent.width;
+		framebufferInfo.height = m_extent.height;
+		framebufferInfo.layers = 1;
+
+		auto status = vkCreateFramebuffer(logicalDevice, &framebufferInfo, nullptr, &m_framebuffers[i]);
+		if (status != VK_SUCCESS)
+			throw std::runtime_error("Failed to create framebuffer!");
 	}
 }
 
@@ -246,6 +275,16 @@ VkExtent2D SwapchainManager::chooseBestExtent(const VkSurfaceCapabilitiesKHR& ca
 
 
 	return actualExtent;
+}
+
+const VkExtent2D& SwapchainManager::getExtent() const
+{
+	return m_extent;
+}
+
+const VkFormat& SwapchainManager::getImageFormat() const
+{
+	return m_imageFormat;
 }
 
 bool SwapchainManager::isSwapchainAdequated(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface)

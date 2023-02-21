@@ -15,6 +15,7 @@ public:
 		const VkRenderPass& renderPass
 	);
 
+	const VkPipeline& getGraphicsPipeline() const;
 	void destroyGraphicsPipeline(const VkDevice& logicalDevice);
 	void destroyPipelineLayout(const VkDevice& logicalDevice);
 

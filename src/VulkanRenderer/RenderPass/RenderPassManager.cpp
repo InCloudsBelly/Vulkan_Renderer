@@ -78,6 +78,28 @@ void RenderPassManager::createRenderPass(const VkDevice& logicalDevice, const Vk
 	VkSubpassDescription subpass{};
 	createSubPass(colorAttachmentRef, subpass);
 
+	// Subpass dependencies
+	VkSubpassDependency dependency{};
+	// Defines the indices of the dependency and the dependent
+	// subpass.
+	//    -VK_SUBPASS_EXTERNAL: Refers to the implicit subpass before or after
+	//    the render pass depending on whether is is specified in srcSubpass
+	//    or dstSubpass.
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	// Specifies the index of our subpass
+	dependency.dstSubpass = 0;
+	// These two param. specify the operations to wait on and the stages in
+	// which these operations occur. We need to wait for the swap chain to
+	// finish reading from the image before we can access it. This can be
+	// accomplished by waiting on the color attachment output stage itself.
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	// Specifies the operations that should wait. These settings will prevent
+	// the transition from happenning until it's actually necessary(and allowed):
+	// when we want to start writing colors to it.
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
 	// Creation of the render pass
 	VkRenderPassCreateInfo renderPassInfo{};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -85,6 +107,8 @@ void RenderPassManager::createRenderPass(const VkDevice& logicalDevice, const Vk
 	renderPassInfo.pAttachments = &colorAttachment;
 	renderPassInfo.subpassCount = 1;
 	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 1;
+	renderPassInfo.pDependencies = &dependency;
 
 	auto status = vkCreateRenderPass(logicalDevice, &renderPassInfo, nullptr, &m_renderPass);
 

@@ -57,6 +57,27 @@ std::vector<const char*> App::getRequiredExtensions()
     return extensions;
 }
 
+void App::createSyncObjects()
+{
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    // Creates the fence in the signaled state, so that the first call to
+    // vkWaitForFences() returns immediately since the fence is already signaled.
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    if(vkCreateSemaphore(m_device.logicalDevice,&semaphoreInfo,nullptr,&m_imageAvailableSemaphore)!=VK_SUCCESS)
+        throw std::runtime_error("Failed to create semaphore!");
+
+    if (vkCreateSemaphore(m_device.logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphore) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create semaphore!");
+
+    if (vkCreateFence(m_device.logicalDevice, &fenceInfo, nullptr, &m_inFlightFence) != VK_SUCCESS) 
+        throw std::runtime_error("Failed to create fence!");
+}
+
 void App::createVkInstance()
 {
     if (vkLayersConfig::VALIDATION_LAYERS_ENABLED &&
@@ -355,17 +376,98 @@ void App::initVulkan()
         m_device.logicalDevice
     );
 
+    createSyncObjects();
 }
+
+void App::drawFrame()
+{
+    // Waits until the previous frame has finished.
+   //    - 2 param. -> FenceCount.
+   //    - 4 param. -> waitAll.
+   //    - 5 param. -> timeOut.
+    vkWaitForFences(m_device.logicalDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
+
+    // After waiting, we need to manually reset the fence.
+    vkResetFences(m_device.logicalDevice, 1, &m_inFlightFence);
+
+    //--------------------Acquires an image from the swapchain------------------
+    uint32_t imageIndex;
+    vkAcquireNextImageKHR(m_device.logicalDevice, m_swapchainM.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+
+    //--------------Records/writes a command to the command buffer--------------
+    // Resets the command buffer to be able to be recorded/written.
+    m_commandM.resetCommandBuffer();
+    m_commandM.writeCommandIntoCommandBuffer(m_swapchainM.getFramebuffer(imageIndex), m_renderPassM.getRenderPass(), 
+                                             m_swapchainM.getExtent(), m_graphicsPipelineM.getGraphicsPipeline());
+
+    //----------------------Submits the command buffer--------------------------
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VkSemaphore waitSemaphores[] = { m_imageAvailableSemaphore };
+    VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submitInfo.waitSemaphoreCount = 1;
+    // Specifies which semaphores to wait on before execution begins.
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    // Specifies which stage/s of the pipeline to wait.
+    submitInfo.pWaitDstStageMask = waitStages;
+    // These two commands specify which command buffers to actualy submit for
+   // execution.
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &(m_commandM.getCommandBuffer());
+    // Specifies which semaphores to signal once the command buffer/s have
+   // finished execution.
+    VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphore };
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if(vkQueueSubmit(m_qfHandles.graphicsQueue, 1, &submitInfo, m_inFlightFence) != VK_SUCCESS)
+        throw std::runtime_error("Failed to submit draw command buffer!");
+
+
+    //-------------------Presentation of the swapchain image--------------------
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapchains[] = { m_swapchainM.getSwapchain() };
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapchains;
+    presentInfo.pImageIndices = &imageIndex;
+
+    presentInfo.pResults = nullptr;
+
+    vkQueuePresentKHR(m_qfHandles.presentQueue, &presentInfo);
+}
+
 void App::mainLoop()
 {
     while (m_windowM.isWindowClosed() == false)
     {
         m_windowM.pollEvents();
+        drawFrame();
     }
+}
+void App::destroySyncObjects()
+{
+    vkDestroySemaphore(
+        m_device.logicalDevice,
+        m_imageAvailableSemaphore,
+        nullptr
+    );
+    vkDestroySemaphore(
+        m_device.logicalDevice,
+        m_renderFinishedSemaphore,
+        nullptr
+    );
+    vkDestroyFence(m_device.logicalDevice, m_inFlightFence, nullptr);
 }
 
 void App::cleanup()
 {
+    // Sync objects
+    destroySyncObjects();
+
     // Command Pool
     m_commandM.destroyCommandPool(m_device.logicalDevice);
 

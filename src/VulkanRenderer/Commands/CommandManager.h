@@ -20,7 +20,9 @@ public:
 		const VkPipeline& graphicsPipeline
 	);
 
+	void resetCommandBuffer();
 	void destroyCommandPool(const VkDevice& logicalDevice);
+	VkCommandBuffer& getCommandBuffer();
 
 private:
 	VkCommandPool m_commandPool;

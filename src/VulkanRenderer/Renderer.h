@@ -11,7 +11,7 @@
 #include "VulkanRenderer/Swapchain/SwapchainManager.h"
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 #include "VulkanRenderer/RenderPass/RenderPassManager.h"
-#include "VulkanRenderer/Commands/CommandManager.h"
+#include "VulkanRenderer/Commands/CommandPool.h"
 
 struct Device
 {
@@ -59,7 +59,7 @@ private:
 	RenderPassManager        m_renderPassM;
 	GraphicsPipelineManager  m_graphicsPipelineM;
 	VkDebugUtilsMessengerEXT m_debugMessenger;
-	CommandManager           m_commandM;
+	CommandPool				 m_commandPool;
 
 	// Sync objects
 	VkSemaphore m_imageAvailableSemaphore;

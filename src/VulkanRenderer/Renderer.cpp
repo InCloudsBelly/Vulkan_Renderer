@@ -19,7 +19,7 @@
 #include "VulkanRenderer/Swapchain/SwapchainManager.h"
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
-#include "VulkanRenderer/Commands/CommandManager.h"
+#include "VulkanRenderer/Commands/CommandPool.h"
 
 void App::run()
 {
@@ -367,14 +367,15 @@ void App::initVulkan()
         m_renderPassM.getRenderPass()
     );
 
-    m_commandM.createCommandPool(
+    m_commandPool.createCommandPool(
         m_device.logicalDevice,
         m_qfIndices
     );
 
-    m_commandM.createCommandBuffer(
-        m_device.logicalDevice
-    );
+    // Command Buffer #1
+    VkCommandBufferAllocateInfo allocInfo1{};
+    m_commandPool.createCommandBufferAllocInfo(allocInfo1);
+    m_commandPool.allocCommandBuffer(allocInfo1);
 
     createSyncObjects();
 }
@@ -390,17 +391,18 @@ void App::drawFrame()
     // After waiting, we need to manually reset the fence.
     vkResetFences(m_device.logicalDevice, 1, &m_inFlightFence);
 
+    const uint32_t cmdBufferIndex = 0;
     //--------------------Acquires an image from the swapchain------------------
     uint32_t imageIndex;
     vkAcquireNextImageKHR(m_device.logicalDevice, m_swapchainM.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
-    //--------------Records/writes a command to the command buffer--------------
+    //------------------------Records command buffer 1--------------------------
     // Resets the command buffer to be able to be recorded/written.
-    m_commandM.resetCommandBuffer();
-    m_commandM.writeCommandIntoCommandBuffer(m_swapchainM.getFramebuffer(imageIndex), m_renderPassM.getRenderPass(), 
-                                             m_swapchainM.getExtent(), m_graphicsPipelineM.getGraphicsPipeline());
+    m_commandPool.resetCommandBuffer(cmdBufferIndex);
+    m_commandPool.recordCommandBuffer(m_swapchainM.getFramebuffer(imageIndex), m_renderPassM.getRenderPass(),
+                                      m_swapchainM.getExtent(), m_graphicsPipelineM.getGraphicsPipeline(), cmdBufferIndex);
 
-    //----------------------Submits the command buffer--------------------------
+    //----------------------Submits the command buffer 1------------------------
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     VkSemaphore waitSemaphores[] = { m_imageAvailableSemaphore };
@@ -413,7 +415,7 @@ void App::drawFrame()
     // These two commands specify which command buffers to actualy submit for
    // execution.
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &(m_commandM.getCommandBuffer());
+    submitInfo.pCommandBuffers = &(m_commandPool.getCommandBuffer(cmdBufferIndex));
     // Specifies which semaphores to signal once the command buffer/s have
    // finished execution.
     VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphore };
@@ -447,19 +449,13 @@ void App::mainLoop()
         m_windowM.pollEvents();
         drawFrame();
     }
+
+    vkDeviceWaitIdle(m_device.logicalDevice);
 }
 void App::destroySyncObjects()
 {
-    vkDestroySemaphore(
-        m_device.logicalDevice,
-        m_imageAvailableSemaphore,
-        nullptr
-    );
-    vkDestroySemaphore(
-        m_device.logicalDevice,
-        m_renderFinishedSemaphore,
-        nullptr
-    );
+    vkDestroySemaphore(m_device.logicalDevice,m_imageAvailableSemaphore,nullptr);
+    vkDestroySemaphore(m_device.logicalDevice,m_renderFinishedSemaphore,nullptr);
     vkDestroyFence(m_device.logicalDevice, m_inFlightFence, nullptr);
 }
 
@@ -469,7 +465,7 @@ void App::cleanup()
     destroySyncObjects();
 
     // Command Pool
-    m_commandM.destroyCommandPool(m_device.logicalDevice);
+    m_commandPool.destroyCommandPool();
 
     // Graphics Pipeline
     m_graphicsPipelineM.destroyGraphicsPipeline(m_device.logicalDevice);

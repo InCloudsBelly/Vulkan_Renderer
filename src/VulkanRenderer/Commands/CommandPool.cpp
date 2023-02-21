@@ -1,46 +1,52 @@
-#include "VulkanRenderer/Commands/CommandManager.h"
+#include "VulkanRenderer/Commands/CommandPool.h"
 
 #include <vulkan/vulkan.h>
 #include <stdexcept>
-CommandManager::CommandManager() {}
 
-CommandManager::~CommandManager() {}
+#include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 
-void CommandManager::createCommandPool(const VkDevice& logicalDevice, const QueueFamilyIndices& queueFamilyIndices)
+CommandPool::CommandPool() {}
+
+void CommandPool::createCommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queueFamilyIndices)
 {
+	m_logicalDevice = logicalDevice;
+	m_queueFamilyIndices = queueFamilyIndices;
+
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+	poolInfo.queueFamilyIndex = m_queueFamilyIndices.graphicsFamily.value();
 
-	if (vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS)
+	if (vkCreateCommandPool(m_logicalDevice, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create command pool!");
 }
 
-void CommandManager::createCommandBuffer(const VkDevice& logicalDevice)
+void CommandPool::destroyCommandPool()
 {
-	VkCommandBufferAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = m_commandPool;
+	vkDestroyCommandPool(m_logicalDevice, m_commandPool, nullptr);
+}
 
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = 1;
-
-	if(vkAllocateCommandBuffers(logicalDevice, &allocInfo, &m_commandBuffer) != VK_SUCCESS)
+void CommandPool::allocCommandBuffer(const VkCommandBufferAllocateInfo& allocInfo)
+{
+	VkCommandBuffer newCommandBuffer;
+	if (vkAllocateCommandBuffers(m_logicalDevice,&allocInfo,&newCommandBuffer) != VK_SUCCESS)
 		throw std::runtime_error("Failed to allocate command buffers!");
+
+	m_commandBuffers.push_back(std::move(newCommandBuffer));
 }
 
-void CommandManager::resetCommandBuffer()
+const VkCommandBuffer& CommandPool::getCommandBuffer(const uint32_t index)
 {
-	vkResetCommandBuffer(m_commandBuffer, 0);
+	return m_commandBuffers[index];
 }
 
-void CommandManager::writeCommandIntoCommandBuffer(
+void CommandPool::recordCommandBuffer(
 	const VkFramebuffer& framebuffer,
 	const VkRenderPass& renderPass,
 	const VkExtent2D& extent,
-	const VkPipeline& graphicsPipeline
-) {
+	const VkPipeline & graphicsPipeline,
+	const uint32_t commandBufferIndex )
+{
 	// Specifies some details about the usage of this specific command
 	// buffer.
 	VkCommandBufferBeginInfo beginInfo{};
@@ -63,7 +69,7 @@ void CommandManager::writeCommandIntoCommandBuffer(
 	// If the command buffer was already recorded/writed once, then a call
 	// to vkBeginCommandBuffer will implicity reset it. It's not possible
 	// to append commands to a buffer at a later time.
-	auto status = vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
+	auto status = vkBeginCommandBuffer(m_commandBuffers[commandBufferIndex],&beginInfo);
 
 	if (status != VK_SUCCESS)
 		throw std::runtime_error("Failed to begin recording command buffer!");
@@ -98,13 +104,13 @@ void CommandManager::writeCommandIntoCommandBuffer(
 
 	//--------------------------------RenderPass--------------------------------
 	vkCmdBeginRenderPass(
-		m_commandBuffer,
+		m_commandBuffers[commandBufferIndex],
 		&renderPassInfo,
 		VK_SUBPASS_CONTENTS_INLINE
 	);
 
 	vkCmdBindPipeline(
-		m_commandBuffer,
+		m_commandBuffers[commandBufferIndex],
 		// this or compute pipeline
 		VK_PIPELINE_BIND_POINT_GRAPHICS,
 		graphicsPipeline
@@ -118,12 +124,12 @@ void CommandManager::writeCommandIntoCommandBuffer(
 	viewport.height = static_cast<float>(extent.height);
 	viewport.minDepth = 0.0f;
 	viewport.maxDepth = 1.0f;
-	vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
+	vkCmdSetViewport(m_commandBuffers[commandBufferIndex], 0, 1, &viewport);
 
 	VkRect2D scissor{};
 	scissor.offset = { 0, 0 };
 	scissor.extent = extent;
-	vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+	vkCmdSetScissor(m_commandBuffers[commandBufferIndex], 0, 1, &scissor);
 
 	// Creates the draw command.
 	//    - 1 param. -> VertexCount: vertices to draw.
@@ -133,21 +139,34 @@ void CommandManager::writeCommandIntoCommandBuffer(
 	//    defines the lowest value of gl_VertexIndex.
 	//    - 4 param. -> firstIntance: Used as an offset for instanced rendering,
 	//    defines the lowest value of gl_InstanceIndex.
-	vkCmdDraw(m_commandBuffer, 3, 1, 0, 0);
+	vkCmdDraw(m_commandBuffers[commandBufferIndex], 3, 1, 0, 0);
 
-	vkCmdEndRenderPass(m_commandBuffer);
+	vkCmdEndRenderPass(m_commandBuffers[commandBufferIndex]);
 
-	status = vkEndCommandBuffer(m_commandBuffer);
+	status = vkEndCommandBuffer(m_commandBuffers[commandBufferIndex]);
 	if (status != VK_SUCCESS)
 		throw std::runtime_error("Failed to record command buffer!");
 }
 
-VkCommandBuffer& CommandManager::getCommandBuffer()
+void CommandPool::resetCommandBuffer(const uint32_t commandBufferIndex)
 {
-	return m_commandBuffer;
+	vkResetCommandBuffer(m_commandBuffers[commandBufferIndex], 0);
 }
 
-void CommandManager::destroyCommandPool(const VkDevice& logicalDevice)
+void CommandPool::createCommandBufferAllocInfo(VkCommandBufferAllocateInfo& allocInfo) 
 {
-	vkDestroyCommandPool(logicalDevice, m_commandPool, nullptr);
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.commandPool = m_commandPool;
+	// Specifies if the allocated command buffers are primary or secondary
+	// buffers:
+	//    - Primary: Can be submitted to a queue for execution, but
+	//    cannot be called from other command buffers.
+	//    - Secondary: Cannot be submitted directly, but can be called from
+	//    primary command buffers. Helpful to reuse common operations from
+	//    primary command buffers.
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	//	  Since we are only allocation one command buffer...
+	allocInfo.commandBufferCount = 1;
 }
+
+CommandPool::~CommandPool() {}

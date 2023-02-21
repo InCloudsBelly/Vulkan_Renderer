@@ -16,8 +16,8 @@ struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
+    bool AllQueueFamiliesSupported;
 
-    bool AllQueueFamiliesSupported();
     void getIndicesOfRequiredQueueFamilies(
         const VkPhysicalDevice& physicalDevice,
         const VkSurfaceKHR& surface

@@ -10,9 +10,8 @@ class CommandPool
 {
 public:
 	CommandPool();
+	CommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queueFamilyIndices);
 	~CommandPool();
-	void createCommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queueFamilyIndices);
-
 	void destroyCommandPool();
 
 	void createCommandBufferAllocInfo(VkCommandBufferAllocateInfo& allocInfo);

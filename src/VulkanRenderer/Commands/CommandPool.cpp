@@ -7,7 +7,7 @@
 
 CommandPool::CommandPool() {}
 
-void CommandPool::createCommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queueFamilyIndices)
+CommandPool::CommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queueFamilyIndices)
 {
 	m_logicalDevice = logicalDevice;
 	m_queueFamilyIndices = queueFamilyIndices;

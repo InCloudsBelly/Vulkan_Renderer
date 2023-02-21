@@ -41,9 +41,18 @@ public:
 	void destroySwapchain(const VkDevice& logicalDevice);
 	void destroyImageViews(const VkDevice& logicalDevice);
 
-	SwapchainSupportedProperties getSupportedProperties(
-		const VkPhysicalDevice& physicalDevice,
-		const VkSurfaceKHR& surface);
+	const VkExtent2D& getExtent() const;
+	const VkFormat& getImageFormat() const;
+	VkFramebuffer& getFramebuffer(const uint32_t imageIndex);
+	VkSwapchainKHR& getSwapchain();
+
+	// Used in isPhysicalDeviceSuitable function.
+	bool isSwapchainAdequated(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface);
+
+
+private:
+	void chooseBestSettings(const VkPhysicalDevice& physicalDevice,const WindowManager& windowM,
+			VkSurfaceFormatKHR& surfaceFormat,VkPresentModeKHR& presentMode,VkExtent2D& extent);
 
 	VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
@@ -51,28 +60,12 @@ public:
 
 	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const WindowManager& windowM);
 
-	void chooseBestSettings(
-		const VkPhysicalDevice& physicalDevice,
-		const WindowManager& windowM,
-		VkSurfaceFormatKHR& surfaceFormat,
-		VkPresentModeKHR& presentMode,
-		VkExtent2D& extent
-	);
+	
 
-	const VkExtent2D& getExtent() const;
-	const VkFormat& getImageFormat() const;
-	VkFramebuffer& getFramebuffer(const uint32_t imageIndex);
-	VkSwapchainKHR& getSwapchain();
+	SwapchainSupportedProperties getSupportedProperties(const VkPhysicalDevice& physicalDevice,const VkSurfaceKHR& surface);
 
-	// Used in isDeviceSuitable function.
-	bool isSwapchainAdequated(
-		const VkPhysicalDevice& physicalDevice,
-		const VkSurfaceKHR& surface
-	);
+	bool existsMaxNumberOfSupportedImages(const VkSurfaceCapabilitiesKHR& capabilities);
 
-	bool existsMaxNumberOfSupportedImages(
-		const VkSurfaceCapabilitiesKHR& capabilities
-	);
 
 private:
 	VkSwapchainKHR m_swapchain;

@@ -6,14 +6,6 @@
 
 #include "VulkanRenderer/QueueFamily/QueueFamilyUtils.h"
 
-bool QueueFamilyIndices::AllQueueFamiliesSupported()
-{
-    return (
-        graphicsFamily.has_value() &&
-        presentFamily.has_value()
-        );
-}
-
 /*
  * Checks if the queue families required are:
  * - Supported by the device.
@@ -38,4 +30,6 @@ void QueueFamilyIndices::getIndicesOfRequiredQueueFamilies(
 
         i++;
     }
+
+    AllQueueFamiliesSupported = (graphicsFamily.has_value() && presentFamily.has_value());
 }

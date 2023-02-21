@@ -12,16 +12,7 @@
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 #include "VulkanRenderer/RenderPass/RenderPassManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
-
-struct Device
-{
-	VkPhysicalDevice physicalDevice;
-	VkDevice logicalDevice;
-
-	const std::vector<const char*> requiredExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
-	};
-};
+#include "VulkanRenderer/Device/Device.h"
 
 class App
 {
@@ -38,16 +29,8 @@ private:
 	void drawFrame();
 
 	void createVkInstance();
-	void createLogicalDevice();
+
 	void createSyncObjects();
-
-	std::vector<const char*> getRequiredExtensions();
-
-	void pickPhysicalDevice();
-
-	bool isDeviceSuitable(const VkPhysicalDevice& device);
-	bool AllExtensionsSupported(const VkPhysicalDevice& device);
-
 	void destroySyncObjects();
 
 	WindowManager            m_windowM;
@@ -59,7 +42,7 @@ private:
 	RenderPassManager        m_renderPassM;
 	GraphicsPipelineManager  m_graphicsPipelineM;
 	VkDebugUtilsMessengerEXT m_debugMessenger;
-	CommandPool				 m_commandPool;
+	std::vector<CommandPool> m_commandPools;
 
 	// Sync objects
 	VkSemaphore m_imageAvailableSemaphore;

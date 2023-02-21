@@ -20,6 +20,7 @@
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Extensions/ExtensionsUtils.h"
 
 void App::run()
 {
@@ -31,30 +32,7 @@ void App::run()
 
 void App::initWindow()
 {
-    m_windowM.createWindow(
-        config::RESOLUTION_W,
-        config::RESOLUTION_H,
-        config::TITLE
-    );
-}
-
-std::vector<const char*> App::getRequiredExtensions()
-{
-    std::vector<const char*> extensions;
-
-    // - GLFW's extensions
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    for (uint32_t i = 0; i != glfwExtensionCount; i++)
-        extensions.push_back(*(glfwExtensions + i));
-
-    // - Vulkan Layers extensions
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED)
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-
-    return extensions;
+    m_windowM.createWindow(config::RESOLUTION_W,config::RESOLUTION_H,config::TITLE);
 }
 
 void App::createSyncObjects()
@@ -68,13 +46,13 @@ void App::createSyncObjects()
     // vkWaitForFences() returns immediately since the fence is already signaled.
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    if(vkCreateSemaphore(m_device.logicalDevice,&semaphoreInfo,nullptr,&m_imageAvailableSemaphore)!=VK_SUCCESS)
+    if(vkCreateSemaphore(m_device.getLogicalDevice(),&semaphoreInfo,nullptr,&m_imageAvailableSemaphore)!=VK_SUCCESS)
         throw std::runtime_error("Failed to create semaphore!");
 
-    if (vkCreateSemaphore(m_device.logicalDevice, &semaphoreInfo, nullptr, &m_renderFinishedSemaphore) != VK_SUCCESS)
+    if (vkCreateSemaphore(m_device.getLogicalDevice(), &semaphoreInfo, nullptr, &m_renderFinishedSemaphore) != VK_SUCCESS)
         throw std::runtime_error("Failed to create semaphore!");
 
-    if (vkCreateFence(m_device.logicalDevice, &fenceInfo, nullptr, &m_inFlightFence) != VK_SUCCESS) 
+    if (vkCreateFence(m_device.getLogicalDevice(), &fenceInfo, nullptr, &m_inFlightFence) != VK_SUCCESS) 
         throw std::runtime_error("Failed to create fence!");
 }
 
@@ -110,7 +88,7 @@ void App::createVkInstance()
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
 
-    std::vector<const char*> extensions = getRequiredExtensions();
+    std::vector<const char*> extensions = extensionsUtils::getRequiredExtensions();
 
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data();
@@ -150,192 +128,6 @@ void App::createVkInstance()
         throw std::runtime_error("Failed to create Vulkan's instance!");
 }
 
-bool App::AllExtensionsSupported(
-    const VkPhysicalDevice& device
-) {
-    uint32_t extensionCount;
-    vkEnumerateDeviceExtensionProperties(
-        device,
-        nullptr,
-        &extensionCount,
-        nullptr
-    );
-
-    std::vector<VkExtensionProperties> availableExtensions(extensionCount);
-    vkEnumerateDeviceExtensionProperties(
-        device,
-        nullptr,
-        &extensionCount,
-        availableExtensions.data()
-    );
-
-    // Verifies if all required extensions are available in the device.
-    // (it can be improved)
-    for (const auto& requiredExtension : m_device.requiredExtensions)
-    {
-        bool extensionFound = false;
-
-        for (const auto& availableExtension : availableExtensions)
-        {
-            const char* extensionName = availableExtension.extensionName;
-            if (std::strcmp(requiredExtension, extensionName) == 0)
-            {
-                extensionFound = true;
-                break;
-            }
-        }
-
-        if (extensionFound == false)
-            return false;
-    }
-
-    return true;
-}
-
-bool App::isDeviceSuitable(const VkPhysicalDevice& physicalDevice)
-{
-    // - Queue-Families
-    // Verifies if the device has the Queue families that we need.
-    m_qfIndices.getIndicesOfRequiredQueueFamilies(physicalDevice, m_windowM.getSurface());
-
-    if (m_qfIndices.AllQueueFamiliesSupported() == false)
-        return false;
-
-    // - Device Properties
-    // Verifies if the device has the properties we want.
-    VkPhysicalDeviceProperties deviceProperties;
-    // Gives us basic device properties like the name, type and supported
-    // Vulkan version.
-    vkGetPhysicalDeviceProperties(physicalDevice, &deviceProperties);
-
-    // - Device Features
-    // Verifies if the device has the features we want.
-    VkPhysicalDeviceFeatures deviceFeatures;
-    // Tells us if features like texture compression, 64 bit floats, multi
-    // vieport renderending and so on, are compatbile with this device.
-    vkGetPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
-
-    // Here we can score the gpu(so later select the best one to use) or 
-    // verify if it has the features that we need.
-
-    // For now, we will just return the dedicated one.
-    if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-        return false;
-
-    // - Device Extensions
-    if (AllExtensionsSupported(physicalDevice) == false)
-    {
-        return false;
-    }
-
-    // - Swapchain support
-    if (m_swapchainM.isSwapchainAdequated(physicalDevice, m_windowM.getSurface()) == false) 
-    {
-        return false;
-    }
-    return true;
-}
-
-void App::pickPhysicalDevice()
-{
-    uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(m_vkInstance, &deviceCount, nullptr);
-
-    if (deviceCount == 0)
-        throw std::runtime_error("Failed to find GPUs with Vulkan support!");
-
-    std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(m_vkInstance, &deviceCount, devices.data());
-
-    for (const auto& device : devices)
-    {
-        if (isDeviceSuitable(device))
-        {
-            m_device.physicalDevice = device;
-            break;
-        }
-    }
-
-    if (m_device.physicalDevice == VK_NULL_HANDLE)
-        throw std::runtime_error("Failed to find a suitable GPU!");
-}
-
-void App::createLogicalDevice()
-{
-    // - Specifies which QUEUES we want to create.
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    // We use a set because we need to not repeat them to create the new one
-    // for the logical device.
-    std::set<uint32_t> uniqueQueueFamilies = {
-          m_qfIndices.graphicsFamily.value(),
-          m_qfIndices.presentFamily.value()
-    };
-
-    float queuePriority = 1.0f;
-    for (uint32_t queueFamily : uniqueQueueFamilies)
-    {
-        VkDeviceQueueCreateInfo queueCreateInfo{};
-
-        queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
-
-        queueCreateInfos.push_back(queueCreateInfo);
-    }
-
-    // - Specifices which device FEATURES we want to use.
-    // For now, this will be empty.
-    VkPhysicalDeviceFeatures deviceFeatures{};
-
-
-    // Now we can create the logical device.
-    VkDeviceCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.queueCreateInfoCount = static_cast<uint32_t>(
-        queueCreateInfos.size()
-        );
-    createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.pEnabledFeatures = &deviceFeatures;
-
-    // - Specifies which device EXTENSIONS we want to use.
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(
-        m_device.requiredExtensions.size()
-        );
-
-    createInfo.ppEnabledExtensionNames = m_device.requiredExtensions.data();
-
-    // Previous implementations of Vulkan made a distinction between instance 
-    // and device specific validation layers, but this is no longer the 
-    // case. That means that the enabledLayerCount and ppEnabledLayerNames 
-    // fields of VkDeviceCreateInfo are ignored by up-to-date 
-    // implementations. However, it is still a good idea to set them anyway to 
-    // be compatible with older implementations:
-
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED)
-    {
-        createInfo.enabledLayerCount = static_cast<uint32_t>(
-            vkLayersConfig::VALIDATION_LAYERS.size()
-            );
-        createInfo.ppEnabledLayerNames = (
-            vkLayersConfig::VALIDATION_LAYERS.data()
-            );
-    }
-    else
-        createInfo.enabledLayerCount = 0;
-
-    auto status = vkCreateDevice(
-        m_device.physicalDevice,
-        &createInfo,
-        nullptr,
-        &m_device.logicalDevice
-    );
-
-    if (status != VK_SUCCESS)
-        throw std::runtime_error("Failed to create logical device!");
-
-    m_qfHandles.setQueueHandles(m_device.logicalDevice, m_qfIndices);
-}
 
 void App::initVulkan()
 {
@@ -344,38 +136,29 @@ void App::initVulkan()
     vlManager::createDebugMessenger(m_vkInstance, m_debugMessenger);
     m_windowM.createSurface(m_vkInstance);
 
-    pickPhysicalDevice();
-    createLogicalDevice();
+    m_device.pickPhysicalDevice(m_vkInstance,m_qfIndices,m_windowM.getSurface(),m_swapchainM);
+    m_device.createLogicalDevice(m_qfIndices);
 
-    m_swapchainM.createSwapchain(m_device.physicalDevice, m_device.logicalDevice, m_windowM);
+    m_qfHandles.setQueueHandles(m_device.getLogicalDevice(), m_qfIndices);
 
-    m_swapchainM.createImageViews(m_device.logicalDevice);
+    m_swapchainM.createSwapchain(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_windowM);
 
-    m_renderPassM.createRenderPass(
-        m_device.logicalDevice,
-        m_swapchainM.getImageFormat()
-    );
+    m_swapchainM.createImageViews(m_device.getLogicalDevice());
 
-    m_graphicsPipelineM.createGraphicsPipeline(
-        m_device.logicalDevice,
-        m_swapchainM.getExtent(),
-        m_renderPassM.getRenderPass()
-    );
+    m_renderPassM.createRenderPass(m_device.getLogicalDevice(),m_swapchainM.getImageFormat());
 
-    m_swapchainM.createFramebuffers(
-        m_device.logicalDevice,
-        m_renderPassM.getRenderPass()
-    );
+    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchainM.getExtent(),m_renderPassM.getRenderPass());
 
-    m_commandPool.createCommandPool(
-        m_device.logicalDevice,
-        m_qfIndices
-    );
+    m_swapchainM.createFramebuffers(m_device.getLogicalDevice(),m_renderPassM.getRenderPass());
+
+    CommandPool newCommandPool(m_device.getLogicalDevice(), m_qfIndices);
+    m_commandPools.push_back(newCommandPool);
+
 
     // Command Buffer #1
     VkCommandBufferAllocateInfo allocInfo1{};
-    m_commandPool.createCommandBufferAllocInfo(allocInfo1);
-    m_commandPool.allocCommandBuffer(allocInfo1);
+    m_commandPools[0].createCommandBufferAllocInfo(allocInfo1);
+    m_commandPools[0].allocCommandBuffer(allocInfo1);
 
     createSyncObjects();
 }
@@ -386,20 +169,20 @@ void App::drawFrame()
    //    - 2 param. -> FenceCount.
    //    - 4 param. -> waitAll.
    //    - 5 param. -> timeOut.
-    vkWaitForFences(m_device.logicalDevice, 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
+    vkWaitForFences(m_device.getLogicalDevice(), 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
 
     // After waiting, we need to manually reset the fence.
-    vkResetFences(m_device.logicalDevice, 1, &m_inFlightFence);
+    vkResetFences(m_device.getLogicalDevice(), 1, &m_inFlightFence);
 
     const uint32_t cmdBufferIndex = 0;
     //--------------------Acquires an image from the swapchain------------------
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(m_device.logicalDevice, m_swapchainM.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchainM.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 
     //------------------------Records command buffer 1--------------------------
     // Resets the command buffer to be able to be recorded/written.
-    m_commandPool.resetCommandBuffer(cmdBufferIndex);
-    m_commandPool.recordCommandBuffer(m_swapchainM.getFramebuffer(imageIndex), m_renderPassM.getRenderPass(),
+    m_commandPools[0].resetCommandBuffer(cmdBufferIndex);
+    m_commandPools[0].recordCommandBuffer(m_swapchainM.getFramebuffer(imageIndex), m_renderPassM.getRenderPass(),
                                       m_swapchainM.getExtent(), m_graphicsPipelineM.getGraphicsPipeline(), cmdBufferIndex);
 
     //----------------------Submits the command buffer 1------------------------
@@ -415,7 +198,7 @@ void App::drawFrame()
     // These two commands specify which command buffers to actualy submit for
    // execution.
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &(m_commandPool.getCommandBuffer(cmdBufferIndex));
+    submitInfo.pCommandBuffers = &(m_commandPools[0].getCommandBuffer(cmdBufferIndex));
     // Specifies which semaphores to signal once the command buffer/s have
    // finished execution.
     VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphore };
@@ -450,13 +233,13 @@ void App::mainLoop()
         drawFrame();
     }
 
-    vkDeviceWaitIdle(m_device.logicalDevice);
+    vkDeviceWaitIdle(m_device.getLogicalDevice());
 }
 void App::destroySyncObjects()
 {
-    vkDestroySemaphore(m_device.logicalDevice,m_imageAvailableSemaphore,nullptr);
-    vkDestroySemaphore(m_device.logicalDevice,m_renderFinishedSemaphore,nullptr);
-    vkDestroyFence(m_device.logicalDevice, m_inFlightFence, nullptr);
+    vkDestroySemaphore(m_device.getLogicalDevice(),m_imageAvailableSemaphore,nullptr);
+    vkDestroySemaphore(m_device.getLogicalDevice(),m_renderFinishedSemaphore,nullptr);
+    vkDestroyFence(m_device.getLogicalDevice(), m_inFlightFence, nullptr);
 }
 
 void App::cleanup()
@@ -465,28 +248,29 @@ void App::cleanup()
     destroySyncObjects();
 
     // Command Pool
-    m_commandPool.destroyCommandPool();
+    for (auto& commandPool : m_commandPools)
+        commandPool.destroyCommandPool();
 
     // Graphics Pipeline
-    m_graphicsPipelineM.destroyGraphicsPipeline(m_device.logicalDevice);
+    m_graphicsPipelineM.destroyGraphicsPipeline(m_device.getLogicalDevice());
 
     // Pipeline Layout
-    m_graphicsPipelineM.destroyPipelineLayout(m_device.logicalDevice);
+    m_graphicsPipelineM.destroyPipelineLayout(m_device.getLogicalDevice());
 
     // Framebuffers
-    m_swapchainM.destroyFramebuffers(m_device.logicalDevice);
+    m_swapchainM.destroyFramebuffers(m_device.getLogicalDevice());
 
     // Render pass
-    m_renderPassM.destroyRenderPass(m_device.logicalDevice);
+    m_renderPassM.destroyRenderPass(m_device.getLogicalDevice());
 
     // Swapchain
-    m_swapchainM.destroySwapchain(m_device.logicalDevice);
+    m_swapchainM.destroySwapchain(m_device.getLogicalDevice());
 
     // ViewImages of the images from the Swapchain
-    m_swapchainM.destroyImageViews(m_device.logicalDevice);
+    m_swapchainM.destroyImageViews(m_device.getLogicalDevice());
 
     // Logical Device
-    vkDestroyDevice(m_device.logicalDevice, nullptr);
+    vkDestroyDevice(m_device.getLogicalDevice(), nullptr);
 
     // Validation Layers
     if (vkLayersConfig::VALIDATION_LAYERS_ENABLED)

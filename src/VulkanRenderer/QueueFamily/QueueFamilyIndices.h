@@ -19,11 +19,8 @@ struct QueueFamilyIndices
 
     bool AllQueueFamiliesSupported();
     void getIndicesOfRequiredQueueFamilies(
-        const VkPhysicalDevice& device,
+        const VkPhysicalDevice& physicalDevice,
         const VkSurfaceKHR& surface
     );
-    void getSupportedQueueFamilies(
-        const VkPhysicalDevice& device,
-        std::vector<VkQueueFamilyProperties> queueFamilySupported
-    );
+
 };

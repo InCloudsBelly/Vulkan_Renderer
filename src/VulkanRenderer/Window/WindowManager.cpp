@@ -34,9 +34,14 @@ void WindowManager::createWindow(
     );
 }
 
-const VkSurfaceKHR WindowManager::getSurface()
+const VkSurfaceKHR WindowManager::getSurface() const
 {
     return m_surface;
+}
+
+void WindowManager::getResolutionInPixels(int& width, int& height) const
+{
+    glfwGetFramebufferSize(m_window, &width, &height);
 }
 
 void WindowManager::createSurface(const VkInstance& instance)
@@ -45,9 +50,14 @@ void WindowManager::createSurface(const VkInstance& instance)
         throw std::runtime_error("Failed to create a window surface");
 }
 
-bool WindowManager::isWindowClosed()
+bool WindowManager::isWindowClosed() const
 {
     return glfwWindowShouldClose(m_window);
+}
+
+bool WindowManager::isAllowedToModifyTheResolution(const VkSurfaceCapabilitiesKHR& capabilities) const 
+{
+    return (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max());
 }
 
 void WindowManager::pollEvents()

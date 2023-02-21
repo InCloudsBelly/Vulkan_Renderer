@@ -18,11 +18,11 @@ bool QueueFamilyUtils::isGraphicsQueueSupported(
 bool QueueFamilyUtils::isPresentQueueSupported(
     const int queueFamilySupportedIndex,
     const VkSurfaceKHR& surface,
-    const VkPhysicalDevice& device
+    const VkPhysicalDevice& physicalDevice
 ) {
     VkBool32 isSupported = false;
     vkGetPhysicalDeviceSurfaceSupportKHR(
-        device,
+        physicalDevice,
         queueFamilySupportedIndex,
         surface,
         &isSupported
@@ -35,12 +35,12 @@ bool QueueFamilyUtils::isPresentQueueSupported(
  * Gets all the queue families supported by the device with their properties.
  */
 void QueueFamilyUtils::getSupportedQueueFamilies(
-    const VkPhysicalDevice& device,
+    const VkPhysicalDevice& physicalDevice,
     std::vector<VkQueueFamilyProperties>& queueFamilySupported
 ) {
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(
-        device,
+        physicalDevice,
         &queueFamilyCount,
         nullptr
     );
@@ -50,7 +50,7 @@ void QueueFamilyUtils::getSupportedQueueFamilies(
     // Contains some details like the type of operations that are supported and
     // the number of queues that can be created.
     vkGetPhysicalDeviceQueueFamilyProperties(
-        device,
+        physicalDevice,
         &queueFamilyCount,
         queueFamilySupported.data()
     );

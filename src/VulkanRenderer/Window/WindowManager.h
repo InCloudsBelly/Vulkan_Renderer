@@ -12,12 +12,15 @@ public:
 
 	void createSurface(const VkInstance& instance);
 
-	const VkSurfaceKHR getSurface();
+	const VkSurfaceKHR getSurface() const;
+	void getResolutionInPixels(int& width, int& height) const;
 
 	void destroyWindow();
 	void destroySurface(const VkInstance& instance);
 
-	bool isWindowClosed();
+	bool isWindowClosed() const;
+	bool isAllowedToModifyTheResolution(const VkSurfaceCapabilitiesKHR& capabilities) const;
+
 	void pollEvents();
 
 	~WindowManager();

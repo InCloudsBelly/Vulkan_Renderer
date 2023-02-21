@@ -21,11 +21,11 @@ bool QueueFamilyIndices::AllQueueFamiliesSupported()
  * If they do, their indices are stored.
  */
 void QueueFamilyIndices::getIndicesOfRequiredQueueFamilies(
-    const VkPhysicalDevice& device,
+    const VkPhysicalDevice& physicalDevice,
     const VkSurfaceKHR& surface
 ) {
     std::vector<VkQueueFamilyProperties> qfSupported;
-    QueueFamilyUtils::getSupportedQueueFamilies(device, qfSupported);
+    QueueFamilyUtils::getSupportedQueueFamilies(physicalDevice, qfSupported);
 
     int i = 0;
     for (const auto& qf : qfSupported)
@@ -33,7 +33,7 @@ void QueueFamilyIndices::getIndicesOfRequiredQueueFamilies(
         if (QueueFamilyUtils::isGraphicsQueueSupported(qf))
             graphicsFamily = i;
 
-        if (QueueFamilyUtils::isPresentQueueSupported(i, surface, device))
+        if (QueueFamilyUtils::isPresentQueueSupported(i, surface, physicalDevice))
             presentFamily = i;
 
         i++;

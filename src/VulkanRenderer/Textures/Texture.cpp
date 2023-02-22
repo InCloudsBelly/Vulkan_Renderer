@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <stdexcept>
 
-#include "VulkanRenderer/Image/ImageManager.h"
+#include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
 
 Texture::Texture() {}
@@ -150,7 +150,7 @@ void Texture::createTextureSampler(
 
 void Texture::createTextureImageView(const VkDevice& logicalDevice, const VkFormat& format)  
 {
-    ImageManager::createImageView(logicalDevice, format, m_textureImage, m_textureImageView);
+    ImageManager::createImageView(logicalDevice, format, m_textureImage, VK_IMAGE_ASPECT_COLOR_BIT, m_textureImageView);
 }
 
 void Texture::createTextureImage(

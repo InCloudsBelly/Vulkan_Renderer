@@ -8,7 +8,8 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
-#include "VulkanRenderer/MeshLoader/Vertex.h"
+#include "VulkanRenderer/Model/Vertex.h"
+#include "VulkanRenderer/DepthBuffer/DepthUtils.h"
 
 GraphicsPipelineManager::GraphicsPipelineManager() {}
 
@@ -291,6 +292,10 @@ void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevi
     // Pipeline layout
     createPipelineLayout(logicalDevice, descriptorSetLayout);
 
+    // Depth and stencil
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    DepthUtils::createDepthStencilStateInfo(depthStencil);
+
     // --------------Graphics pipeline creation------------
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -303,7 +308,7 @@ void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevi
     pipelineInfo.pViewportState = &viewportStateInfo;
     pipelineInfo.pRasterizationState = &rasterizerInfo;
     pipelineInfo.pMultisampleState = &multisamplingInfo;
-    pipelineInfo.pDepthStencilState = nullptr;
+    pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pColorBlendState = &colorBlendingInfo;
     pipelineInfo.pDynamicState = &dynamicStatesInfo;
     // Pipeline Layout

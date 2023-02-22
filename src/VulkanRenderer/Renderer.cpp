@@ -23,22 +23,12 @@
 #include "VulkanRenderer/Extensions/ExtensionsUtils.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
 #include "VulkanRenderer/Buffers/BufferUtils.h"
-#include "VulkanRenderer/MeshLoader/Vertex.h"
+#include "VulkanRenderer/Model/Vertex.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Descriptors/DescriptorTypes.h"
 #include "VulkanRenderer/Textures/Texture.h"
+#include "VulkanRenderer/DepthBuffer/DepthBuffer.h"
 
-// Contains the pos and the color.
-const std::vector<Vertex> data = {
-   {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
-   {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
-   {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-   {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
-};
-
-const std::vector<uint16_t> indices = {
-   0, 1, 2, 2, 3, 0
-};
 
 void Renderer::run()
 {
@@ -178,13 +168,15 @@ void Renderer::initVulkan()
 
     m_swapchain.createAllImageViews(m_device.getLogicalDevice());
 
-    m_renderPass.createRenderPass(m_device.getLogicalDevice(),m_swapchain.getImageFormat());
+    m_renderPass.createRenderPass(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain.getImageFormat());
 
     m_descriptorPool.createDescriptorSetLayout(m_device.getLogicalDevice());
 
     m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchain.getExtent(), m_renderPass.getRenderPass(),m_descriptorPool.getDescriptorSetLayout());
 
-    m_swapchain.createFramebuffers(m_device.getLogicalDevice(),m_renderPass.getRenderPass());
+    m_depthBuffer.createDepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain.getExtent());
+
+    m_swapchain.createFramebuffers(m_device.getLogicalDevice(), m_renderPass.getRenderPass(), m_depthBuffer);
 
 
     // Command Pool #1
@@ -192,15 +184,18 @@ void Renderer::initVulkan()
     CommandPool newCommandPool(m_device.getLogicalDevice(), m_qfIndices);
     m_commandPools.push_back(newCommandPool);
 
+    // Load Models
+    m_model.readModel((std::string(MODEL_DIR) + "viking_room.obj").c_str());
+
     // Vertex Buffer(with staging buffer)
-    BufferManager::createBufferAndTransferToDevice(m_commandPools[cmdPoolIndex], m_device.getPhysicalDevice(), m_device.getLogicalDevice(), data, m_qfHandles.graphicsQueue, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, m_memory1, m_vertexBuffer);
+    BufferManager::createBufferAndTransferToDevice(m_commandPools[cmdPoolIndex], m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_model.vertices, m_qfHandles.graphicsQueue, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, m_model.vertexMemory, m_model.vertexBuffer);
 
     // Index Buffer(with staging buffer)
-    BufferManager::createBufferAndTransferToDevice(m_commandPools[cmdPoolIndex], m_device.getPhysicalDevice(), m_device.getLogicalDevice(), indices, m_qfHandles.graphicsQueue, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_memory2, m_indexBuffer);
+    BufferManager::createBufferAndTransferToDevice(m_commandPools[cmdPoolIndex], m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_model.indices, m_qfHandles.graphicsQueue, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_model.indexMemory, m_model.indexBuffer);
 
-    m_texture.createTextureImage("test.jpg", m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_commandPools[0], m_qfHandles.graphicsQueue);
-    m_texture.createTextureImageView(m_device.getLogicalDevice(), VK_FORMAT_R8G8B8A8_SRGB);
-    m_texture.createTextureSampler(m_device.getPhysicalDevice(), m_device.getLogicalDevice());
+    m_model.texture.createTextureImage("viking_room.png", m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_commandPools[0], m_qfHandles.graphicsQueue);
+    m_model.texture.createTextureImageView(m_device.getLogicalDevice(), VK_FORMAT_R8G8B8A8_SRGB);
+    m_model.texture.createTextureSampler(m_device.getPhysicalDevice(), m_device.getLogicalDevice());
 
 
     // Uniform Buffers
@@ -210,7 +205,7 @@ void Renderer::initVulkan()
     m_descriptorPool.createDescriptorPool(m_device.getLogicalDevice(),Config::MAX_FRAMES_IN_FLIGHT,Config::MAX_FRAMES_IN_FLIGHT);
 
     // Descriptor Sets
-    m_descriptorPool.createDescriptorSets(m_device.getLogicalDevice(), m_texture.getTextureImageView(), m_texture.getTextureSampler());
+    m_descriptorPool.createDescriptorSets(m_device.getLogicalDevice(), m_model.texture.getTextureImageView(), m_model.texture.getTextureSampler());
 
     // Allocates all the command buffers in the command Pool #1
     m_commandPools[cmdPoolIndex].allocAllCommandBuffers();
@@ -250,9 +245,9 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         m_swapchain.getExtent(),
         m_graphicsPipelineM.getGraphicsPipeline(),
         currentFrame,
-        m_vertexBuffer,
-        m_indexBuffer,
-        indices.size(),
+        m_model.vertexBuffer,
+        m_model.indexBuffer,
+        m_model.indices.size(),
         m_graphicsPipelineM.getPipelineLayout(),
         m_descriptorPool.getDescriptorSets()
     );
@@ -327,6 +322,9 @@ void Renderer::destroySyncObjects()
 
 void Renderer::cleanup()
 {
+    // DepthBuffer
+    m_depthBuffer.destroyDepthBuffer(m_device.getLogicalDevice());
+
     // Framebuffers
     m_swapchain.destroyFramebuffers(m_device.getLogicalDevice());
 
@@ -335,18 +333,6 @@ void Renderer::cleanup()
 
     // Swapchain
     m_swapchain.destroySwapchain(m_device.getLogicalDevice());
-
-    // Texture
-    m_texture.destroyTexture(m_device.getLogicalDevice());
-
-    // Uniform Buffer and Memory
-    m_descriptorPool.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
-
-    // Descriptor Pool
-    m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
-
-    // Descriptor Set Layout
-    m_descriptorPool.destroyDescriptorSetLayout(m_device.getLogicalDevice());
 
     // Graphics Pipeline
     m_graphicsPipelineM.destroyGraphicsPipeline(m_device.getLogicalDevice());
@@ -357,13 +343,25 @@ void Renderer::cleanup()
     // Render pass
     m_renderPass.destroyRenderPass(m_device.getLogicalDevice());
 
+    // Uniform Buffer and Memory
+    m_descriptorPool.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
+
+    // Descriptor Pool
+    m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
+
+    // Texture
+    m_model.texture.destroyTexture(m_device.getLogicalDevice());
+
+    // Descriptor Set Layout
+    m_descriptorPool.destroyDescriptorSetLayout(m_device.getLogicalDevice());
+
     // Buffers
-    BufferManager::destroyBuffer(m_device.getLogicalDevice(), m_vertexBuffer);
-    BufferManager::destroyBuffer(m_device.getLogicalDevice(), m_indexBuffer);
+    BufferManager::destroyBuffer(m_device.getLogicalDevice(), m_model.vertexBuffer);
+    BufferManager::destroyBuffer(m_device.getLogicalDevice(), m_model.indexBuffer);
 
     // Buffer Memories
-    BufferManager::freeMemory(m_device.getLogicalDevice(), m_memory1);
-    BufferManager::freeMemory(m_device.getLogicalDevice(), m_memory2);
+    BufferManager::freeMemory(m_device.getLogicalDevice(), m_model.vertexMemory);
+    BufferManager::freeMemory(m_device.getLogicalDevice(), m_model.indexMemory);
 
     // Sync objects
     destroySyncObjects();

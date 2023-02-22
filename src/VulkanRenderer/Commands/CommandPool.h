@@ -40,7 +40,7 @@ public:
 private:
 	//-----------------Methods needed to record cmd buffer----------------------
 	void createRenderPassBeginInfo(const VkRenderPass& renderPass, const VkFramebuffer& framebuffer,
-		const VkExtent2D& extent, VkRenderPassBeginInfo& renderPassInfo);
+		const VkExtent2D& extent, const std::vector<VkClearValue>& clearValues, VkRenderPassBeginInfo& renderPassInfo);
 
 	void bindVertexBuffers(const VkBuffer& vertexBuffer, VkCommandBuffer& commandBuffer);
 

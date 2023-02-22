@@ -14,7 +14,7 @@ set(SHADER_DIR "${CMAKE_SOURCE_DIR}/shaders")
 set(SHADERS_BINARY_DIR "${PROJECT_BIN_DIR}/shaders")
 set(PROJECT_LIBRARIES_DIR "${CMAKE_SOURCE_DIR}/libs")
 set(TEXTURES_DIR "${CMAKE_SOURCE_DIR}/assets/textures")
-
+set(MODEL_DIR "${CMAKE_SOURCE_DIR}/assets/models")
 
 # 递归查找文件夹下的 .h .hpp. ini 文件保存到 HEADER_FILES
 file(GLOB_RECURSE HEADER_FILES  ${PROJECT_SOURCE_DIR}/*.h ${PROJECT_SOURCE_DIR}/*.hpp ${PROJECT_SOURCE_DIR}/*.ini) 
@@ -51,6 +51,10 @@ add_subdirectory(${GLM_DIR} EXCLUDE_FROM_ALL)
 set(STB_DIR "${PROJECT_LIBRARIES_DIR}/stb_image")
 add_subdirectory(${STB_DIR} EXCLUDE_FROM_ALL)
 
+# -TinyObjLoader
+set(TINY_OBJ_LOADER_DIR "${PROJECT_LIBRARIES_DIR}/tiny_objloader")
+add_subdirectory(${TINY_OBJ_LOADER_DIR})
+
 # - PThreads
 set(THREADS_PREFER_PTRHEAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -63,8 +67,10 @@ add_subdirectory(${SHADER_DIR})
 add_definitions(-DSHADERS_BINARY_DIR="${SHADERS_BINARY_DIR}")
 
 
-################################Textures#######################################
+################################Definitions####################################
+
 add_definitions(-DTEXTURES_DIR="${TEXTURES_DIR}/")
+add_definitions(-DMODEL_DIR="${MODEL_DIR}/")
 
 #################################Executable####################################
 
@@ -85,6 +91,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
    Threads::Threads  # Needed by GLFW.
    glm
    stb_image
+   tinyobjloader
    PRIVATE ${CMAKE_DL_LIBS}
 )
 

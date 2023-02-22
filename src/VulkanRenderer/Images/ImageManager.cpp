@@ -1,4 +1,4 @@
-#include "VulkanRenderer/Image/ImageManager.h"
+#include "VulkanRenderer/Images/ImageManager.h"
 
 #include <stdexcept>
 
@@ -96,6 +96,7 @@ void ImageManager::createImageView(
     const VkDevice& logicalDevice,
     const VkFormat& format,
     const VkImage& image,
+    const VkImageAspectFlags& aspectFlags,
     VkImageView& imageView
 ) {
     VkImageViewCreateInfo createInfo{};
@@ -115,18 +116,13 @@ void ImageManager::createImageView(
     // Specifies what the image's purpose is and which part of the image
     // should be accessed.
     // (E.g: with mipmapping leves or multiple layers)
-    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    createInfo.subresourceRange.aspectMask = aspectFlags;
     createInfo.subresourceRange.baseMipLevel = 0;
     createInfo.subresourceRange.levelCount = 1;
     createInfo.subresourceRange.baseArrayLayer = 0;
     createInfo.subresourceRange.layerCount = 1;
 
-    const auto status = vkCreateImageView(
-        logicalDevice,
-        &createInfo,
-        nullptr,
-        &imageView
-    );
+    const auto status = vkCreateImageView(logicalDevice, &createInfo, nullptr, &imageView);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create image views!");

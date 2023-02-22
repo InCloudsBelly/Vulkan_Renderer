@@ -16,6 +16,7 @@
 #include "VulkanRenderer/Buffers/BufferManager.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Textures/Texture.h"
+#include "VulkanRenderer/Model/Model.h"
 
 class Renderer
 {
@@ -48,6 +49,7 @@ private:
 	std::vector<CommandPool>	m_commandPools;
 
 	DescriptorPool				m_descriptorPool;
+	DepthBuffer					m_depthBuffer;
 	// Future improv.
 	//CommandPool				m_commandPoolMemoryAlloc;
 
@@ -56,13 +58,6 @@ private:
 	std::vector<VkSemaphore>	m_renderFinishedSemaphores;
 	std::vector<VkFence>		m_inFlightFences;
 
-	// Buffers with their memories
-	VkBuffer					m_vertexBuffer;
-	VkDeviceMemory				m_memory1;
-
-	VkBuffer					m_indexBuffer;
-	VkDeviceMemory				m_memory2;
-
-	// Textures
-	Texture						m_texture;
+	// Models
+	Model						m_model;
 };

@@ -22,6 +22,7 @@ namespace ImageManager {
         const VkDevice& logicalDevice,
         const VkFormat& format,
         const VkImage& image,
+        const VkImageAspectFlags& aspectFlags,
         VkImageView& imageView
     );
     void copyBufferToImage(

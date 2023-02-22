@@ -21,8 +21,24 @@
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Extensions/ExtensionsUtils.h"
+#include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/MeshLoader/Vertex.h"
+#include "VulkanRenderer/Descriptors/DescriptorPool.h"
+#include "VulkanRenderer/Descriptors/UniformBufferObject.h"
 
-void App::run()
+// Contains the pos and the color.
+const std::vector<Vertex> data = {
+   {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+   {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+   {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+   {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+const std::vector<uint16_t> indices = {
+   0, 1, 2, 2, 3, 0
+};
+
+void Renderer::run()
 {
     initWindow();
     initVulkan();
@@ -30,13 +46,21 @@ void App::run()
     cleanup();
 }
 
-void App::initWindow()
+void Renderer::initWindow()
 {
     m_windowM.createWindow(config::RESOLUTION_W,config::RESOLUTION_H,config::TITLE);
 }
 
-void App::createSyncObjects()
+void Renderer::createSyncObjects()
 {
+    m_imageAvailableSemaphores.resize(config::MAX_FRAMES_IN_FLIGHT);
+    m_renderFinishedSemaphores.resize(config::MAX_FRAMES_IN_FLIGHT);
+    m_inFlightFences.resize(config::MAX_FRAMES_IN_FLIGHT);
+
+
+    //---------------------------Sync. Objects Info----------------------------
+
+
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -46,17 +70,24 @@ void App::createSyncObjects()
     // vkWaitForFences() returns immediately since the fence is already signaled.
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    if(vkCreateSemaphore(m_device.getLogicalDevice(),&semaphoreInfo,nullptr,&m_imageAvailableSemaphore)!=VK_SUCCESS)
-        throw std::runtime_error("Failed to create semaphore!");
 
-    if (vkCreateSemaphore(m_device.getLogicalDevice(), &semaphoreInfo, nullptr, &m_renderFinishedSemaphore) != VK_SUCCESS)
-        throw std::runtime_error("Failed to create semaphore!");
 
-    if (vkCreateFence(m_device.getLogicalDevice(), &fenceInfo, nullptr, &m_inFlightFence) != VK_SUCCESS) 
-        throw std::runtime_error("Failed to create fence!");
+    //---------------------Creation of Sync. Objects---------------------------
+
+    for (size_t i = 0; i < config::MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        if (vkCreateSemaphore(m_device.getLogicalDevice(), &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create semaphore!");
+        
+        if (vkCreateSemaphore(m_device.getLogicalDevice(), &semaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create semaphore!");
+        
+        if (vkCreateFence(m_device.getLogicalDevice(), &fenceInfo, nullptr, &m_inFlightFences[i]) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create fence!");
+    }
 }
 
-void App::createVkInstance()
+void Renderer::createVkInstance()
 {
     if (vkLayersConfig::VALIDATION_LAYERS_ENABLED &&
         !vlManager::AllRequestedLayersAvailable()
@@ -129,7 +160,7 @@ void App::createVkInstance()
 }
 
 
-void App::initVulkan()
+void Renderer::initVulkan()
 {
     createVkInstance();
 
@@ -147,48 +178,112 @@ void App::initVulkan()
 
     m_renderPassM.createRenderPass(m_device.getLogicalDevice(),m_swapchainM.getImageFormat());
 
-    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchainM.getExtent(),m_renderPassM.getRenderPass());
+    m_descriptorPool.createDescriptorSetLayout(m_device.getLogicalDevice());
+
+    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchainM.getExtent(), m_renderPassM.getRenderPass(),m_descriptorPool.getDescriptorSetLayout());
 
     m_swapchainM.createFramebuffers(m_device.getLogicalDevice(),m_renderPassM.getRenderPass());
 
+
+    // Command Pool #1
+    const uint32_t cmdPoolIndex = 0;
     CommandPool newCommandPool(m_device.getLogicalDevice(), m_qfIndices);
     m_commandPools.push_back(newCommandPool);
 
+    // Vertex Buffer(with staging buffer)
 
-    // Command Buffer #1
-    VkCommandBufferAllocateInfo allocInfo1{};
-    m_commandPools[0].createCommandBufferAllocInfo(allocInfo1);
-    m_commandPools[0].allocCommandBuffer(allocInfo1);
+    BufferManager::createBufferAndTransferToDevice(
+        m_commandPools[cmdPoolIndex],
+        m_device.getPhysicalDevice(),
+        m_device.getLogicalDevice(),
+        data,
+        m_qfHandles.graphicsQueue,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        m_memory1,
+        m_vertexBuffer
+    );
+
+    // Index Buffer(with staging buffer)
+    BufferManager::createBufferAndTransferToDevice(
+        m_commandPools[cmdPoolIndex],
+        m_device.getPhysicalDevice(),
+        m_device.getLogicalDevice(),
+        indices,
+        m_qfHandles.graphicsQueue,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        m_memory2,
+        m_indexBuffer
+    );
+
+    // Uniform Buffers
+    m_descriptorPool.createUniformBuffers(
+        m_device.getPhysicalDevice(),
+        m_device.getLogicalDevice(),
+        config::MAX_FRAMES_IN_FLIGHT
+    );
+
+    // Descriptor Pool
+    m_descriptorPool.createDescriptorPool(
+        m_device.getLogicalDevice(),
+        config::MAX_FRAMES_IN_FLIGHT,
+        config::MAX_FRAMES_IN_FLIGHT
+    );
+
+    // Descriptor Sets
+    m_descriptorPool.createDescriptorSets(m_device.getLogicalDevice());
+
+
+    // Allocates all the command buffers in the command Pool #1
+    m_commandPools[cmdPoolIndex].allocAllCommandBuffers();
 
     createSyncObjects();
 }
 
-void App::drawFrame()
+void Renderer::drawFrame(uint8_t& currentFrame)
 {
     // Waits until the previous frame has finished.
    //    - 2 param. -> FenceCount.
    //    - 4 param. -> waitAll.
    //    - 5 param. -> timeOut.
-    vkWaitForFences(m_device.getLogicalDevice(), 1, &m_inFlightFence, VK_TRUE, UINT64_MAX);
+    vkWaitForFences(m_device.getLogicalDevice(), 1, &m_inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     // After waiting, we need to manually reset the fence.
-    vkResetFences(m_device.getLogicalDevice(), 1, &m_inFlightFence);
+    vkResetFences(m_device.getLogicalDevice(), 1, &m_inFlightFences[currentFrame]);
 
-    const uint32_t cmdBufferIndex = 0;
+
+    //------------------------Updates uniform buffer----------------------------
+
+    m_descriptorPool.updateUniformBuffer(m_device.getLogicalDevice(),currentFrame,m_swapchainM.getExtent());
+
+
     //--------------------Acquires an image from the swapchain------------------
+
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchainM.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchainM.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-    //------------------------Records command buffer 1--------------------------
+    //----------------------- Records command buffer ---------------------------
+    
     // Resets the command buffer to be able to be recorded/written.
-    m_commandPools[0].resetCommandBuffer(cmdBufferIndex);
-    m_commandPools[0].recordCommandBuffer(m_swapchainM.getFramebuffer(imageIndex), m_renderPassM.getRenderPass(),
-                                      m_swapchainM.getExtent(), m_graphicsPipelineM.getGraphicsPipeline(), cmdBufferIndex);
+    m_commandPools[0].resetCommandBuffer(currentFrame);
+    m_commandPools[0].recordCommandBuffer(
+        m_swapchainM.getFramebuffer(imageIndex),
+        m_renderPassM.getRenderPass(),
+        m_swapchainM.getExtent(),
+        m_graphicsPipelineM.getGraphicsPipeline(),
+        currentFrame,
+        m_vertexBuffer,
+        m_indexBuffer,
+        indices.size(),
+        m_graphicsPipelineM.getPipelineLayout(),
+        m_descriptorPool.getDescriptorSets()
+    );
 
-    //----------------------Submits the command buffer 1------------------------
+
+    //----------------------Submits the command buffer -------------------------
+
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    VkSemaphore waitSemaphores[] = { m_imageAvailableSemaphore };
+    VkSemaphore waitSemaphores[] = { m_imageAvailableSemaphores[currentFrame] };
     VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
     submitInfo.waitSemaphoreCount = 1;
     // Specifies which semaphores to wait on before execution begins.
@@ -198,14 +293,14 @@ void App::drawFrame()
     // These two commands specify which command buffers to actualy submit for
    // execution.
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &(m_commandPools[0].getCommandBuffer(cmdBufferIndex));
+    submitInfo.pCommandBuffers = &(m_commandPools[0].getCommandBuffer(currentFrame));
     // Specifies which semaphores to signal once the command buffer/s have
    // finished execution.
-    VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphore };
+    VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphores[currentFrame] };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if(vkQueueSubmit(m_qfHandles.graphicsQueue, 1, &submitInfo, m_inFlightFence) != VK_SUCCESS)
+    if(vkQueueSubmit(m_qfHandles.graphicsQueue, 1, &submitInfo, m_inFlightFences[currentFrame]) != VK_SUCCESS)
         throw std::runtime_error("Failed to submit draw command buffer!");
 
 
@@ -223,51 +318,79 @@ void App::drawFrame()
     presentInfo.pResults = nullptr;
 
     vkQueuePresentKHR(m_qfHandles.presentQueue, &presentInfo);
+
+    // Updates the frame
+    currentFrame = (currentFrame + 1) % config::MAX_FRAMES_IN_FLIGHT;
 }
 
-void App::mainLoop()
+void Renderer::mainLoop()
 {
+    // Tells us in which frame we are,
+    // between 1 <= frame <= MAX_FRAMES_IN_FLIGHT
+    uint8_t currentFrame = 0;
     while (m_windowM.isWindowClosed() == false)
     {
         m_windowM.pollEvents();
-        drawFrame();
+        drawFrame(currentFrame);
     }
-
     vkDeviceWaitIdle(m_device.getLogicalDevice());
 }
-void App::destroySyncObjects()
+
+void Renderer::destroySyncObjects()
 {
-    vkDestroySemaphore(m_device.getLogicalDevice(),m_imageAvailableSemaphore,nullptr);
-    vkDestroySemaphore(m_device.getLogicalDevice(),m_renderFinishedSemaphore,nullptr);
-    vkDestroyFence(m_device.getLogicalDevice(), m_inFlightFence, nullptr);
+    for (size_t i = 0; i < config::MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        vkDestroySemaphore(m_device.getLogicalDevice(), m_imageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(m_device.getLogicalDevice(), m_renderFinishedSemaphores[i], nullptr);
+        vkDestroyFence(m_device.getLogicalDevice(), m_inFlightFences[i], nullptr);
+    }
 }
 
-void App::cleanup()
+void Renderer::cleanup()
 {
+    // Framebuffers
+    m_swapchainM.destroyFramebuffers(m_device.getLogicalDevice());
+
+    // ViewImages of the images from the Swapchain
+    m_swapchainM.destroyImageViews(m_device.getLogicalDevice());
+
+    // Swapchain
+    m_swapchainM.destroySwapchain(m_device.getLogicalDevice());
+
+    // Uniform Buffer and Memory
+    m_descriptorPool.destroyUniformBuffersAndMemories(
+        m_device.getLogicalDevice()
+    );
+
+    // Descriptor Pool
+    m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
+
+    // Descriptor Set Layout
+    m_descriptorPool.destroyDescriptorSetLayout(m_device.getLogicalDevice());
+
+    // Graphics Pipeline
+    m_graphicsPipelineM.destroyGraphicsPipeline(m_device.getLogicalDevice());
+
+    // Graphics Pipeline Layout
+    m_graphicsPipelineM.destroyPipelineLayout(m_device.getLogicalDevice());
+
+    // Render pass
+    m_renderPassM.destroyRenderPass(m_device.getLogicalDevice());
+
+    // Buffers
+    BufferManager::destroyBuffer(m_device.getLogicalDevice(), m_vertexBuffer);
+    BufferManager::destroyBuffer(m_device.getLogicalDevice(), m_indexBuffer);
+
+    // Buffer Memories
+    BufferManager::freeMemory(m_device.getLogicalDevice(), m_memory1);
+    BufferManager::freeMemory(m_device.getLogicalDevice(), m_memory2);
+
     // Sync objects
     destroySyncObjects();
 
     // Command Pool
     for (auto& commandPool : m_commandPools)
         commandPool.destroyCommandPool();
-
-    // Graphics Pipeline
-    m_graphicsPipelineM.destroyGraphicsPipeline(m_device.getLogicalDevice());
-
-    // Pipeline Layout
-    m_graphicsPipelineM.destroyPipelineLayout(m_device.getLogicalDevice());
-
-    // Framebuffers
-    m_swapchainM.destroyFramebuffers(m_device.getLogicalDevice());
-
-    // Render pass
-    m_renderPassM.destroyRenderPass(m_device.getLogicalDevice());
-
-    // Swapchain
-    m_swapchainM.destroySwapchain(m_device.getLogicalDevice());
-
-    // ViewImages of the images from the Swapchain
-    m_swapchainM.destroyImageViews(m_device.getLogicalDevice());
 
     // Logical Device
     vkDestroyDevice(m_device.getLogicalDevice(), nullptr);

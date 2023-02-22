@@ -7,7 +7,7 @@
 
 int main()
 {
-    App app;
+    Renderer  app;
 
     try
     {

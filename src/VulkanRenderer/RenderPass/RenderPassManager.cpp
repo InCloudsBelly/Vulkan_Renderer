@@ -57,11 +57,11 @@ void RenderPassManager::createColorAttachmentReference(VkAttachmentReference& co
 	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 }
 
-void RenderPassManager::createSubPass(const VkAttachmentReference& colorAttachmentRef, VkSubpassDescription& subpass)
+void RenderPassManager::createSubPass(const VkAttachmentReference& colorAttachmentRef, VkSubpassDescription& subpassDescript)
 {
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentRef;
+	subpassDescript.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpassDescript.colorAttachmentCount = 1;
+	subpassDescript.pColorAttachments = &colorAttachmentRef;
 }
 
 void RenderPassManager::createRenderPass(const VkDevice& logicalDevice, const VkFormat& imageFormat)
@@ -75,8 +75,8 @@ void RenderPassManager::createRenderPass(const VkDevice& logicalDevice, const Vk
 	createColorAttachmentReference(colorAttachmentRef);
 
 	// Subpasses
-	VkSubpassDescription subpass{};
-	createSubPass(colorAttachmentRef, subpass);
+	VkSubpassDescription subpassDescript{};
+	createSubPass(colorAttachmentRef, subpassDescript);
 
 	// Subpass dependencies
 	VkSubpassDependency dependency{};
@@ -106,7 +106,7 @@ void RenderPassManager::createRenderPass(const VkDevice& logicalDevice, const Vk
 	renderPassInfo.attachmentCount = 1;
 	renderPassInfo.pAttachments = &colorAttachment;
 	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.pSubpasses = &subpassDescript;
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
 

@@ -13,8 +13,10 @@
 #include "VulkanRenderer/RenderPass/RenderPassManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Device/Device.h"
+#include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/Descriptors/DescriptorPool.h"
 
-class App
+class Renderer
 {
 public:
 
@@ -26,7 +28,7 @@ private:
 	void initVulkan();
 	void mainLoop();
 	void cleanup();
-	void drawFrame();
+	void drawFrame(uint8_t& currentFrame);
 
 	void createVkInstance();
 
@@ -44,8 +46,19 @@ private:
 	VkDebugUtilsMessengerEXT m_debugMessenger;
 	std::vector<CommandPool> m_commandPools;
 
-	// Sync objects
-	VkSemaphore m_imageAvailableSemaphore;
-	VkSemaphore m_renderFinishedSemaphore;
-	VkFence m_inFlightFence;
+	DescriptorPool           m_descriptorPool;
+	// Future improv.
+	//CommandPool              m_commandPoolMemoryAlloc;
+
+	// Sync objects(for each frame)
+	std::vector<VkSemaphore> m_imageAvailableSemaphores;
+	std::vector<VkSemaphore> m_renderFinishedSemaphores;
+	std::vector<VkFence>     m_inFlightFences;
+
+	// Buffers with their memories
+	VkBuffer m_vertexBuffer;
+	VkDeviceMemory m_memory1;
+
+	VkBuffer m_indexBuffer;
+	VkDeviceMemory m_memory2;
 };

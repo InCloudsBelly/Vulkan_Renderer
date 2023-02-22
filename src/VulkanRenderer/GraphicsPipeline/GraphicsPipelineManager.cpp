@@ -1,12 +1,14 @@
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 
 #include <vector>
-#include <iostream>
+#include <array>
+#include <stdexcept>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
+#include "VulkanRenderer/MeshLoader/Vertex.h"
 
 GraphicsPipelineManager::GraphicsPipelineManager() {}
 
@@ -27,8 +29,8 @@ void GraphicsPipelineManager::createShaderModules(VkShaderModule& vertexShaderMo
        fragmentShaderModule = ShaderManager::createShaderModule(fragmentShaderCode, logicalDevice);
 }
 
-// Creates the info strucutres to link the shaders to specific pipeline stages.
-void GraphicsPipelineManager::createShaderStagesInfos(const VkShaderModule& vertexShaderModule,const VkShaderModule& fragmentShaderModule,VkPipelineShaderStageCreateInfo(&shaderStagesInfos)[2]) 
+//Creates the info strucutres to link the shaders to specific pipeline stages.
+void GraphicsPipelineManager::createShaderStagesInfos(const VkShaderModule& vertexShaderModule,const VkShaderModule& fragmentShaderModule,VkPipelineShaderStageCreateInfo(&shaderStagesInfos)[2])
 {
     // - Vertex Shader
     VkPipelineShaderStageCreateInfo vertexShaderStageInfo{};
@@ -62,21 +64,29 @@ void GraphicsPipelineManager::createDynamicStatesInfo(const std::vector<VkDynami
     dynamicStatesInfo.pDynamicStates = dynamicStates.data();
 }
 
-// Describes the format of the vertex data that will be passed to the
-// vertex shader.
+/*
+ * Describes the format of the vertex data that will be passed to the
+ * vertex shader.
+ */
+
 void GraphicsPipelineManager::createVertexShaderInputInfo(
+    const VkVertexInputBindingDescription& bindingDescription,
+    const std::array<VkVertexInputAttributeDescription, 2>&
+    attribDescriptions,
     VkPipelineVertexInputStateCreateInfo& vertexInputInfo
 ) {
     vertexInputInfo.sType = (
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
         );
-    // Bindings: SPACING between data and whether the data is per-vertex or
-    //           per-instance.
-    vertexInputInfo.vertexBindingDescriptionCount = 0;
+    // Bindings: Number of vertex bindings descriptions provided in
+    //           pVertexBindingDescriptions
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
     // Attribute descriptions: Type of the attributes passsed to the vertex
     //                         shader, which binding to load them from and at
     //                         which OFFSET.
-    vertexInputInfo.vertexAttributeDescriptionCount = 0;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attribDescriptions.size());
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+    vertexInputInfo.pVertexAttributeDescriptions = attribDescriptions.data();
 
 }
 
@@ -142,7 +152,7 @@ void GraphicsPipelineManager::createRasterizerInfo(VkPipelineRasterizationStateC
     rasterizerInfo.lineWidth = 1.0f;
     // Determines the type of face culling to use.
     rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizerInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
     // Alters the depth values by adding a constant value or biasing them based
     // on a fragment's slope. Used sometimes for shadow mapping. We won't be
@@ -201,14 +211,13 @@ void GraphicsPipelineManager::createColorBlendingGlobalInfo(const VkPipelineColo
 
 // Interface that creates and allows us to communicate with the uniform
 // values and push constants in the shaders.
-void GraphicsPipelineManager::createPipelineLayout(const VkDevice& logicalDevice) 
+void GraphicsPipelineManager::createPipelineLayout(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout) 
 {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    // Optional
-    pipelineLayoutInfo.setLayoutCount = 0;
-    // Optional
-    pipelineLayoutInfo.pSetLayouts = nullptr;
+    // In this case we gonna bind the descriptor layout.
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
     // Optional
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     // Optional
@@ -220,7 +229,7 @@ void GraphicsPipelineManager::createPipelineLayout(const VkDevice& logicalDevice
         throw std::runtime_error("Failed to create pipeline layout!");
 }
 
-void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevice,const VkExtent2D& extent,const VkRenderPass& renderPass) 
+void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevice, const VkExtent2D& extent, const VkRenderPass& renderPass, const VkDescriptorSetLayout& descriptorSetLayout)
 {
     // -------------------Shader Modules--------------------
     VkShaderModule vertexShaderModule;
@@ -253,9 +262,11 @@ void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevi
     VkPipelineViewportStateCreateInfo viewportStateInfo{};
     createViewportStateInfo(viewportStateInfo);
 
-    // Vertex input
+    // -Vertex input
+    VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+    std::array<VkVertexInputAttributeDescription, 2> attribDescriptions = Vertex::getAttributeDescriptions();
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    createVertexShaderInputInfo(vertexInputInfo);
+    createVertexShaderInputInfo(bindingDescription, attribDescriptions, vertexInputInfo);
 
     // Input assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
@@ -278,7 +289,7 @@ void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevi
     createColorBlendingGlobalInfo(colorBlendAttachment, colorBlendingInfo);
 
     // Pipeline layout
-    createPipelineLayout(logicalDevice);
+    createPipelineLayout(logicalDevice, descriptorSetLayout);
 
     // --------------Graphics pipeline creation------------
 
@@ -325,6 +336,11 @@ void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevi
         fragmentShaderModule,
         logicalDevice
     );
+}
+
+VkPipelineLayout& GraphicsPipelineManager::getPipelineLayout()
+{
+    return m_pipelineLayout;
 }
 
 const VkPipeline& GraphicsPipelineManager::getGraphicsPipeline() const

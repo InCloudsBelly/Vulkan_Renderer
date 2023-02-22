@@ -71,7 +71,7 @@ void GraphicsPipelineManager::createDynamicStatesInfo(const std::vector<VkDynami
 
 void GraphicsPipelineManager::createVertexShaderInputInfo(
     const VkVertexInputBindingDescription& bindingDescription,
-    const std::array<VkVertexInputAttributeDescription, 2>&
+    const std::array<VkVertexInputAttributeDescription, 3>&
     attribDescriptions,
     VkPipelineVertexInputStateCreateInfo& vertexInputInfo
 ) {
@@ -264,7 +264,7 @@ void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevi
 
     // -Vertex input
     VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-    std::array<VkVertexInputAttributeDescription, 2> attribDescriptions = Vertex::getAttributeDescriptions();
+    std::array<VkVertexInputAttributeDescription, 3> attribDescriptions = Vertex::getAttributeDescriptions();
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     createVertexShaderInputInfo(bindingDescription, attribDescriptions, vertexInputInfo);
 

@@ -1,7 +1,7 @@
 #pragma once 
 #include <vulkan/vulkan.h>
 
-namespace config
+namespace Config
 {
 	inline const uint16_t RESOLUTION_W = 800;
 	inline const uint16_t RESOLUTION_H = 600;

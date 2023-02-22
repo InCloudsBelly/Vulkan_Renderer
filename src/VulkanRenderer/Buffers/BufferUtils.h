@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-namespace bufferUtils
+namespace BufferUtils
 {
-    uint32_t findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags& properties, const VkPhysicalDevice& physicalDevice);
+    uint32_t findMemoryType(const VkPhysicalDevice& physicalDevice, const uint32_t typeFilter, const VkMemoryPropertyFlags& properties);
 };

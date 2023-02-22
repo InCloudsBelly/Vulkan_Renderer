@@ -2,7 +2,7 @@
 
 #include <vector>
 
-namespace vkLayersConfig
+namespace VkLayersConfig
 {
 #ifdef NDEBUG
     inline const bool VALIDATION_LAYERS_ENABLED = false;

@@ -6,7 +6,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Settings/vkLayersConfig.h"
+#include "VulkanRenderer/Settings/VkLayersConfig.h"
 
 /*
  * Indicates if the Vulkan call that triggered the validation layer
@@ -57,7 +57,7 @@ void vlManager::createDebugMessenger(
     VkInstance& instance,
     VkDebugUtilsMessengerEXT& debugMessenger
 ) {
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED == false)
+    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED == false)
         return;
 
     VkDebugUtilsMessengerCreateInfoEXT createInfo = (
@@ -83,7 +83,7 @@ bool vlManager::AllRequestedLayersAvailable()
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-    for (const char* layerName : vkLayersConfig::VALIDATION_LAYERS)
+    for (const char* layerName : VkLayersConfig::VALIDATION_LAYERS)
     {
         bool layerFound = false;
 

@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
-#include "VulkanRenderer/SwapChain/SwapChainManager.h"
+#include "VulkanRenderer/Swapchain/Swapchain.h"
 
 class Device
 {
@@ -17,7 +17,7 @@ public:
         VkInstance& m_vkInstance,
         QueueFamilyIndices& requiredQueueFamiliesIndices,
         const VkSurfaceKHR& windowSurface,
-        SwapchainManager& swapchain
+        Swapchain& swapchain
     );
     const VkDevice& getLogicalDevice();
     const VkPhysicalDevice& getPhysicalDevice();
@@ -27,7 +27,7 @@ private:
     bool isPhysicalDeviceSuitable(
         QueueFamilyIndices& requiredQueueFamiliesIndices,
         const VkSurfaceKHR& windowSurface,
-        SwapchainManager& swapchain,
+        Swapchain& swapchain,
         const VkPhysicalDevice& possiblePhysicalDevice
     );
     bool areAllExtensionsSupported(

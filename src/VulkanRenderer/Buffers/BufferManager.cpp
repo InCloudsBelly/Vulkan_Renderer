@@ -62,17 +62,7 @@ void BufferManager::copyBuffer(CommandPool& commandPool, const VkDeviceSize size
     // Records the cmd buffer.
     commandUtils::copyCommandBuffer::record(size,srcBuffer,dstBuffer,commandBuffer);
 
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    // Submits and execute the cmd immediately and wait on this transfer to
-    // complete.
-    vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphicsQueue);
-
-    commandPool.freeCommandBuffer(commandBuffer);
+    commandPool.submitCommandBuffer(graphicsQueue, commandBuffer);
 }
 
 void BufferManager::allocBuffer(const VkDevice& logicalDevice, const VkPhysicalDevice& physicalDevice,
@@ -96,7 +86,7 @@ void BufferManager::allocBuffer(const VkDevice& logicalDevice, const VkPhysicalD
 
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = bufferUtils::findMemoryType(memRequirements.memoryTypeBits, memoryProperties, physicalDevice);
+    allocInfo.memoryTypeIndex = BufferUtils::findMemoryType(physicalDevice,memRequirements.memoryTypeBits, memoryProperties);
 
     auto status = vkAllocateMemory(logicalDevice,&allocInfo,nullptr,&memory);
 

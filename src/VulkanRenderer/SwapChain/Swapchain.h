@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Window/WindowManager.h"
+#include "VulkanRenderer/Window/Window.h"
 
 struct SwapchainSupportedProperties
 {
@@ -22,19 +22,19 @@ struct SwapchainSupportedProperties
 	std::vector<VkPresentModeKHR> presentModes;
 };
 
-class SwapchainManager
+class Swapchain
 {
 public:
-	SwapchainManager();
-	~SwapchainManager() {}
+	Swapchain();
+	~Swapchain() {}
 
 	void createSwapchain(
 		const VkPhysicalDevice& physicalDevice,
 		const VkDevice& logicalDevice,
-		const WindowManager& windowM
+		const Window& windowM
 	);
 
-	void createImageViews(const VkDevice& logicalDevice);
+	void createAllImageViews(const VkDevice& logicalDevice);
 	void createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass);
 
 	void destroyFramebuffers(const VkDevice& logicalDevice);
@@ -51,14 +51,14 @@ public:
 
 
 private:
-	void chooseBestSettings(const VkPhysicalDevice& physicalDevice,const WindowManager& windowM,
+	void chooseBestSettings(const VkPhysicalDevice& physicalDevice,const Window& window,
 			VkSurfaceFormatKHR& surfaceFormat,VkPresentModeKHR& presentMode,VkExtent2D& extent);
 
 	VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
 	VkPresentModeKHR chooseBestPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
-	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const WindowManager& windowM);
+	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const Window& window);
 
 	
 

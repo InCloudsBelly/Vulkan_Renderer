@@ -3,7 +3,7 @@
 #include <vulkan/vulkan.h>
 #include <stdexcept>
 
-#include "VulkanRenderer/Settings/config.h"
+#include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 
 CommandPool::CommandPool() {}
@@ -12,7 +12,7 @@ CommandPool::CommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queu
 {
 	m_logicalDevice = logicalDevice;
 	m_queueFamilyIndices = queueFamilyIndices;
-	m_commandBuffers.resize(config::MAX_FRAMES_IN_FLIGHT);
+	m_commandBuffers.resize(Config::MAX_FRAMES_IN_FLIGHT);
 
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -37,6 +37,21 @@ void CommandPool::allocCommandBuffer(VkCommandBuffer& commandBuffer)
 	allocInfo.commandBufferCount = 1;
 
 	vkAllocateCommandBuffers(m_logicalDevice, &allocInfo, &commandBuffer);
+}
+
+void CommandPool::submitCommandBuffer(VkQueue& graphicsQueue, VkCommandBuffer& commandBuffer)
+{
+	VkSubmitInfo submitInfo{};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	// Submits and execute the cmd immediately and wait on this transfer to complete.
+
+	vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(graphicsQueue);
+
+	freeCommandBuffer(commandBuffer);
 }
 
 void CommandPool::allocAllCommandBuffers()
@@ -133,7 +148,7 @@ void CommandPool::createRenderPassBeginInfo(const VkRenderPass& renderPass, cons
 	// VK_ATTACHMENT_LOAD_OP_CLEAR, which we used as load operation for the
 	// color attachment.
 	renderPassInfo.clearValueCount = 1;
-	renderPassInfo.pClearValues = &config::CLEAR_COLOR;
+	renderPassInfo.pClearValues = &Config::CLEAR_COLOR;
 }
 
 void CommandPool::bindVertexBuffers(const VkBuffer& vertexBuffer, VkCommandBuffer& commandBuffer)

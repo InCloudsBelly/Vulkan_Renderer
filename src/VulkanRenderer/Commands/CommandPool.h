@@ -15,6 +15,7 @@ public:
 	void destroyCommandPool();
 
 	void allocCommandBuffer(VkCommandBuffer& commandBuffer);
+	void submitCommandBuffer(VkQueue& graphicsQueue,VkCommandBuffer& commandBuffer);
 	void allocAllCommandBuffers();
 
 	const VkCommandBuffer& getCommandBuffer(const uint32_t index);

@@ -7,7 +7,7 @@
 /*
  * Searchs for a suitable memory type with the indicated properties.
  */
-uint32_t bufferUtils::findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags& properties, const VkPhysicalDevice& physicalDevice) 
+uint32_t BufferUtils::findMemoryType(const VkPhysicalDevice& physicalDevice, const uint32_t typeFilter, const VkMemoryPropertyFlags& properties)
 {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);

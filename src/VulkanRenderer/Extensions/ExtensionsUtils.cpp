@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "VulkanRenderer/Settings/vkLayersConfig.h"
+#include "VulkanRenderer/Settings/VkLayersConfig.h"
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -19,7 +19,7 @@ std::vector<const char*> extensionsUtils::getRequiredExtensions()
         extensions.push_back(*(glfwExtensions + i));
 
     // - Vulkan Layers extensions
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED)
+    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED)
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
     return extensions;

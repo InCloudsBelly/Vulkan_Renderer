@@ -11,27 +11,29 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanRenderer/Settings/config.h"
-#include "VulkanRenderer/Settings/vkLayersConfig.h"
+#include "VulkanRenderer/Settings/VkLayersConfig.h"
 #include "VulkanRenderer/ValidationLayersManager/vlManager.h"
-#include "VulkanRenderer/Window/WindowManager.h"
+#include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
-#include "VulkanRenderer/Swapchain/SwapchainManager.h"
+#include "VulkanRenderer/Swapchain/Swapchain.h"
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Extensions/ExtensionsUtils.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/Buffers/BufferUtils.h"
 #include "VulkanRenderer/MeshLoader/Vertex.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
-#include "VulkanRenderer/Descriptors/UniformBufferObject.h"
+#include "VulkanRenderer/Descriptors/DescriptorTypes.h"
+#include "VulkanRenderer/Textures/Texture.h"
 
 // Contains the pos and the color.
 const std::vector<Vertex> data = {
-   {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-   {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-   {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-   {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+   {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+   {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+   {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+   {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
 };
 
 const std::vector<uint16_t> indices = {
@@ -48,14 +50,14 @@ void Renderer::run()
 
 void Renderer::initWindow()
 {
-    m_windowM.createWindow(config::RESOLUTION_W,config::RESOLUTION_H,config::TITLE);
+    m_window.createWindow(Config::RESOLUTION_W,Config::RESOLUTION_H,Config::TITLE);
 }
 
 void Renderer::createSyncObjects()
 {
-    m_imageAvailableSemaphores.resize(config::MAX_FRAMES_IN_FLIGHT);
-    m_renderFinishedSemaphores.resize(config::MAX_FRAMES_IN_FLIGHT);
-    m_inFlightFences.resize(config::MAX_FRAMES_IN_FLIGHT);
+    m_imageAvailableSemaphores.resize(Config::MAX_FRAMES_IN_FLIGHT);
+    m_renderFinishedSemaphores.resize(Config::MAX_FRAMES_IN_FLIGHT);
+    m_inFlightFences.resize(Config::MAX_FRAMES_IN_FLIGHT);
 
 
     //---------------------------Sync. Objects Info----------------------------
@@ -74,7 +76,7 @@ void Renderer::createSyncObjects()
 
     //---------------------Creation of Sync. Objects---------------------------
 
-    for (size_t i = 0; i < config::MAX_FRAMES_IN_FLIGHT; i++)
+    for (size_t i = 0; i < Config::MAX_FRAMES_IN_FLIGHT; i++)
     {
         if (vkCreateSemaphore(m_device.getLogicalDevice(), &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create semaphore!");
@@ -89,7 +91,7 @@ void Renderer::createSyncObjects()
 
 void Renderer::createVkInstance()
 {
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED &&
+    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED &&
         !vlManager::AllRequestedLayersAvailable()
         ) {
         throw std::runtime_error(
@@ -107,7 +109,7 @@ void Renderer::createVkInstance()
     VkApplicationInfo appInfo{};
 
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = config::TITLE;
+    appInfo.pApplicationName = Config::TITLE;
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "No Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -128,13 +130,13 @@ void Renderer::createVkInstance()
     // not destroyed before the vkCreateInstance call.
     VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED)
+    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED)
     {
 
         createInfo.enabledLayerCount = static_cast<uint32_t> (
-            vkLayersConfig::VALIDATION_LAYERS.size()
+            VkLayersConfig::VALIDATION_LAYERS.size()
             );
-        createInfo.ppEnabledLayerNames = vkLayersConfig::VALIDATION_LAYERS.data();
+        createInfo.ppEnabledLayerNames = VkLayersConfig::VALIDATION_LAYERS.data();
 
         debugCreateInfo = vlManager::getDebugMessengerCreateInfo();
 
@@ -165,24 +167,24 @@ void Renderer::initVulkan()
     createVkInstance();
 
     vlManager::createDebugMessenger(m_vkInstance, m_debugMessenger);
-    m_windowM.createSurface(m_vkInstance);
+    m_window.createSurface(m_vkInstance);
 
-    m_device.pickPhysicalDevice(m_vkInstance,m_qfIndices,m_windowM.getSurface(),m_swapchainM);
+    m_device.pickPhysicalDevice(m_vkInstance,m_qfIndices,m_window.getSurface(),m_swapchain);
     m_device.createLogicalDevice(m_qfIndices);
 
     m_qfHandles.setQueueHandles(m_device.getLogicalDevice(), m_qfIndices);
 
-    m_swapchainM.createSwapchain(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_windowM);
+    m_swapchain.createSwapchain(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_window);
 
-    m_swapchainM.createImageViews(m_device.getLogicalDevice());
+    m_swapchain.createAllImageViews(m_device.getLogicalDevice());
 
-    m_renderPassM.createRenderPass(m_device.getLogicalDevice(),m_swapchainM.getImageFormat());
+    m_renderPass.createRenderPass(m_device.getLogicalDevice(),m_swapchain.getImageFormat());
 
     m_descriptorPool.createDescriptorSetLayout(m_device.getLogicalDevice());
 
-    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchainM.getExtent(), m_renderPassM.getRenderPass(),m_descriptorPool.getDescriptorSetLayout());
+    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchain.getExtent(), m_renderPass.getRenderPass(),m_descriptorPool.getDescriptorSetLayout());
 
-    m_swapchainM.createFramebuffers(m_device.getLogicalDevice(),m_renderPassM.getRenderPass());
+    m_swapchain.createFramebuffers(m_device.getLogicalDevice(),m_renderPass.getRenderPass());
 
 
     // Command Pool #1
@@ -191,47 +193,24 @@ void Renderer::initVulkan()
     m_commandPools.push_back(newCommandPool);
 
     // Vertex Buffer(with staging buffer)
-
-    BufferManager::createBufferAndTransferToDevice(
-        m_commandPools[cmdPoolIndex],
-        m_device.getPhysicalDevice(),
-        m_device.getLogicalDevice(),
-        data,
-        m_qfHandles.graphicsQueue,
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        m_memory1,
-        m_vertexBuffer
-    );
+    BufferManager::createBufferAndTransferToDevice(m_commandPools[cmdPoolIndex], m_device.getPhysicalDevice(), m_device.getLogicalDevice(), data, m_qfHandles.graphicsQueue, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, m_memory1, m_vertexBuffer);
 
     // Index Buffer(with staging buffer)
-    BufferManager::createBufferAndTransferToDevice(
-        m_commandPools[cmdPoolIndex],
-        m_device.getPhysicalDevice(),
-        m_device.getLogicalDevice(),
-        indices,
-        m_qfHandles.graphicsQueue,
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        m_memory2,
-        m_indexBuffer
-    );
+    BufferManager::createBufferAndTransferToDevice(m_commandPools[cmdPoolIndex], m_device.getPhysicalDevice(), m_device.getLogicalDevice(), indices, m_qfHandles.graphicsQueue, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, m_memory2, m_indexBuffer);
+
+    m_texture.createTextureImage("test.jpg", m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_commandPools[0], m_qfHandles.graphicsQueue);
+    m_texture.createTextureImageView(m_device.getLogicalDevice(), VK_FORMAT_R8G8B8A8_SRGB);
+    m_texture.createTextureSampler(m_device.getPhysicalDevice(), m_device.getLogicalDevice());
+
 
     // Uniform Buffers
-    m_descriptorPool.createUniformBuffers(
-        m_device.getPhysicalDevice(),
-        m_device.getLogicalDevice(),
-        config::MAX_FRAMES_IN_FLIGHT
-    );
+    m_descriptorPool.createUniformBuffers(m_device.getPhysicalDevice(), m_device.getLogicalDevice(),Config::MAX_FRAMES_IN_FLIGHT);
 
     // Descriptor Pool
-    m_descriptorPool.createDescriptorPool(
-        m_device.getLogicalDevice(),
-        config::MAX_FRAMES_IN_FLIGHT,
-        config::MAX_FRAMES_IN_FLIGHT
-    );
+    m_descriptorPool.createDescriptorPool(m_device.getLogicalDevice(),Config::MAX_FRAMES_IN_FLIGHT,Config::MAX_FRAMES_IN_FLIGHT);
 
     // Descriptor Sets
-    m_descriptorPool.createDescriptorSets(m_device.getLogicalDevice());
-
+    m_descriptorPool.createDescriptorSets(m_device.getLogicalDevice(), m_texture.getTextureImageView(), m_texture.getTextureSampler());
 
     // Allocates all the command buffers in the command Pool #1
     m_commandPools[cmdPoolIndex].allocAllCommandBuffers();
@@ -253,22 +232,22 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
     //------------------------Updates uniform buffer----------------------------
 
-    m_descriptorPool.updateUniformBuffer(m_device.getLogicalDevice(),currentFrame,m_swapchainM.getExtent());
+    m_descriptorPool.updateUniformBuffer(m_device.getLogicalDevice(),currentFrame,m_swapchain.getExtent());
 
 
     //--------------------Acquires an image from the swapchain------------------
 
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchainM.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchain.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
     //----------------------- Records command buffer ---------------------------
     
     // Resets the command buffer to be able to be recorded/written.
     m_commandPools[0].resetCommandBuffer(currentFrame);
     m_commandPools[0].recordCommandBuffer(
-        m_swapchainM.getFramebuffer(imageIndex),
-        m_renderPassM.getRenderPass(),
-        m_swapchainM.getExtent(),
+        m_swapchain.getFramebuffer(imageIndex),
+        m_renderPass.getRenderPass(),
+        m_swapchain.getExtent(),
         m_graphicsPipelineM.getGraphicsPipeline(),
         currentFrame,
         m_vertexBuffer,
@@ -310,7 +289,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapchains[] = { m_swapchainM.getSwapchain() };
+    VkSwapchainKHR swapchains[] = { m_swapchain.getSwapchain() };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapchains;
     presentInfo.pImageIndices = &imageIndex;
@@ -320,7 +299,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     vkQueuePresentKHR(m_qfHandles.presentQueue, &presentInfo);
 
     // Updates the frame
-    currentFrame = (currentFrame + 1) % config::MAX_FRAMES_IN_FLIGHT;
+    currentFrame = (currentFrame + 1) % Config::MAX_FRAMES_IN_FLIGHT;
 }
 
 void Renderer::mainLoop()
@@ -328,9 +307,9 @@ void Renderer::mainLoop()
     // Tells us in which frame we are,
     // between 1 <= frame <= MAX_FRAMES_IN_FLIGHT
     uint8_t currentFrame = 0;
-    while (m_windowM.isWindowClosed() == false)
+    while (m_window.isWindowClosed() == false)
     {
-        m_windowM.pollEvents();
+        m_window.pollEvents();
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -338,7 +317,7 @@ void Renderer::mainLoop()
 
 void Renderer::destroySyncObjects()
 {
-    for (size_t i = 0; i < config::MAX_FRAMES_IN_FLIGHT; i++)
+    for (size_t i = 0; i < Config::MAX_FRAMES_IN_FLIGHT; i++)
     {
         vkDestroySemaphore(m_device.getLogicalDevice(), m_imageAvailableSemaphores[i], nullptr);
         vkDestroySemaphore(m_device.getLogicalDevice(), m_renderFinishedSemaphores[i], nullptr);
@@ -349,18 +328,19 @@ void Renderer::destroySyncObjects()
 void Renderer::cleanup()
 {
     // Framebuffers
-    m_swapchainM.destroyFramebuffers(m_device.getLogicalDevice());
+    m_swapchain.destroyFramebuffers(m_device.getLogicalDevice());
 
     // ViewImages of the images from the Swapchain
-    m_swapchainM.destroyImageViews(m_device.getLogicalDevice());
+    m_swapchain.destroyImageViews(m_device.getLogicalDevice());
 
     // Swapchain
-    m_swapchainM.destroySwapchain(m_device.getLogicalDevice());
+    m_swapchain.destroySwapchain(m_device.getLogicalDevice());
+
+    // Texture
+    m_texture.destroyTexture(m_device.getLogicalDevice());
 
     // Uniform Buffer and Memory
-    m_descriptorPool.destroyUniformBuffersAndMemories(
-        m_device.getLogicalDevice()
-    );
+    m_descriptorPool.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
 
     // Descriptor Pool
     m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
@@ -375,7 +355,7 @@ void Renderer::cleanup()
     m_graphicsPipelineM.destroyPipelineLayout(m_device.getLogicalDevice());
 
     // Render pass
-    m_renderPassM.destroyRenderPass(m_device.getLogicalDevice());
+    m_renderPass.destroyRenderPass(m_device.getLogicalDevice());
 
     // Buffers
     BufferManager::destroyBuffer(m_device.getLogicalDevice(), m_vertexBuffer);
@@ -396,7 +376,7 @@ void Renderer::cleanup()
     vkDestroyDevice(m_device.getLogicalDevice(), nullptr);
 
     // Validation Layers
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED)
+    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED)
     {
         vlManager::destroyDebugUtilsMessengerEXT(
             m_vkInstance,
@@ -406,11 +386,11 @@ void Renderer::cleanup()
     }
 
     // Window Surface
-    m_windowM.destroySurface(m_vkInstance);
+    m_window.destroySurface(m_vkInstance);
 
     // Vulkan's instance
     vkDestroyInstance(m_vkInstance, nullptr);
 
     // GLFW
-    m_windowM.destroyWindow();
+    m_window.destroyWindow();
 }

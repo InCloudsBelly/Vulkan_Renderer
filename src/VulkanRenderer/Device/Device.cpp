@@ -8,8 +8,8 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
-#include "VulkanRenderer/Swapchain/SwapchainManager.h"
-#include "VulkanRenderer/Settings/vkLayersConfig.h"
+#include "VulkanRenderer/Swapchain/Swapchain.h"
+#include "VulkanRenderer/Settings/VkLayersConfig.h"
 
 Device::Device() {}
 
@@ -43,21 +43,17 @@ void Device::createLogicalDevice(
     // - Specifices which device FEATURES we want to use.
     // For now, this will be empty.
     VkPhysicalDeviceFeatures deviceFeatures{};
-
+    deviceFeatures.samplerAnisotropy = VK_TRUE;
 
     // Now we can create the logical device.
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    createInfo.queueCreateInfoCount = static_cast<uint32_t>(
-        queueCreateInfos.size()
-        );
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
     createInfo.pEnabledFeatures = &deviceFeatures;
 
     // - Specifies which device EXTENSIONS we want to use.
-    createInfo.enabledExtensionCount = static_cast<uint32_t>(
-        m_requiredExtensions.size()
-        );
+    createInfo.enabledExtensionCount = static_cast<uint32_t>(m_requiredExtensions.size());
 
     createInfo.ppEnabledExtensionNames = m_requiredExtensions.data();
 
@@ -68,24 +64,15 @@ void Device::createLogicalDevice(
     // implementations. However, it is still a good idea to set them anyway to 
     // be compatible with older implementations:
 
-    if (vkLayersConfig::VALIDATION_LAYERS_ENABLED)
+    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED)
     {
-        createInfo.enabledLayerCount = static_cast<uint32_t>(
-            vkLayersConfig::VALIDATION_LAYERS.size()
-            );
-        createInfo.ppEnabledLayerNames = (
-            vkLayersConfig::VALIDATION_LAYERS.data()
-            );
+        createInfo.enabledLayerCount = static_cast<uint32_t>(VkLayersConfig::VALIDATION_LAYERS.size());
+        createInfo.ppEnabledLayerNames = (VkLayersConfig::VALIDATION_LAYERS.data());
     }
     else
         createInfo.enabledLayerCount = 0;
 
-    auto status = vkCreateDevice(
-        m_physicalDevice,
-        &createInfo,
-        nullptr,
-        &m_logicalDevice
-    );
+    auto status = vkCreateDevice(m_physicalDevice, &createInfo, nullptr, &m_logicalDevice);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create logical device!");
@@ -95,7 +82,7 @@ void Device::pickPhysicalDevice(
     VkInstance& vkInstance,
     QueueFamilyIndices& requiredQueueFamiliesIndices,
     const VkSurfaceKHR& windowSurface,
-    SwapchainManager& swapchain
+    Swapchain& swapchain
 ) {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, nullptr);
@@ -127,16 +114,13 @@ void Device::pickPhysicalDevice(
 bool Device::isPhysicalDeviceSuitable(
     QueueFamilyIndices& requiredQueueFamiliesIndices,
     const VkSurfaceKHR& windowSurface,
-    SwapchainManager& swapchain,
+    Swapchain& swapchain,
     const VkPhysicalDevice& possiblePhysicalDevice
 ) {
 
     // - Queue-Families
     // Verifies if the device has the Queue families that we need.
-    requiredQueueFamiliesIndices.getIndicesOfRequiredQueueFamilies(
-        possiblePhysicalDevice,
-        windowSurface
-    );
+    requiredQueueFamiliesIndices.getIndicesOfRequiredQueueFamilies(possiblePhysicalDevice, windowSurface);
 
     if (requiredQueueFamiliesIndices.AllQueueFamiliesSupported == false)
         return false;
@@ -158,6 +142,9 @@ bool Device::isPhysicalDeviceSuitable(
     // Here we can score the gpu(so later select the best one to use) or just
     // verify if it has the features that we need.
 
+    if (!deviceFeatures.samplerAnisotropy)
+        return false;
+
     // For now, we will just return the dedicated one.
     if (deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         return false;
@@ -167,10 +154,8 @@ bool Device::isPhysicalDeviceSuitable(
         return false;
 
     // - Swapchain support
-    if (swapchain.isSwapchainAdequated(
-        possiblePhysicalDevice, windowSurface
-    ) == false
-        ) {
+    if (swapchain.isSwapchainAdequated(possiblePhysicalDevice, windowSurface) == false) 
+    {
         return false;
     }
 

@@ -1,14 +1,14 @@
-#include "VulkanRenderer/RenderPass/RenderPassManager.h"
+#include "VulkanRenderer/RenderPass/RenderPass.h"
 
 #include <iostream>
 
 #include <vulkan/vulkan.h>
 
-RenderPassManager::RenderPassManager() {}
+RenderPass::RenderPass() {}
 
-RenderPassManager::~RenderPassManager() {}
+RenderPass::~RenderPass() {}
 
-void RenderPassManager::createColorAttachment(const VkFormat& imageFormat, VkAttachmentDescription& colorAttachment)
+void RenderPass::createColorAttachment(const VkFormat& imageFormat, VkAttachmentDescription& colorAttachment)
 {
 	colorAttachment.format = imageFormat;
 	// We won't configure the multisample yet.
@@ -41,7 +41,7 @@ void RenderPassManager::createColorAttachment(const VkFormat& imageFormat, VkAtt
 	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 }
 
-void RenderPassManager::createColorAttachmentReference(VkAttachmentReference& colorAttachmentRef)
+void RenderPass::createColorAttachmentReference(VkAttachmentReference& colorAttachmentRef)
 {
 	// Specifies which attachment to reference by its index in the attachment
    // descriptions array.
@@ -57,14 +57,14 @@ void RenderPassManager::createColorAttachmentReference(VkAttachmentReference& co
 	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 }
 
-void RenderPassManager::createSubPass(const VkAttachmentReference& colorAttachmentRef, VkSubpassDescription& subpassDescript)
+void RenderPass::createSubPass(const VkAttachmentReference& colorAttachmentRef, VkSubpassDescription& subpassDescript)
 {
 	subpassDescript.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpassDescript.colorAttachmentCount = 1;
 	subpassDescript.pColorAttachments = &colorAttachmentRef;
 }
 
-void RenderPassManager::createRenderPass(const VkDevice& logicalDevice, const VkFormat& imageFormat)
+void RenderPass::createRenderPass(const VkDevice& logicalDevice, const VkFormat& imageFormat)
 {
 	// Attachments
 	VkAttachmentDescription colorAttachment{};
@@ -116,12 +116,12 @@ void RenderPassManager::createRenderPass(const VkDevice& logicalDevice, const Vk
 		throw std::runtime_error("Failed to create render pass!");
 }
 
-const VkRenderPass& RenderPassManager::getRenderPass() const
+const VkRenderPass& RenderPass::getRenderPass() const
 {
 	return m_renderPass;
 }
 
-void RenderPassManager::destroyRenderPass(const VkDevice& logicalDevice)
+void RenderPass::destroyRenderPass(const VkDevice& logicalDevice)
 {
 	vkDestroyRenderPass(logicalDevice, m_renderPass, nullptr);
 }

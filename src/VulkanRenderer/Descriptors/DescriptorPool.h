@@ -13,7 +13,7 @@ public:
 	void createDescriptorPool(const VkDevice& logicalDevice, const size_t size, const size_t maxSets);
 	void createUniformBuffers(const VkPhysicalDevice physicalDevice, const VkDevice logicalDevice, const size_t nSets);
 	void createDescriptorSetLayout(const VkDevice& logicalDevice);
-	void createDescriptorSets(const VkDevice logicalDevice);
+	void createDescriptorSets(const VkDevice logicalDevice, const VkImageView& textureImageView, const VkSampler& textureSampler);
 
 	void destroyDescriptorPool(const VkDevice& logicalDevice);
 	void destroyDescriptorSetLayout(const VkDevice& logicalDevice);
@@ -25,7 +25,6 @@ public:
 	void updateUniformBuffer(const VkDevice& logicalDevice, const uint8_t currentFrame, const VkExtent2D extent);
 
 private:
-	void createUboLayoutBinding(VkDescriptorSetLayoutBinding& uboLayoutBinding);
 
 	void allocDescriptorSets(const VkDevice& logicalDevice);
 

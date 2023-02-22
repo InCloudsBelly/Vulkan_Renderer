@@ -13,6 +13,7 @@ set(PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set(SHADER_DIR "${CMAKE_SOURCE_DIR}/shaders")
 set(SHADERS_BINARY_DIR "${PROJECT_BIN_DIR}/shaders")
 set(PROJECT_LIBRARIES_DIR "${CMAKE_SOURCE_DIR}/libs")
+set(TEXTURES_DIR "${CMAKE_SOURCE_DIR}/assets/textures")
 
 
 # 递归查找文件夹下的 .h .hpp. ini 文件保存到 HEADER_FILES
@@ -46,6 +47,10 @@ add_subdirectory(${GLFW_DIR} EXCLUDE_FROM_ALL)
 set(GLM_DIR "${PROJECT_LIBRARIES_DIR}/glm")
 add_subdirectory(${GLM_DIR} EXCLUDE_FROM_ALL)
 
+# -STB(Image Loader) -> Header file that contains all the code.
+set(STB_DIR "${PROJECT_LIBRARIES_DIR}/stb_image")
+add_subdirectory(${STB_DIR} EXCLUDE_FROM_ALL)
+
 # - PThreads
 set(THREADS_PREFER_PTRHEAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -56,6 +61,10 @@ find_package(Threads REQUIRED)
 add_subdirectory(${SHADER_DIR})
 # To get the full path of the compiled shaders in the c++ code.
 add_definitions(-DSHADERS_BINARY_DIR="${SHADERS_BINARY_DIR}")
+
+
+################################Textures#######################################
+add_definitions(-DTEXTURES_DIR="${TEXTURES_DIR}/")
 
 #################################Executable####################################
 
@@ -75,6 +84,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
    ${Vulkan_LIBRARIES}
    Threads::Threads  # Needed by GLFW.
    glm
+   stb_image
    PRIVATE ${CMAKE_DL_LIBS}
 )
 

@@ -37,7 +37,7 @@ private:
 	void createDynamicStatesInfo(const std::vector<VkDynamicState>& dynamicStates, VkPipelineDynamicStateCreateInfo& dynamicStatesInfo);
 	
 	void createVertexShaderInputInfo(const VkVertexInputBindingDescription& bindingDescription,
-		const std::array<VkVertexInputAttributeDescription, 2>& attribDescriptions,
+		const std::array<VkVertexInputAttributeDescription, 3>& attribDescriptions,
 		VkPipelineVertexInputStateCreateInfo& vertexInputInfo);
 
 	void createInputAssemblyInfo(VkPipelineInputAssemblyStateCreateInfo& inputAssemblyInfo);

@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 
+#include "VulkanRenderer/Commands/CommandUtils.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Buffers/BufferUtils.h"
 
@@ -43,12 +44,7 @@ void ImageManager::createImage(
     // Optional.
     imageInfo.flags = 0;
 
-    auto status = vkCreateImage(
-        logicalDevice,
-        &imageInfo,
-        nullptr,
-        &image
-    );
+    auto status = vkCreateImage(logicalDevice, &imageInfo, nullptr, &image);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create the Image Object");
@@ -56,39 +52,20 @@ void ImageManager::createImage(
 
     // Allocates memory(in the device) for the image.
     VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(
-        logicalDevice,
-        image,
-        &memRequirements
-    );
+    vkGetImageMemoryRequirements(logicalDevice, image, &memRequirements);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex = BufferUtils::findMemoryType(
-        physicalDevice,
-        memRequirements.memoryTypeBits,
-        memoryProperties
-    );
+    allocInfo.memoryTypeIndex = BufferUtils::findMemoryType(physicalDevice, memRequirements.memoryTypeBits, memoryProperties);
 
-    status = vkAllocateMemory(
-        logicalDevice,
-        &allocInfo,
-        nullptr,
-        &memory
-    );
+    status = vkAllocateMemory(logicalDevice, &allocInfo, nullptr, &memory);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate image memory!");
 
     // Bind the image object(it's like a buffer) to the memory.
-    vkBindImageMemory(
-        logicalDevice,
-        image,
-        memory,
-        0
-    );
-
+    vkBindImageMemory(logicalDevice, image, memory, 0);
 }
 
 
@@ -142,14 +119,10 @@ void ImageManager::copyBufferToImage(
 
     commandPool.allocCommandBuffer(commandBuffer);
 
+
+    commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, commandBuffer);
     // Specifies which part of the buffer is going to be copied to which
     // part of the image.
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
-
     VkBufferImageCopy region{};
 
     // Which parts of the buffer to copy.
@@ -164,29 +137,11 @@ void ImageManager::copyBufferToImage(
     region.imageSubresource.layerCount = 1;
 
     region.imageOffset = { 0, 0, 0 };
-    region.imageExtent = {
-       width,
-       height,
-       1
-    };
+    region.imageExtent = { width,height,1 };
 
-    vkCmdCopyBufferToImage(
-        commandBuffer,
-        buffer,
-        image,
-        // Indicates wich layout the image is currently using. Here
-        // we are asumming that the image has already been transitioned to
-        // the layout that is optimal for copying pixels to.
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        // Count of VkBufferImageCopy(it can be an array of that).
-        1,
-        &region
-    );
+    CommandUtils::ACTION::copyBufferToImage(buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, region, commandBuffer);
 
-    vkEndCommandBuffer(commandBuffer);
+    commandPool.endCommandBuffer(commandBuffer);
 
-    commandPool.submitCommandBuffer(
-        graphicsQueue,
-        commandBuffer
-    );
+    commandPool.submitCommandBuffer(graphicsQueue, commandBuffer);
 }

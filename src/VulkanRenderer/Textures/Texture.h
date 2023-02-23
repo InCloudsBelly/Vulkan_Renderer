@@ -13,7 +13,7 @@ public:
 	~Texture();
 
 	void createTextureImage(
-		const std::string& texture,
+		const char* texture,
 		const VkPhysicalDevice& physicalDevice, 
 		const VkDevice& logicalDevice,
 		CommandPool& commandPool, 

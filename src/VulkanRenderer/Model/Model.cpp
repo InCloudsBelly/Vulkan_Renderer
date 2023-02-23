@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <string>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
@@ -27,8 +28,12 @@ namespace std {
 	};
 };
 
-void Model::readModel(const char* pathToMesh)
+Model::Model(const char* pathToMesh, const std::string& texture)
 {
+    // We'll read the texture file later(after the creation of a cmd pool and
+    // the queue handles).
+    textureFile = texture;
+
     // Holds all the positions, normals and texture coordinates.
     tinyobj::attrib_t attrib;
     // Contains all the objects and their faces.
@@ -75,4 +80,25 @@ void Model::readModel(const char* pathToMesh)
             indices.push_back(uniqueVertices[vertex]);
         }
     }
+}
+
+/*
+ * Creates all the texture resources.
+ */
+void Model::createTexture(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    const VkFormat& format,
+    CommandPool& commandPool,
+    VkQueue& graphicsQueue
+) {
+    texture.createTextureImage(
+        (std::string(TEXTURES_DIR) + textureFile).c_str(),
+        physicalDevice,
+        logicalDevice,
+        commandPool,
+        graphicsQueue
+    );
+    texture.createTextureImageView(logicalDevice,format);
+    texture.createTextureSampler(physicalDevice,logicalDevice);
 }

@@ -76,28 +76,28 @@ void DescriptorPool::createDescriptorSetLayout(const VkDevice& logicalDevice)
 		throw std::runtime_error("Failed to create descriptor set layout!");
 }
 
-void DescriptorPool::allocDescriptorSets(const VkDevice& logicalDevice)
+void DescriptorPool::allocDescriptorSets(const VkDevice& logicalDevice , std::vector<VkDescriptorSet>& descriptorSets)
 {
 	std::vector<VkDescriptorSetLayout> layouts(Config::MAX_FRAMES_IN_FLIGHT , m_descriptorSetLayout);
 
-	m_descriptorSets.resize(Config::MAX_FRAMES_IN_FLIGHT);
+	descriptorSets.resize(Config::MAX_FRAMES_IN_FLIGHT);
 
 	VkDescriptorSetAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocInfo.descriptorPool = m_descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(m_descriptorSets.size());
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(descriptorSets.size());
 	allocInfo.pSetLayouts = layouts.data();
 
-	if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, m_descriptorSets.data()) != VK_SUCCESS) 
+	if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, descriptorSets.data()) != VK_SUCCESS)
 		throw std::runtime_error("Failed to allocate descriptr sets!");
 }
 
-void DescriptorPool::createDescriptorSets(const VkDevice logicalDevice,const VkImageView& textureImageView,const VkSampler& textureSampler) 
+void DescriptorPool::createDescriptorSets(const VkDevice logicalDevice,const VkImageView& textureImageView,const VkSampler& textureSampler, std::vector<VkDescriptorSet>& descriptorSets)
 {
-	allocDescriptorSets(logicalDevice);
+	allocDescriptorSets(logicalDevice, descriptorSets);
 
 	// Configures the descriptor sets
-	for (size_t i = 0; i < m_descriptorSets.size(); i++)
+	for (size_t i = 0; i < descriptorSets.size(); i++)
 	{
 		VkDescriptorBufferInfo bufferInfo{};
 		DescriptorTypeUtils::createDescriptorBufferInfo(m_uniformBuffers[i],bufferInfo);
@@ -109,9 +109,9 @@ void DescriptorPool::createDescriptorSets(const VkDevice logicalDevice,const VkI
 	  // (how and which buffer/image use to bind with the each descriptor)
 		std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
 
-		DescriptorTypeUtils::createUboWriteInfo(bufferInfo,m_descriptorSets[i],descriptorWrites[0]);
+		DescriptorTypeUtils::createUboWriteInfo(bufferInfo, descriptorSets[i],descriptorWrites[0]);
 
-		DescriptorTypeUtils::createSamplerWriteInfo(imageInfo,m_descriptorSets[i],descriptorWrites[1]);
+		DescriptorTypeUtils::createSamplerWriteInfo(imageInfo, descriptorSets[i],descriptorWrites[1]);
 
 		vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()),descriptorWrites.data(), 0, nullptr);
 	}
@@ -136,17 +136,12 @@ void DescriptorPool::destroyUniformBuffersAndMemories(const VkDevice& logicalDev
 	}
 }
 
-const std::vector<VkDescriptorSet> DescriptorPool::getDescriptorSets() const
-{
-	return m_descriptorSets;
-}
-
 const VkDescriptorSetLayout DescriptorPool::getDescriptorSetLayout() const
 {
 	return m_descriptorSetLayout;
 }
 
-void DescriptorPool::updateUniformBuffer(const VkDevice& logicalDevice,const uint8_t currentFrame,const VkExtent2D extent) 
+void DescriptorPool::updateUniformBuffer1(const VkDevice& logicalDevice,const uint8_t currentFrame,const VkExtent2D extent)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -154,7 +149,7 @@ void DescriptorPool::updateUniformBuffer(const VkDevice& logicalDevice,const uin
 	float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
 	DescriptorTypes::UniformBufferObject ubo{};
-	ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(time * 90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(time * 30.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	ubo.view = glm::lookAt(glm::vec3(2.0, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0f, 1.0f));
 	ubo.proj = glm::perspective(glm::radians(45.0f), extent.width / (float)extent.height, 0.1f, 10.0f);
 
@@ -167,4 +162,42 @@ void DescriptorPool::updateUniformBuffer(const VkDevice& logicalDevice,const uin
 	vkMapMemory(logicalDevice, m_uniformBuffersMemory[currentFrame], 0, sizeof(ubo), 0, &data);
 		memcpy(data, &ubo, sizeof(ubo));
 	vkUnmapMemory(logicalDevice, m_uniformBuffersMemory[currentFrame]);
+}
+
+void DescriptorPool::updateUniformBuffer2(
+	const VkDevice& logicalDevice,
+	const uint8_t currentFrame,
+	const VkExtent2D extent
+) {
+	static auto startTime = std::chrono::high_resolution_clock::now();
+
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration<float, std::chrono::seconds::period>(
+		currentTime - startTime
+		).count();
+
+	DescriptorTypes::UniformBufferObject ubo{};
+	//ubo.model = glm::rotate(
+	//      glm::mat4(1.0f),
+	//      glm::radians(time * 90.0f),
+	//      glm::vec3(0.0f, 0.0f, 1.0f)
+	//);
+	ubo.model = glm::mat4(1.0f);
+	ubo.model = glm::scale(ubo.model,glm::vec3(0.003f));
+	ubo.model = glm::translate(ubo.model,glm::vec3(-700.0f, 0.0f, 0.0f));
+	ubo.model = glm::rotate(ubo.model,glm::radians(time * 90.0f),glm::vec3(0.0f, 1.0f, 1.0f));
+	
+	ubo.view = glm::lookAt(glm::vec3(2.0, 2.0f, 2.0f),glm::vec3(0.0f, 0.0f, 0.0f),glm::vec3(0.0, 0.0f, 1.0f));
+	
+	ubo.proj = glm::perspective(glm::radians(45.0f), (extent.width / (float)extent.height), 0.1f, 10.0f);
+
+	// GLM was designed for OpenGl, where the Y coordinate of the clip coord. is
+	// inverted. To compensate for that, we have to flip the sign on the scaling
+	// factor of the Y axis.
+	ubo.proj[1][1] *= -1;
+
+	void* data;
+	vkMapMemory(logicalDevice,m_uniformBuffersMemory[currentFrame],0,sizeof(ubo),0,&data);
+		memcpy(data, &ubo, sizeof(ubo));
+	vkUnmapMemory(logicalDevice,m_uniformBuffersMemory[currentFrame]);
 }

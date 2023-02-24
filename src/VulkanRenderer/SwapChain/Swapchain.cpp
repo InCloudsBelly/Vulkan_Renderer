@@ -20,7 +20,7 @@ void Swapchain::createSwapchain(
 	VkPresentModeKHR presentMode;
 	VkExtent2D extent;
 
-	chooseBestSettings(
+ 	chooseBestSettings(
 		physicalDevice,
 		window,
 		surfaceFormat,

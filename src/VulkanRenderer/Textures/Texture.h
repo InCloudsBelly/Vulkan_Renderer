@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Descriptors/DescriptorTypes/Sampler.h"
 
 class Texture
 {
@@ -13,7 +14,7 @@ public:
 	~Texture();
 
 	void createTextureImage(
-		const char* texture,
+		const char* pathToTexture,
 		const VkPhysicalDevice& physicalDevice, 
 		const VkDevice& logicalDevice,
 		CommandPool& commandPool, 
@@ -43,5 +44,7 @@ private:
 	VkImage        m_textureImage;
 	VkDeviceMemory m_textureImageMemory;
 	VkImageView    m_textureImageView;
-	VkSampler      m_textureSampler;
+
+	// Descriptor
+	Sampler        m_textureSampler;
 };

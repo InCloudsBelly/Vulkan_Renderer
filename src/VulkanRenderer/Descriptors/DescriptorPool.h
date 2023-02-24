@@ -10,28 +10,27 @@ public:
 	DescriptorPool();
 	~DescriptorPool();
 
-	void createDescriptorPool(const VkDevice& logicalDevice, const size_t size, const size_t maxSets);
-	void createUniformBuffers(const VkPhysicalDevice physicalDevice, const VkDevice logicalDevice, const size_t nSets);
-	void createDescriptorSetLayout(const VkDevice& logicalDevice);
-	void createDescriptorSets(const VkDevice logicalDevice, const VkImageView& textureImageView, const VkSampler& textureSampler, std::vector<VkDescriptorSet>& descriptorSets);
+	void createDescriptorPool(
+		const VkDevice& logicalDevice, 
+		const std::vector<VkDescriptorType>& descriptorTypes,
+		const std::vector<uint32_t> descriptorSizes,
+		const uint32_t descriptorSetsCount
+	);
+
+	void allocDescriptorSets(
+		const VkDevice& logicalDevice,
+		std::vector<VkDescriptorSet>& descriptorSets,
+		std::vector<VkDescriptorSetLayout>& descriptorSetLayouts
+	);
 
 	void destroyDescriptorPool(const VkDevice& logicalDevice);
-	void destroyDescriptorSetLayout(const VkDevice& logicalDevice);
-	void destroyUniformBuffersAndMemories(const VkDevice& logicalDevice);
 
-	const VkDescriptorSetLayout getDescriptorSetLayout() const;
-
-	void updateUniformBuffer1(const VkDevice& logicalDevice, const uint8_t currentFrame, const VkExtent2D extent);
-	void updateUniformBuffer2(const VkDevice& logicalDevice, const uint8_t currentFrame, const VkExtent2D extent);
+	void updateUniformBuffer1(const VkDevice& logicalDevice, const uint8_t currentFrame, const VkExtent2D extent, std::vector<VkDeviceMemory>& uniformBufferMemories);
+	void updateUniformBuffer2(const VkDevice& logicalDevice, const uint8_t currentFrame, const VkExtent2D extent, std::vector<VkDeviceMemory>& uniformBufferMemories);
 
 private:
 
-	void allocDescriptorSets(const VkDevice& logicalDevice, std::vector<VkDescriptorSet>& descriptorSets);
+	void createPoolSize(const size_t size, const VkDescriptorType& type, VkDescriptorPoolSize& poolSize);
 
-	VkDescriptorPool             m_descriptorPool;
-	VkDescriptorSetLayout        m_descriptorSetLayout;
-
-	std::vector<VkBuffer>        m_uniformBuffers;
-	std::vector<VkDeviceMemory>  m_uniformBuffersMemory;
-
+	VkDescriptorPool  m_descriptorPool;
 };

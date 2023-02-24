@@ -28,10 +28,38 @@ public:
 
 private:
 
+	// Modify this
+	void updateUniformBuffer1(
+		const VkDevice& logicalDevice,
+		const uint8_t currentFrame,
+		const VkExtent2D extent,
+		std::vector<VkDeviceMemory>& uniformBufferMemories
+	);
+	// Modify this
+	void updateUniformBuffer2(
+		const VkDevice& logicalDevice,
+		const uint8_t currentFrame,
+		const VkExtent2D extent,
+		std::vector<VkDeviceMemory>& uniformBufferMemories
+	);
+
+
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
 	void cleanup();
+
+	void recordCommandBuffer(
+		const VkFramebuffer& framebuffer,
+		const VkRenderPass& renderPass,
+		const VkExtent2D& extent,
+		const VkPipeline& graphicsPipeline,
+		const VkPipelineLayout& pipelineLayout,
+		const uint32_t currentFrame,
+		VkCommandBuffer& commandBuffer,
+		CommandPool& commandPool
+	);
+
 	void drawFrame(uint8_t& currentFrame);
 
 	void createVkInstance();
@@ -62,4 +90,5 @@ private:
 
 	// Models
 	std::vector<std::unique_ptr<Model>> m_models;
+	VkDescriptorSetLayout		m_descriptorSetLayout;
 };

@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include <vector>
+#include <memory>
 
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 
@@ -22,30 +23,17 @@ public:
 	void submitCommandBuffer(VkQueue& graphicsQueue,VkCommandBuffer& commandBuffer);
 	void allocAllCommandBuffers();
 
-	const VkCommandBuffer& getCommandBuffer(const uint32_t index);
+	VkCommandBuffer& getCommandBuffer(const uint32_t index);
 	
 	void resetCommandBuffer(const uint32_t index);
-
-	void recordCommandBuffer(
-		const VkFramebuffer& framebuffer,
-		const VkRenderPass& renderPass,
-		const VkExtent2D& extent,
-		const VkPipeline& graphicsPipeline,
-		const uint32_t index,
-		const VkBuffer& vertexBuffer,
-		const VkBuffer& indexBuffer,
-		const size_t indexCount,
-		const VkPipelineLayout& pipelineLayout,
-		const std::vector<VkDescriptorSet>& descriptorSets
-	);
-
-private:
 
 	void freeCommandBuffer(VkCommandBuffer& commandBuffer);
 
 	void createRenderPassBeginInfo(const VkRenderPass& renderPass, const VkFramebuffer& framebuffer,
 		const VkExtent2D& extent, const std::vector<VkClearValue>& clearValues, VkRenderPassBeginInfo& renderPassInfo);
 
+
+private:
 	//--------------------------------------------------------------------------
 
 	VkCommandPool m_commandPool;

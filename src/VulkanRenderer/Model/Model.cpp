@@ -102,3 +102,8 @@ void Model::createTexture(
     texture.createTextureImageView(logicalDevice,format);
     texture.createTextureSampler(physicalDevice,logicalDevice);
 }
+
+const VkDescriptorSet& Model::getDescriptorSet(const uint32_t index) const
+{
+    return descriptorSets.getDescriptorSet(index);
+}

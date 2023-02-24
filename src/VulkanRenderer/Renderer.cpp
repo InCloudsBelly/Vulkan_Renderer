@@ -6,9 +6,13 @@
 #include <cstring>
 #include <limits>
 #include <algorithm>
+#include <chrono>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "VulkanRenderer/Settings/config.h"
 #include "VulkanRenderer/Settings/VkLayersConfig.h"
@@ -20,12 +24,16 @@
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Commands/CommandUtils.h"
 #include "VulkanRenderer/Extensions/ExtensionsUtils.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
 #include "VulkanRenderer/Buffers/BufferUtils.h"
 #include "VulkanRenderer/Model/Vertex.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
-#include "VulkanRenderer/Descriptors/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptors/DescriptorSetLayoutUtils.h"
+#include "VulkanRenderer/Descriptors/DescriptorTypes/UBO.h"
+#include "VulkanRenderer/Descriptors/DescriptorTypes/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptors/DescriptorSets.h"
 #include "VulkanRenderer/Textures/Texture.h"
 #include "VulkanRenderer/DepthBuffer/DepthBuffer.h"
 
@@ -85,11 +93,8 @@ void Renderer::createSyncObjects()
 
 void Renderer::createVkInstance()
 {
-    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED &&
-        !vlManager::AllRequestedLayersAvailable()
-        ) {
-        throw std::runtime_error(
-            "Validation layers requested, but not available!"
+    if (VkLayersConfig::VALIDATION_LAYERS_ENABLED &&!vlManager::AllRequestedLayersAvailable()) {
+        throw std::runtime_error("Validation layers requested, but not available!"
         );
     }
 
@@ -174,9 +179,15 @@ void Renderer::initVulkan()
 
     m_renderPass.createRenderPass(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain.getImageFormat());
 
-    m_descriptorPool.createDescriptorSetLayout(m_device.getLogicalDevice());
+    DescriptorSetLayoutUtils::createDescriptorSetLayout(
+        m_device.getLogicalDevice(),
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER },
+        { 0,1 },
+        { VK_SHADER_STAGE_VERTEX_BIT,VK_SHADER_STAGE_FRAGMENT_BIT },
+        m_descriptorSetLayout
+    );
 
-    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchain.getExtent(), m_renderPass.getRenderPass(),m_descriptorPool.getDescriptorSetLayout());
+    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchain.getExtent(), m_renderPass.getRenderPass(), m_descriptorSetLayout);
 
     m_depthBuffer.createDepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain.getExtent());
 
@@ -190,6 +201,7 @@ void Renderer::initVulkan()
 
     for (auto& model : m_models)
     {
+        // Vertex buffer(with staging buffer)
         BufferManager::createBufferAndTransferToDevice(
             m_commandPools[cmdPoolIndex],
             m_device.getPhysicalDevice(),
@@ -221,22 +233,30 @@ void Renderer::initVulkan()
             m_commandPools[0],
             m_qfHandles.graphicsQueue
         );
+
+
+        // Uniform Buffers
+        model->ubo.createUniformBuffers(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), Config::MAX_FRAMES_IN_FLIGHT);
     }
 
-    // Uniform Buffers
-    m_descriptorPool.createUniformBuffers(m_device.getPhysicalDevice(), m_device.getLogicalDevice(),Config::MAX_FRAMES_IN_FLIGHT);
-
     // Descriptor Pool
-    m_descriptorPool.createDescriptorPool(m_device.getLogicalDevice(),Config::MAX_FRAMES_IN_FLIGHT,Config::MAX_FRAMES_IN_FLIGHT);
+    m_descriptorPool.createDescriptorPool(
+        m_device.getLogicalDevice(),
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER },
+        { static_cast<uint32_t>(m_models.size() * Config::MAX_FRAMES_IN_FLIGHT),static_cast<uint32_t>(m_models.size() * Config::MAX_FRAMES_IN_FLIGHT) },
+        m_models.size() * Config::MAX_FRAMES_IN_FLIGHT
+    );
 
     // Descriptor Sets(of each type of model)
     for (auto& model : m_models)
     {
-        m_descriptorPool.createDescriptorSets(
+        model->descriptorSets.createDescriptorSets(
             m_device.getLogicalDevice(),
             model->texture.getTextureImageView(),
             model->texture.getTextureSampler(),
-            model->descriptorSets
+            model->ubo.getUniformBuffers(),
+            m_descriptorSetLayout,
+            m_descriptorPool
         );
     }
     // Allocates all the command buffers in the command Pool #1
@@ -244,6 +264,62 @@ void Renderer::initVulkan()
 
     createSyncObjects();
 }
+
+void Renderer::recordCommandBuffer(
+    const VkFramebuffer& framebuffer,
+    const VkRenderPass& renderPass,
+    const VkExtent2D& extent,
+    const VkPipeline& graphicsPipeline,
+    const VkPipelineLayout& pipelineLayout,
+    const uint32_t currentFrame,
+    VkCommandBuffer& commandBuffer,
+    CommandPool& commandPool
+) {
+
+    // Specifies some details about the usage of this specific command
+    // buffer.
+    commandPool.beginCommandBuffer(0, commandBuffer);
+
+    // NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
+    std::vector<VkClearValue> clearValues(2);
+    clearValues[0].color = { {0.3f, 0.3f, 0.3f, 1.0f} };
+    clearValues[1].color = { 1.0f, 0.0f };
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    commandPool.createRenderPassBeginInfo(renderPass, framebuffer, extent, clearValues, renderPassInfo);
+
+    //--------------------------------RenderPass-----------------------------
+
+    // The final parameter controls how the drawing commands between the
+    // render pass will be provided:
+    //    -VK_SUBPASS_CONTENTS_INLINE: The render pass commands will be
+    //    embedded in the primary command buffer itself and no secondary
+    //    command buffers will be executed.
+    //    -VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: The render pass
+    //    commands will be executed from secondary command buffers.
+    vkCmdBeginRenderPass(commandBuffer,&renderPassInfo,VK_SUBPASS_CONTENTS_INLINE);
+
+    CommandUtils::STATE::bindPipeline(graphicsPipeline, commandBuffer);
+
+    // Set Dynamic States
+    CommandUtils::STATE::setViewport(0.0f, 0.0f, extent, 0.0f, 1.0f, 0, 1, commandBuffer);
+    CommandUtils::STATE::setScissor({ 0, 0 }, extent, 0, 1, commandBuffer);
+
+    for (const auto& model : m_models)
+    {
+        CommandUtils::STATE::bindVertexBuffers({ model->vertexBuffer }, { 0 }, 0, 1, commandBuffer);
+        CommandUtils::STATE::bindIndexBuffer(model->indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
+
+        CommandUtils::STATE::bindDescriptorSets(pipelineLayout, 0, { model->getDescriptorSet(currentFrame) }, {}, commandBuffer);
+
+        CommandUtils::ACTION::drawIndexed(model->indices.size(), 1, 0, 0, 0, commandBuffer);
+    }
+
+    vkCmdEndRenderPass(commandBuffer);
+
+    commandPool.endCommandBuffer(commandBuffer);
+}
+
 
 void Renderer::drawFrame(uint8_t& currentFrame)
 {
@@ -258,9 +334,9 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     //------------------------Updates uniform buffer----------------------------
-    m_descriptorPool.updateUniformBuffer1(m_device.getLogicalDevice(),currentFrame,m_swapchain.getExtent());
+    updateUniformBuffer1(m_device.getLogicalDevice(), currentFrame, m_swapchain.getExtent(), m_models[0]->ubo.getUniformBufferMemories());
 
-
+    updateUniformBuffer2(m_device.getLogicalDevice(), currentFrame, m_swapchain.getExtent(), m_models[1]->ubo.getUniformBufferMemories());
     //--------------------Acquires an image from the swapchain------------------
     uint32_t imageIndex;
     vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchain.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
@@ -269,17 +345,15 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     //---------------------Records all the command buffer-----------------------    
     // Resets the command buffer to be able to be recorded/written.
     m_commandPools[0].resetCommandBuffer(currentFrame);
-    m_commandPools[0].recordCommandBuffer(
+    recordCommandBuffer(
         m_swapchain.getFramebuffer(imageIndex),
         m_renderPass.getRenderPass(),
         m_swapchain.getExtent(),
         m_graphicsPipelineM.getGraphicsPipeline(),
-        currentFrame,
-        m_models[0]->vertexBuffer,
-        m_models[0]->indexBuffer,
-        m_models[0]->indices.size(),
         m_graphicsPipelineM.getPipelineLayout(),
-        m_models[0]->descriptorSets
+        currentFrame,
+        m_commandPools[0].getCommandBuffer(currentFrame),
+        m_commandPools[0]
     );
 
 
@@ -373,8 +447,9 @@ void Renderer::cleanup()
     // Render pass
     m_renderPass.destroyRenderPass(m_device.getLogicalDevice());
 
-    // Uniform Buffer and Memory
-    m_descriptorPool.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
+    // UBO(with their uniform buffers and uniform memories)
+    for (auto& model : m_models)
+        model->ubo.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
 
     // Descriptor Pool
     m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
@@ -384,7 +459,10 @@ void Renderer::cleanup()
         model->texture.destroyTexture(m_device.getLogicalDevice());
 
     // Descriptor Set Layout
-    m_descriptorPool.destroyDescriptorSetLayout(m_device.getLogicalDevice());
+    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(
+        m_device.getLogicalDevice(),
+        m_descriptorSetLayout
+    );
 
     // Bufferss
     for (auto& model : m_models)
@@ -433,4 +511,67 @@ void Renderer::addModel(const std::string& meshFile, const std::string& textureF
     std::unique_ptr<Model> newModel = std::make_unique<Model>((std::string(MODEL_DIR) + meshFile).c_str(), textureFile);
 
     m_models.push_back(std::move(newModel));
+}
+
+
+void Renderer::updateUniformBuffer1(
+    const VkDevice& logicalDevice,
+    const uint8_t currentFrame,
+    const VkExtent2D extent,
+    std::vector<VkDeviceMemory>& uniformBufferMemories
+) {
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    DescriptorTypes::UniformBufferObject ubo{};
+    ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(time * 90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0f, 1.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), (extent.width / (float)extent.height), 0.1f, 10.0f);
+
+    // GLM was designed for OpenGl, where the Y coordinate of the clip coord. is
+    // inverted. To compensate for that, we have to flip the sign on the scaling
+    // factor of the Y axis.
+    ubo.proj[1][1] *= -1;
+
+    void* data;
+    vkMapMemory(logicalDevice, uniformBufferMemories[currentFrame], 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(logicalDevice, uniformBufferMemories[currentFrame]);
+}
+
+void Renderer::updateUniformBuffer2(
+    const VkDevice& logicalDevice,
+    const uint8_t currentFrame,
+    const VkExtent2D extent,
+    std::vector<VkDeviceMemory>& uniformBufferMemories
+) {
+    static auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    DescriptorTypes::UniformBufferObject ubo{};
+    //ubo.model = glm::rotate(
+    //      glm::mat4(1.0f),
+    //      glm::radians(time * 90.0f),
+    //      glm::vec3(0.0f, 0.0f, 1.0f)
+    //);
+    ubo.model = glm::mat4(1.0f);
+    ubo.model = glm::scale(ubo.model,glm::vec3(0.003f));
+    ubo.model = glm::translate(ubo.model, glm::vec3(-700.0f, 0.0f, 0.0f));
+    ubo.model = glm::rotate(ubo.model, glm::radians(time * 90.0f), glm::vec3(0.0f, 1.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(2.0, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0f, 1.0f));
+    ubo.proj = glm::perspective(glm::radians(45.0f), (extent.width / (float)extent.height), 0.1f, 10.0f);
+
+    // GLM was designed for OpenGl, where the Y coordinate of the clip coord. is
+    // inverted. To compensate for that, we have to flip the sign on the scaling
+    // factor of the Y axis.
+    ubo.proj[1][1] *= -1;
+
+    void* data;
+    vkMapMemory(logicalDevice, uniformBufferMemories[currentFrame], 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(logicalDevice, uniformBufferMemories[currentFrame]);
 }

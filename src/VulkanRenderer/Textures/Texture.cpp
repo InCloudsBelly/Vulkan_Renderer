@@ -9,6 +9,8 @@
 #include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
 #include "VulkanRenderer/Commands/CommandUtils.h"
+#include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Descriptors/DescriptorTypes/Sampler.h"
 
 Texture::Texture() {}
 
@@ -94,49 +96,13 @@ void Texture::transitionImageLayout(
     commandPool.submitCommandBuffer(graphicsQueue,commandBuffer);
 }
 
-void Texture::createTextureSampler(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice
-) {
-    VkSamplerCreateInfo samplerInfo{};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    // Specifies how to interpolate texels that are magnified or minified.
-    // Manification -> when oversampling.
-    // Minification -> when undersampling.
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_TRUE;
-
-    // Limits the amount of texel samples that can be used to calculate the
-    // final color.
-    // (A lower value results in better performance, but lower quality results)
-    // (To find the best match, we will retrieve the Phyisical Device properties)
-    VkPhysicalDeviceProperties properties{};
-    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-
-    // Specifies the color that is returned when sampling beyond the image with
-    // clmap to border adressing mode.
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    // Vk_TRUE: we can use the coords within [0, texWidth) and [0, texHeight)
-    // Vk_FALSE: we can use the coords within [0, 1)
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    // These two options are used in SHADOW MAPS(percentage-closer filtering).
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    // Mipmapping fields:
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.mipLodBias = 0.0f;
-    samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
-
-    auto status = vkCreateSampler(logicalDevice,&samplerInfo,nullptr,&m_textureSampler);
-
-    if (status != VK_SUCCESS)
-        throw std::runtime_error("Failed to create texture sampler!");
+void Texture::createTextureSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice) 
+{
+    m_textureSampler.createSampler(
+        physicalDevice,
+        logicalDevice
+    );
+   
 }
 
 void Texture::createTextureImageView(const VkDevice& logicalDevice, const VkFormat& format)  
@@ -238,12 +204,12 @@ const VkImageView& Texture::getTextureImageView() const
 
 const VkSampler& Texture::getTextureSampler() const
 {
-    return m_textureSampler;
+    return m_textureSampler.getSampler();
 }
 
 void Texture::destroyTexture(const VkDevice& logicalDevice)
 {
-    vkDestroySampler(logicalDevice, m_textureSampler, nullptr);
+    m_textureSampler.destroySampler(logicalDevice);
     vkDestroyImageView(logicalDevice, m_textureImageView, nullptr);
     vkDestroyImage(logicalDevice, m_textureImage, nullptr);
     vkFreeMemory(logicalDevice, m_textureImageMemory, nullptr);

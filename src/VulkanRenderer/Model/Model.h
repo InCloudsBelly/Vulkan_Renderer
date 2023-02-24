@@ -4,6 +4,8 @@
 
 #include "VulkanRenderer/Model/Vertex.h"
 #include "VulkanRenderer/Textures/Texture.h"
+#include "VulkanRenderer/Descriptors/DescriptorSets.h"
+#include "VulkanRenderer/Descriptors/DescriptorTypes/UBO.h"
 
 // REMEMBER: LoadObj automatically applies triangularization by default!
 
@@ -19,6 +21,7 @@ struct Model
 		VkQueue& graphicsQueue
 	);
 
+	const VkDescriptorSet& getDescriptorSet(const uint32_t index) const;
 
 	std::vector<Vertex>				vertices;
 	std::vector<uint32_t>			indices;
@@ -29,8 +32,9 @@ struct Model
 	VkDeviceMemory					indexMemory;
 
 	Texture							texture;
-
-	// DescriptorType descriptorType;
-	std::vector<VkDescriptorSet>	descriptorSets;
 	std::string						textureFile;
+
+	// Descriptors
+	UBO								ubo;
+	DescriptorSets					descriptorSets;
 };

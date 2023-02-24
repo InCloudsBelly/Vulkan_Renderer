@@ -1,7 +1,10 @@
 #include "VulkanRenderer/Commands/CommandPool.h"
 
 #include <vulkan/vulkan.h>
+
 #include <stdexcept>
+#include <memory>
+#include <vector>
 
 #include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
@@ -72,62 +75,11 @@ void CommandPool::allocAllCommandBuffers()
 		throw std::runtime_error("Failed to allocate command buffers!");
 }
 
-const VkCommandBuffer& CommandPool::getCommandBuffer(const uint32_t index) 
+VkCommandBuffer& CommandPool::getCommandBuffer(const uint32_t index)
 {
 	return m_commandBuffers[index];
 }
 
-void CommandPool::recordCommandBuffer(
-	const VkFramebuffer& framebuffer,
-	const VkRenderPass& renderPass,
-	const VkExtent2D& extent,
-	const VkPipeline& graphicsPipeline,
-	const uint32_t index,
-	const VkBuffer& vertexBuffer,
-	const VkBuffer& indexBuffer,
-	const size_t indexCount,
-	const VkPipelineLayout& pipelineLayout,
-	const std::vector<VkDescriptorSet>& descriptorSets)
-{
-	// Specifies some details about the usage of this specific command
-	// buffer.
-	beginCommandBuffer(0, m_commandBuffers[index]);
-
-		// NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
-		std::vector<VkClearValue> clearValues(2);
-		clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-		clearValues[1].color = { 1.0f, 0.0f };
-
-		VkRenderPassBeginInfo renderPassInfo{};
-		createRenderPassBeginInfo(renderPass,framebuffer,extent,clearValues,renderPassInfo);
-
-
-		//--------------------------------RenderPass--------------------------------
-		// The final parameter controls how the drawing commands between the
-		// render pass will be provided:
-		//    -VK_SUBPASS_CONTENTS_INLINE: The render pass commands will be
-		//    embedded in the primary command buffer itself and no secondary
-		//    command buffers will be executed.
-		//    -VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: The render pass
-		//    commands will be executed from secondary command buffers.
-
-		vkCmdBeginRenderPass(m_commandBuffers[index], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-		CommandUtils::STATE::bindPipeline(graphicsPipeline,m_commandBuffers[index]);
-		CommandUtils::STATE::bindVertexBuffers({ vertexBuffer }, { 0 }, 0, 1, m_commandBuffers[index]);
-		CommandUtils::STATE::bindIndexBuffer(indexBuffer, 0, VK_INDEX_TYPE_UINT32, m_commandBuffers[index]);
-
-		// Set Dynamic States
-		CommandUtils::STATE::setViewport(0.0f, 0.0f, extent, 0.0f, 1.0f, 0, 1, m_commandBuffers[index]);
-		CommandUtils::STATE::setScissor({ 0, 0 }, extent, 0, 1, m_commandBuffers[index]);
-		CommandUtils::STATE::bindDescriptorSets(pipelineLayout, 0, { descriptorSets[index] }, {}, m_commandBuffers[index]);
-
-		CommandUtils::ACTION::drawIndexed(indexCount, 1, 0, 0, 0, m_commandBuffers[index]);
-
-		vkCmdEndRenderPass(m_commandBuffers[index]);
-
-	endCommandBuffer(m_commandBuffers[index]);
-}
 
 void CommandPool::createRenderPassBeginInfo(const VkRenderPass& renderPass, const VkFramebuffer& framebuffer,
 	const VkExtent2D& extent, const std::vector<VkClearValue>& clearValues, VkRenderPassBeginInfo& renderPassInfo)

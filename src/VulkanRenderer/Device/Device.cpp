@@ -95,13 +95,8 @@ void Device::pickPhysicalDevice(
 
     for (const auto& device : devices)
     {
-        if (isPhysicalDeviceSuitable(
-            requiredQueueFamiliesIndices,
-            windowSurface,
-            swapchain,
-            device
-        )
-            ) {
+        if (isPhysicalDeviceSuitable(requiredQueueFamiliesIndices,windowSurface,swapchain,device)) 
+        {
             m_physicalDevice = device;
             break;
         }

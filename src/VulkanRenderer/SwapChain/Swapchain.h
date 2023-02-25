@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Window/WindowManager.h"
+#include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/DepthBuffer/DepthBuffer.h"
 
 
@@ -28,13 +28,13 @@ class Swapchain
 {
 public:
 	Swapchain();
-	~Swapchain() {}
-
-	void createSwapchain(
+	Swapchain(
 		const VkPhysicalDevice& physicalDevice,
 		const VkDevice& logicalDevice,
-		const WindowManager& windowM
+		const Window& window,
+		const SwapchainSupportedProperties& supportedProperties
 	);
+	~Swapchain();
 
 	void createAllImageViews(const VkDevice& logicalDevice);
 	void createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass, const DepthBuffer& depthBuffer);
@@ -45,33 +45,27 @@ public:
 
 	const VkExtent2D& getExtent() const;
 	const VkFormat& getImageFormat() const;
-	VkFramebuffer& getFramebuffer(const uint32_t imageIndex);
-	VkSwapchainKHR& getSwapchain();
-
-	uint32_t getImageCount();
-	uint32_t getMinImageCount();
-	VkImageView getImageView(const uint32_t index);
-
+	const VkFramebuffer& getFramebuffer(const uint32_t imageIndex) const;
+	const VkSwapchainKHR& get() const;
+	const uint32_t getImageCount() const;
+	const uint32_t getMinImageCount() const;
+	const VkImageView& getImageView(const uint32_t index) const;
 
 	// Used in isPhysicalDeviceSuitable function.
 	bool isSwapchainAdequated(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface);
 
 
 private:
-	void chooseBestSettings(const VkPhysicalDevice& physicalDevice,const WindowManager& window,
+	void chooseBestSettings(const Window& window,const SwapchainSupportedProperties& supportedProperties,
 			VkSurfaceFormatKHR& surfaceFormat,VkPresentModeKHR& presentMode,VkExtent2D& extent);
 
 	VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
 	VkPresentModeKHR chooseBestPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
-	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const WindowManager& window);
+	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const Window& window);
 
-	
-
-	SwapchainSupportedProperties getSupportedProperties(const VkPhysicalDevice& physicalDevice,const VkSurfaceKHR& surface);
-
-	bool existsMaxNumberOfSupportedImages(const VkSurfaceCapabilitiesKHR& capabilities);
+	const bool existsMaxNumberOfSupportedImages(const VkSurfaceCapabilitiesKHR& capabilities)const;
 
 
 private:
@@ -84,7 +78,6 @@ private:
 	// access.
 	std::vector<VkImageView>		m_imageViews;
 
-	std::optional<SwapchainSupportedProperties> m_supportedProperties;
 	VkFormat						m_imageFormat;
 	VkExtent2D						m_extent;
 

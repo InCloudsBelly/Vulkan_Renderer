@@ -14,44 +14,63 @@ CommandPool::CommandPool() {}
 
 CommandPool::~CommandPool() {}
 
-void CommandPool::createCommandPool(const VkDevice& logicalDevice, const VkCommandPoolCreateFlags& flags, QueueFamilyIndices& queueFamilyIndices)
+CommandPool::CommandPool(const VkDevice& logicalDevice, const VkCommandPoolCreateFlags& flags, const uint32_t& graphicsFamilyIndex)
+	: m_logicalDevice(logicalDevice) 
 {
-	m_logicalDevice = logicalDevice;
-	m_queueFamilyIndices = queueFamilyIndices;
-	m_commandBuffers.resize(Config::MAX_FRAMES_IN_FLIGHT);
 
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 	poolInfo.flags = flags;
-	poolInfo.queueFamilyIndex = m_queueFamilyIndices.graphicsFamily.value();
+	poolInfo.queueFamilyIndex = graphicsFamilyIndex;
 
 	if (vkCreateCommandPool(m_logicalDevice, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create command pool!");
 }
 
-VkCommandPool& CommandPool::getCommandPool()
+const VkCommandPool& CommandPool::get() const
 {
 	return m_commandPool;
 }
 
 
-void CommandPool::destroyCommandPool()
+void CommandPool::destroy()
 {
 	vkDestroyCommandPool(m_logicalDevice, m_commandPool, nullptr);
 }
 
-void CommandPool::allocCommandBuffer(VkCommandBuffer& commandBuffer)
+void CommandPool::createCommandBufferAllocateInfo(const uint32_t& commandBuffersCount,VkCommandBufferAllocateInfo& allocInfo) 
 {
-	VkCommandBufferAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 	allocInfo.commandPool = m_commandPool;
-	allocInfo.commandBufferCount = 1;
-
-	vkAllocateCommandBuffers(m_logicalDevice, &allocInfo, &commandBuffer);
+	allocInfo.commandBufferCount = commandBuffersCount;
 }
 
-void CommandPool::submitCommandBuffer(VkQueue& graphicsQueue, VkCommandBuffer& commandBuffer)
+void CommandPool::allocCommandBuffers(const uint32_t& commandBuffersCount)
+{
+	const uint32_t oldSize = m_commandBuffers.size();
+	m_commandBuffers.resize(oldSize + commandBuffersCount);
+
+	VkCommandBufferAllocateInfo allocInfo{};
+	createCommandBufferAllocateInfo(commandBuffersCount, allocInfo);
+
+	vkAllocateCommandBuffers(m_logicalDevice, &allocInfo, &m_commandBuffers[oldSize]);
+
+}
+
+void CommandPool::allocCommandBuffer(VkCommandBuffer& commandBuffer, const bool isOneTimeUsage)
+{
+	VkCommandBufferAllocateInfo allocInfo{};
+	createCommandBufferAllocateInfo(1, allocInfo);
+
+	vkAllocateCommandBuffers(m_logicalDevice, &allocInfo, &commandBuffer);
+
+	if (isOneTimeUsage == false)
+		m_commandBuffers.push_back(commandBuffer);
+}
+
+
+void CommandPool::submitCommandBuffer(const VkQueue& graphicsQueue, const VkCommandBuffer& commandBuffer)
 {
 	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -63,27 +82,11 @@ void CommandPool::submitCommandBuffer(VkQueue& graphicsQueue, VkCommandBuffer& c
 	vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
 	vkQueueWaitIdle(graphicsQueue);
 
-	freeCommandBuffer(commandBuffer);
+	//freeCommandBuffer(commandBuffer);
 }
 
-// Allocates all the commands buffers saved in m_commandBuffers in the cmd pool.
 
-void CommandPool::allocAllCommandBuffers()
-{
-	if (m_commandBuffers.size() == 0)
-		throw std::runtime_error("Allocating empty CMD Buffers to the CMD Pool!");
-
-	VkCommandBufferAllocateInfo allocInfo{};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = m_commandPool;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = (uint32_t)m_commandBuffers.size();
-
-	if (vkAllocateCommandBuffers(m_logicalDevice,&allocInfo,m_commandBuffers.data()) != VK_SUCCESS)
-		throw std::runtime_error("Failed to allocate command buffers!");
-}
-
-VkCommandBuffer& CommandPool::getCommandBuffer(const uint32_t index)
+const VkCommandBuffer& CommandPool::getCommandBuffer(const uint32_t index) const
 {
 	return m_commandBuffers[index];
 }
@@ -110,7 +113,7 @@ void CommandPool::createRenderPassBeginInfo(const VkRenderPass& renderPass, cons
 }
 
 
-void CommandPool::beginCommandBuffer(const VkCommandBufferUsageFlags& flags, VkCommandBuffer& commandBuffer)
+void CommandPool::beginCommandBuffer(const VkCommandBufferUsageFlags& flags,const VkCommandBuffer& commandBuffer)
 {
 	VkCommandBufferBeginInfo beginInfo{};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -138,7 +141,7 @@ void CommandPool::beginCommandBuffer(const VkCommandBufferUsageFlags& flags, VkC
 		throw std::runtime_error("Failed to begin recording command buffer!");
 }
 
-void CommandPool::endCommandBuffer(VkCommandBuffer& commandBuffer)
+void CommandPool::endCommandBuffer(const VkCommandBuffer& commandBuffer)
 {
 	auto status = vkEndCommandBuffer(commandBuffer);
 	if (status != VK_SUCCESS)

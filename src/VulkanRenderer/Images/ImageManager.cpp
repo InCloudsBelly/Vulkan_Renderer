@@ -117,7 +117,7 @@ void ImageManager::copyBufferToImage(
 
     VkCommandBuffer commandBuffer;
 
-    commandPool.allocCommandBuffer(commandBuffer);
+    commandPool.allocCommandBuffer(commandBuffer, true);
 
 
     commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, commandBuffer);

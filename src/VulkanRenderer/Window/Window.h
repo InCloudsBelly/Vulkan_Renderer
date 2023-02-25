@@ -4,11 +4,11 @@
 #include <GLFW/glfw3.h>
 
 // Make it Singleton!
-class WindowManager
+class Window
 {
 public:
-	WindowManager();
-   ~WindowManager();
+	Window();
+   ~Window();
 	
 	void createWindow(const uint16_t width, const uint16_t height, const char* title);
 
@@ -25,10 +25,12 @@ public:
 
 	void pollEvents();
 
-	GLFWwindow* getWindow();
+	const GLFWwindow* get() const;
 
 private:
 
+	// ImGui needs to access to non-const GLFWwindow.
+	friend class GUI;
 	GLFWwindow* m_window;
 	VkSurfaceKHR m_surface;
 };

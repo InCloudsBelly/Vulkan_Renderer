@@ -14,18 +14,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <imgui.h>
-#include <imgui_internal.h>
-#include <imstb_rectpack.h>
-#include <imstb_textedit.h>
-#include <imstb_truetype.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_vulkan.h>
-
 #include "VulkanRenderer/Settings/config.h"
 #include "VulkanRenderer/Settings/VkLayersConfig.h"
 #include "VulkanRenderer/ValidationLayersManager/vlManager.h"
-#include "VulkanRenderer/Window/WindowManager.h"
+#include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
@@ -44,6 +36,11 @@
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
 #include "VulkanRenderer/Textures/Texture.h"
 #include "VulkanRenderer/DepthBuffer/DepthBuffer.h"
+#include "VulkanRenderer/DepthBuffer/DepthUtils.h"
+#include "VulkanRenderer/RenderPass/RenderPass.h"
+#include "VulkanRenderer/RenderPass/SubPassUtils.h"
+#include "VulkanRenderer/RenderPass/AttachmentUtils.h"
+#include "VulkanRenderer/GUI/GUI.h"
 
 
 float rotX = 1.0f;
@@ -54,179 +51,14 @@ float movX = 1.0f;
 float movY = 1.0f;
 float movZ = 1.0f;
 
-void Renderer::initImgui()
-{
-    // -Descriptor Pool
-
-    // (calculates the total size of the pool depending of the descriptors
-    // we send as parameter and the number of descriptor SETS defined)
-
-    m_descriptorPoolImgui.createDescriptorPool(
-        m_device.getLogicalDevice(),
-        {
-            { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-            { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-            { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-            { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-        },
-        // Descriptor SETS count.
-         // (11 -> count of all the descriptor types)
-        1000 * 11
-    );
-
-    // -RenderPass
-
-    VkAttachmentDescription attachment = {};
-    attachment.format = m_swapchain.getImageFormat();
-    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-    // Tells Vulkan to not clear the content of the framebuffer but to draw
-    // over it instead.
-    // (because we want the GUI to be drawn over our main rendering)
-    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    // We don't care about stencil in Imgui.
-    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    // We want optimal performance because we are going to draw some stuff.
-    attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    VkAttachmentReference colorAttachment = {};
-    colorAttachment.attachment = 0;
-    colorAttachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    // -Subpass
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &colorAttachment;
-
-    // -Synch. between this render pass and the one from the renderer.
-    VkSubpassDependency dependency = {};
-    // To create a dependency outside the current render pass.
-    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-    // Refers to our first and only subpass by its index.
-    dependency.dstSubpass = 0;
-    // Here we have to state what we're watining for.
-    // Before drawing the GUI, we want our geometry to be already renderer. That
-    // means we want the pixels to be already written to the framebuffer(that's
-    // why we use VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    // Here we state when we want to draw(also the same thing that we are
-    // waiting in srcStageMask).
-    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    // 0 means "nothing". As in, the ir no memory dependency the barrier
-    // introduces. Implicit sync. means Vulkan does it for us.
-    dependency.srcAccessMask = 0;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-    VkRenderPassCreateInfo info = {};
-    info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    info.attachmentCount = 1;
-    info.pAttachments = &attachment;
-    info.subpassCount = 1;
-    info.pSubpasses = &subpass;
-    info.dependencyCount = 1;
-    info.pDependencies = &dependency;
-
-    auto status = vkCreateRenderPass(
-        m_device.getLogicalDevice(),
-        &info,
-        nullptr,
-        &m_renderPassImgui
-    );
-
-    if (status != VK_SUCCESS)
-        throw std::runtime_error("Failed to create Imgui's render pass");
-
-
-    //********************* Imgui ***************************/
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-
-    ImGui::StyleColorsDark();
-
-    ImGui_ImplGlfw_InitForVulkan(m_windowM.getWindow(), true);
-    ImGui_ImplVulkan_InitInfo initInfo = {};
-    initInfo.Instance = m_vkInstance;
-    initInfo.PhysicalDevice = m_device.getPhysicalDevice();
-    initInfo.Device = m_device.getLogicalDevice();
-    initInfo.QueueFamily = m_qfIndices.graphicsFamily.value();
-    initInfo.Queue = m_qfHandles.graphicsQueue;
-    initInfo.PipelineCache = VK_NULL_HANDLE;
-    initInfo.DescriptorPool = m_descriptorPoolImgui.getDescriptorPool();
-    initInfo.Allocator = nullptr;
-    initInfo.MinImageCount = m_swapchain.getMinImageCount();
-    initInfo.ImageCount = m_swapchain.getImageCount();
-    initInfo.CheckVkResultFn = nullptr;
-    ImGui_ImplVulkan_Init(&initInfo, m_renderPassImgui);
-
-    // -Createion of command buffers and comman pool
-    m_commandPoolImgui.createCommandPool(m_device.getLogicalDevice(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_qfIndices);
-
-    // (CHANGE THIS -> BEGIN COMMAND BUFFER TO UTILS! IT HAST NOTHING TO DO
-    // WITH COMMANDPOOL.h)
-    // (one time usage command buffer...)
-    m_commandBuffersImgui.resize(Config::MAX_FRAMES_IN_FLIGHT);
-    m_commandPoolImgui.allocCommandBuffer(m_commandBuffersImgui[0]);
-    m_commandPoolImgui.allocCommandBuffer(m_commandBuffersImgui[1]);
-    {
-        // -Uploading the fonts to the GPU
-       // (one time command buffer)
-       // We can just use any commandBuffer.
-        VkCommandBuffer newCommandBuffer;
-
-        m_commandPoolImgui.allocCommandBuffer(newCommandBuffer);
-        m_commandPoolImgui.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, newCommandBuffer);
-
-        ImGui_ImplVulkan_CreateFontsTexture(newCommandBuffer);
-
-        m_commandPoolImgui.endCommandBuffer(newCommandBuffer);
-        m_commandPoolImgui.submitCommandBuffer(m_qfHandles.graphicsQueue, newCommandBuffer);
-    }
-
-    // FrameBuffer
-    {
-        m_framebuffersImgui.resize(m_swapchain.getImageCount());
-
-        VkImageView attachment[1];
-        VkFramebufferCreateInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        info.renderPass = m_renderPassImgui;
-        info.attachmentCount = 1;
-        info.pAttachments = attachment;
-        info.width = m_swapchain.getExtent().width;
-        info.height = m_swapchain.getExtent().height;
-        // The layers is 1 because our imageViews are single images and not
-        // arrays.
-        info.layers = 1;
-        for (uint32_t i = 0; i < m_swapchain.getImageCount(); i++)
-        {
-            attachment[0] = m_swapchain.getImageView(i);
-            vkCreateFramebuffer(m_device.getLogicalDevice(), &info, nullptr, &m_framebuffersImgui[i]);
-        }
-    }
-
-}
-
 
 void Renderer::run()
 {
     // Improve this!
     // NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
-    clearValues.resize(2);
-    clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-    clearValues[1].color = { 1.0f, 0.0f };
+    m_clearValues.resize(2);
+    m_clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    m_clearValues[1].color = { 1.0f, 0.0f };
 
     if (m_models.size() == 0)
     {
@@ -236,14 +68,24 @@ void Renderer::run()
 
     initWindow();
     initVulkan();
-    initImgui();
+
+    m_GUI = std::make_unique<GUI>(
+        m_device.getPhysicalDevice(),
+        m_device.getLogicalDevice(),
+        m_vkInstance,
+        *(m_swapchain.get()),
+        m_qfIndices.graphicsFamily.value(),
+        m_qfHandles.graphicsQueue,
+        m_window
+        );
+
     mainLoop();
     cleanup();
 }
 
 void Renderer::initWindow()
 {
-    m_windowM.createWindow(Config::RESOLUTION_W,Config::RESOLUTION_H,Config::TITLE);
+    m_window.createWindow(Config::RESOLUTION_W,Config::RESOLUTION_H,Config::TITLE);
 }
 
 void Renderer::createSyncObjects()
@@ -349,24 +191,132 @@ void Renderer::createVkInstance()
         throw std::runtime_error("Failed to create Vulkan's instance!");
 }
 
+void Renderer::createRenderPass()
+{
+    // -Attachments
+    // Color Attachment
+    VkAttachmentDescription colorAttachment{};
+    AttachmentUtils::createAttachmentDescription(
+        m_swapchain->getImageFormat(),
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        colorAttachment
+    );
+
+    // Depth Attachment
+    VkFormat depthFormat = DepthUtils::findSupportedFormat(
+        m_device.getPhysicalDevice(),
+        {
+         VK_FORMAT_D32_SFLOAT,
+         VK_FORMAT_D32_SFLOAT_S8_UINT,
+         VK_FORMAT_D24_UNORM_S8_UINT
+        },
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+    );
+    VkAttachmentDescription depthAttachment{};
+    AttachmentUtils::createAttachmentDescriptionWithStencil(
+        depthFormat,
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
+        // We don't care about storing the depth data, because it will not be
+        // used after drawing has finished.
+        VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        // Just like the color buffer, we don't care about the previous depth
+        // contents.
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        depthAttachment
+    );
+
+    // Attachment references
+
+    VkAttachmentReference colorAttachmentRef{};
+    AttachmentUtils::createAttachmentReference(
+        0,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        colorAttachmentRef
+    );
+
+    VkAttachmentReference depthAttachmentRef{};
+    AttachmentUtils::createAttachmentReference(
+        1,
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        depthAttachmentRef
+    );
+
+    // Subpasses
+
+    std::vector<VkAttachmentReference> allAttachments = {
+       colorAttachmentRef
+    };
+    VkSubpassDescription subPassDescript{};
+    SubPassUtils::createSubPassDescription(
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        allAttachments,
+        &depthAttachmentRef,
+        subPassDescript
+    );
+
+    // Subpass dependencies
+
+    VkSubpassDependency dependency{};
+    SubPassUtils::createSubPassDependency(
+        // -Source parameters.
+        //VK_SUBPASS_EXTERNAL means anything outside of a given render pass
+        //scope. When used for srcSubpass it specifies anything that happened 
+        //before the render pass. 
+        VK_SUBPASS_EXTERNAL,
+        // Operations that the subpass needs to wait on. 
+        (
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+            ),
+        0,
+        // -Destination parameters.
+        0,
+        (
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+            ),
+        (
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+            ),
+        dependency
+    );
+
+    m_renderPass = RenderPass(
+        m_device.getLogicalDevice(),
+        { colorAttachment, depthAttachment },
+        { subPassDescript },
+        { dependency }
+    );
+}
+
 
 void Renderer::initVulkan()
 {
     createVkInstance();
 
     vlManager::createDebugMessenger(m_vkInstance, m_debugMessenger);
-    m_windowM.createSurface(m_vkInstance);
+    m_window.createSurface(m_vkInstance);
 
-    m_device.pickPhysicalDevice(m_vkInstance,m_qfIndices,m_windowM.getSurface(),m_swapchain);
+    m_device.pickPhysicalDevice(m_vkInstance,m_qfIndices,m_window.getSurface());
     m_device.createLogicalDevice(m_qfIndices);
 
     m_qfHandles.setQueueHandles(m_device.getLogicalDevice(), m_qfIndices);
 
-    m_swapchain.createSwapchain(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_windowM);
+    m_swapchain = std::make_unique<Swapchain>(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_window, m_device.getSupportedProperties());
 
-    m_swapchain.createAllImageViews(m_device.getLogicalDevice());
+    m_swapchain->createAllImageViews(m_device.getLogicalDevice());
 
-    m_renderPass.createRenderPass(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain.getImageFormat());
+    createRenderPass();
 
     DescriptorSetLayoutUtils::createDescriptorSetLayout(
         m_device.getLogicalDevice(),
@@ -377,31 +327,29 @@ void Renderer::initVulkan()
         m_descriptorSetLayout
     );
 
-    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(),m_swapchain.getExtent(), m_renderPass.getRenderPass(), m_descriptorSetLayout);
+    m_graphicsPipelineM.createGraphicsPipeline(m_device.getLogicalDevice(), m_swapchain->getExtent(), m_renderPass.get() , m_descriptorSetLayout);
 
-    m_depthBuffer.createDepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain.getExtent());
+    m_depthBuffer.createDepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain->getExtent());
 
-    m_swapchain.createFramebuffers(m_device.getLogicalDevice(), m_renderPass.getRenderPass(), m_depthBuffer);
+    m_swapchain->createFramebuffers(m_device.getLogicalDevice(), m_renderPass.get(), m_depthBuffer);
 
 
     // Command Pool #1
     // (improve this)
-    const uint32_t cmdPoolIndex = 0;
-
-    CommandPool newCommandPool;
-    newCommandPool.createCommandPool(
+    m_commandPool = CommandPool(
         m_device.getLogicalDevice(),
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        m_qfIndices
+        m_qfIndices.graphicsFamily.value()
     );
 
-    m_commandPools.push_back(newCommandPool);
+    // Allocates all the neccessary cmd buffers in the cmd pool.
+    m_commandPool.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
 
     for (auto& model : m_models)
     {
         // Vertex buffer(with staging buffer)
         BufferManager::createBufferAndTransferToDevice(
-            m_commandPools[cmdPoolIndex],
+            m_commandPool,
             m_device.getPhysicalDevice(),
             m_device.getLogicalDevice(),
             model->vertices,
@@ -413,7 +361,7 @@ void Renderer::initVulkan()
 
         // Index Buffer(with staging buffer)
         BufferManager::createBufferAndTransferToDevice(
-            m_commandPools[cmdPoolIndex],
+            m_commandPool,
             m_device.getPhysicalDevice(),
             m_device.getLogicalDevice(),
             model->indices,
@@ -428,7 +376,7 @@ void Renderer::initVulkan()
             m_device.getPhysicalDevice(),
             m_device.getLogicalDevice(),
             VK_FORMAT_R8G8B8A8_SRGB,
-            m_commandPools[0],
+            m_commandPool,
             m_qfHandles.graphicsQueue
         );
 
@@ -459,8 +407,6 @@ void Renderer::initVulkan()
             m_descriptorPool
         );
     }
-    // Allocates all the command buffers in the command Pool #1
-    m_commandPools[cmdPoolIndex].allocAllCommandBuffers();
 
     createSyncObjects();
 }
@@ -472,7 +418,7 @@ void Renderer::recordCommandBuffer(
     const VkPipeline& graphicsPipeline,
     const VkPipelineLayout& pipelineLayout,
     const uint32_t currentFrame,
-    VkCommandBuffer& commandBuffer,
+    const VkCommandBuffer& commandBuffer,
     CommandPool& commandPool
 ) {
 
@@ -481,7 +427,7 @@ void Renderer::recordCommandBuffer(
     commandPool.beginCommandBuffer(0, commandBuffer);
 
     VkRenderPassBeginInfo renderPassInfo{};
-    commandPool.createRenderPassBeginInfo(renderPass, framebuffer, extent, clearValues, renderPassInfo);
+    commandPool.createRenderPassBeginInfo(renderPass, framebuffer, extent, m_clearValues, renderPassInfo);
 
     //--------------------------------RenderPass-----------------------------
 
@@ -529,30 +475,30 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     //------------------------Updates uniform buffer----------------------------
-    updateUniformBuffer1(m_device.getLogicalDevice(), currentFrame, m_swapchain.getExtent(), m_models[0]->ubo.getUniformBufferMemories());
+    updateUniformBuffer1(m_device.getLogicalDevice(), currentFrame, m_swapchain->getExtent(), m_models[0]->ubo.getUniformBufferMemories());
 
    /* updateUniformBuffer2(m_device.getLogicalDevice(), currentFrame, m_swapchain.getExtent(), m_models[1]->ubo.getUniformBufferMemories());*/
     //--------------------Acquires an image from the swapchain------------------
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchain.getSwapchain(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+    vkAcquireNextImageKHR(m_device.getLogicalDevice(), m_swapchain->get(), UINT64_MAX, m_imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
 
     //---------------------Records all the command buffer-----------------------    
     // Resets the command buffer to be able to be recorded/written.
-    m_commandPools[0].resetCommandBuffer(currentFrame);
+    m_commandPool.resetCommandBuffer(currentFrame);
     recordCommandBuffer(
-        m_swapchain.getFramebuffer(imageIndex),
-        m_renderPass.getRenderPass(),
-        m_swapchain.getExtent(),
+        m_swapchain->getFramebuffer(imageIndex),
+        m_renderPass.get(),
+        m_swapchain->getExtent(),
         m_graphicsPipelineM.getGraphicsPipeline(),
         m_graphicsPipelineM.getPipelineLayout(),
         currentFrame,
-        m_commandPools[0].getCommandBuffer(currentFrame),
-        m_commandPools[0]
+        m_commandPool.getCommandBuffer(currentFrame),
+        m_commandPool
     );
 
     // Draws imgui
-    imguiRender(currentFrame, imageIndex);
+    m_GUI->recordCommandBuffer(currentFrame, imageIndex, m_clearValues);
 
     //----------------------Submits the command buffer -------------------------
 
@@ -569,8 +515,8 @@ void Renderer::drawFrame(uint8_t& currentFrame)
    // execution.
     ///////////////////////MAKE IT CUSTOM -> IMGUI!////////////////////////////
     std::array<VkCommandBuffer, 2> submitCommandBuffers = {
-       m_commandPools[0].getCommandBuffer(currentFrame),
-       m_commandBuffersImgui[currentFrame]
+        m_commandPool.getCommandBuffer(currentFrame),
+        m_GUI->getCommandBuffer(currentFrame)
     };
     submitInfo.commandBufferCount = 2;
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
@@ -590,7 +536,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     presentInfo.waitSemaphoreCount = 1;
     presentInfo.pWaitSemaphores = signalSemaphores;
 
-    VkSwapchainKHR swapchains[] = { m_swapchain.getSwapchain() };
+    VkSwapchainKHR swapchains[] = { m_swapchain->get() };
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapchains;
     presentInfo.pImageIndices = &imageIndex;
@@ -603,85 +549,16 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     currentFrame = (currentFrame + 1) % Config::MAX_FRAMES_IN_FLIGHT;
 }
 
-void Renderer::imguiRender(const uint8_t currentFrame, const uint8_t imageIndex)
-{
-    // - Resets a command pool and starts to record command into a command buffer
-    // (because the UI can change...e.g buttons will be added on the fly, window resizing, etc)
-
-    {
-        //vkResetCommandPool(m_device.getLogicalDevice(), m_commandPoolImgui.getCommandPool(), 0);
-        vkResetCommandBuffer(m_commandBuffersImgui[currentFrame], 0);
-        VkCommandBufferBeginInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkBeginCommandBuffer(m_commandBuffersImgui[currentFrame], &info);
-    }
-
-    // Starts the render pass
-    {
-        VkRenderPassBeginInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        info.renderPass = m_renderPassImgui;
-        info.framebuffer = m_framebuffersImgui[imageIndex];
-        info.renderArea.extent.width = m_swapchain.getExtent().width;
-        info.renderArea.extent.height = m_swapchain.getExtent().height;
-        info.clearValueCount = 1;
-        // no se si usar imageIndex or currentFrame
-        info.pClearValues = &(clearValues[currentFrame]);
-        vkCmdBeginRenderPass(m_commandBuffersImgui[currentFrame], &info, VK_SUBPASS_CONTENTS_INLINE);
-
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_commandBuffersImgui[currentFrame]);
-
-        vkCmdEndRenderPass(m_commandBuffersImgui[currentFrame]);
-        vkEndCommandBuffer(m_commandBuffersImgui[currentFrame]);
-    }
-}
 
 void Renderer::mainLoop()
 {
     // Tells us in which frame we are,
     // between 1 <= frame <= MAX_FRAMES_IN_FLIGHT
     uint8_t currentFrame = 0;
-    while (m_windowM.isWindowClosed() == false)
+    while (m_window.isWindowClosed() == false)
     {
-        m_windowM.pollEvents();
-
-        // Draws Imgui
-        ImGui_ImplVulkan_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        ImGui::ShowDemoWindow();
-        //{
-        //   static float f = 0.0f;
-        //   static int counter = 0;
-        //   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-        //   bool show_demo_window;
-        //   
-        //   ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-        //   
-        //   ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-        //   ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-        //   
-        //   ImGui::SliderFloat("float1", &rotX, -100.0f, 360.0f);
-        //   ImGui::SliderFloat("float2", &rotY, -100.0f, 360.0f);
-        //   ImGui::SliderFloat("float3", &rotZ, -100.0f, 360.0f);
-        //   ImGui::SliderFloat("float4", &movX, -30.0f, 10.0f);
-        //   ImGui::SliderFloat("float5", &movY, -30.0f, 10.0f);
-        //   ImGui::SliderFloat("float6", &movZ, -30.0f, 10.0f);
-
-        //   ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-        //   
-        //   if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-        //       counter++;
-        //   ImGui::SameLine();
-        //   ImGui::Text("counter = %d", counter);
-        //   
-        //   ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        //   ImGui::End();
-
-        //}
-        ImGui::Render();
-
+        m_window.pollEvents();
+        m_GUI->draw();
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -702,14 +579,17 @@ void Renderer::cleanup()
     // DepthBuffer
     m_depthBuffer.destroyDepthBuffer(m_device.getLogicalDevice());
 
+    // ImGui
+    m_GUI->destroy(m_device.getLogicalDevice());
+
     // Framebuffers
-    m_swapchain.destroyFramebuffers(m_device.getLogicalDevice());
+    m_swapchain->destroyFramebuffers(m_device.getLogicalDevice());
 
     // ViewImages of the images from the Swapchain
-    m_swapchain.destroyImageViews(m_device.getLogicalDevice());
+    m_swapchain->destroyImageViews(m_device.getLogicalDevice());
 
     // Swapchain
-    m_swapchain.destroySwapchain(m_device.getLogicalDevice());
+    m_swapchain->destroySwapchain(m_device.getLogicalDevice());
 
     // Graphics Pipeline
     m_graphicsPipelineM.destroyGraphicsPipeline(m_device.getLogicalDevice());
@@ -718,7 +598,7 @@ void Renderer::cleanup()
     m_graphicsPipelineM.destroyPipelineLayout(m_device.getLogicalDevice());
 
     // Render pass
-    m_renderPass.destroyRenderPass(m_device.getLogicalDevice());
+    m_renderPass.destroy(m_device.getLogicalDevice());
 
     // UBO(with their uniform buffers and uniform memories)
     for (auto& model : m_models)
@@ -751,9 +631,8 @@ void Renderer::cleanup()
     // Sync objects
     destroySyncObjects();
 
-    // Command Pool
-    for (auto& commandPool : m_commandPools)
-        commandPool.destroyCommandPool();
+    // Command Pools
+    m_commandPool.destroy();
 
     // Logical Device
     vkDestroyDevice(m_device.getLogicalDevice(), nullptr);
@@ -769,13 +648,13 @@ void Renderer::cleanup()
     }
 
     // Window Surface
-    m_windowM.destroySurface(m_vkInstance);
+    m_window.destroySurface(m_vkInstance);
 
     // Vulkan's instance
     vkDestroyInstance(m_vkInstance, nullptr);
 
     // GLFW
-    m_windowM.destroyWindow();
+    m_window.destroyWindow();
 }
 
 
@@ -799,8 +678,49 @@ void Renderer::updateUniformBuffer1(
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     DescriptorTypes::UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(time * 90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.model = glm::translate(ubo.model, glm::vec3(movX, movY, movZ));
+    //ubo.model = glm::scale(
+   //      glm::mat4(1.0f),
+   //      glm::vec3(0.05f)
+   //);
+   //ubo.model = glm::rotate(
+   //      ubo.model,
+   //      glm::radians(rotX),
+   //      glm::vec3(1.0f, 0.0f, 0.0f)
+   //);
+   //ubo.model = glm::rotate(
+   //      ubo.model,
+   //      glm::radians(rotY),
+   //      glm::vec3(0.0f, 1.0f, 0.0f)
+   //);
+   //ubo.model = glm::rotate(
+   //      ubo.model,
+   //      glm::radians(rotZ),
+   //      glm::vec3(0.0f, 0.0f, 1.0f)
+   //);
+
+   //ubo.model = glm::translate(
+   //      ubo.model,
+   //      glm::vec3(movX, movY, movZ)
+   //);
+    ubo.model = glm::mat4(1.0);
+    ubo.model = glm::translate(
+        ubo.model,
+        glm::vec3(
+            -((m_models[0]->extremeX[1] + m_models[0]->extremeX[0]) / 2.0),
+            -((m_models[0]->extremeY[1] + m_models[0]->extremeY[0]) / 2.0),
+            -((m_models[0]->extremeZ[1] + m_models[0]->extremeZ[0]) / 2.0)
+        )
+    );
+    ubo.model = glm::rotate(ubo.model, glm::radians(0.0f),glm::vec3(1.0f, 0.0f, 0.0f));
+    ubo.model = glm::rotate(ubo.model,glm::radians(0.0f),glm::vec3(0.0f, 1.0f, 0.0f));
+    ubo.model = glm::rotate(ubo.model,glm::radians(0.0f),glm::vec3(0.0f, 0.0f, 1.0f));
+    float mX = std::fmax(std::fabs(m_models[0]->extremeX[0]),std::fabs(m_models[0]->extremeX[1]));
+    float mY = std::fmax(std::fabs(m_models[0]->extremeY[0]),std::fabs(m_models[0]->extremeY[1]));
+    float mZ = std::fmax(std::fabs(m_models[0]->extremeZ[0]),std::fabs(m_models[0]->extremeZ[1]));
+
+    ubo.model = glm::scale(ubo.model,glm::vec3(1.0f / mX, 1.0f / mY, 1.0f / mZ));
+    ubo.model = glm::translate(ubo.model,glm::vec3(movX, movY, movZ));
+ 
     ubo.view = glm::lookAt(glm::vec3(2.0, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), (extent.width / (float)extent.height), 0.1f, 10.0f);
 

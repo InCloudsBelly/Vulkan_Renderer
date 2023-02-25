@@ -81,9 +81,8 @@ void Device::createLogicalDevice(
 void Device::pickPhysicalDevice(
     VkInstance& vkInstance,
     QueueFamilyIndices& requiredQueueFamiliesIndices,
-    const VkSurfaceKHR& windowSurface,
-    Swapchain& swapchain
-) {
+    const VkSurfaceKHR& windowSurface ) 
+{
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(vkInstance, &deviceCount, nullptr);
 
@@ -95,7 +94,7 @@ void Device::pickPhysicalDevice(
 
     for (const auto& device : devices)
     {
-        if (isPhysicalDeviceSuitable(requiredQueueFamiliesIndices,windowSurface,swapchain,device)) 
+        if (isPhysicalDeviceSuitable(requiredQueueFamiliesIndices,windowSurface,device)) 
         {
             m_physicalDevice = device;
             break;
@@ -109,7 +108,6 @@ void Device::pickPhysicalDevice(
 bool Device::isPhysicalDeviceSuitable(
     QueueFamilyIndices& requiredQueueFamiliesIndices,
     const VkSurfaceKHR& windowSurface,
-    Swapchain& swapchain,
     const VkPhysicalDevice& possiblePhysicalDevice
 ) {
 
@@ -149,10 +147,8 @@ bool Device::isPhysicalDeviceSuitable(
         return false;
 
     // - Swapchain support
-    if (swapchain.isSwapchainAdequated(possiblePhysicalDevice, windowSurface) == false) 
-    {
+    if (isSwapchainAdequated(possiblePhysicalDevice, windowSurface) == false)
         return false;
-    }
 
     return true;
 }
@@ -199,12 +195,61 @@ bool Device::areAllExtensionsSupported(
     return true;
 }
 
-const VkDevice& Device::getLogicalDevice()
+const VkDevice& Device::getLogicalDevice() const
 {
     return m_logicalDevice;
 }
 
-const VkPhysicalDevice& Device::getPhysicalDevice()
+const VkPhysicalDevice& Device::getPhysicalDevice() const
 {
     return m_physicalDevice;
+}
+
+const SwapchainSupportedProperties& Device::getSupportedProperties() const
+{
+    return m_supportedProperties;
+}
+
+/*
+ * Verifies if the device is compatible with the swapchain.
+*/
+bool Device::isSwapchainAdequated(const VkPhysicalDevice& physicalDevice,const VkSurfaceKHR& surface) 
+{
+    findSupportedProperties(physicalDevice, surface, m_supportedProperties);
+
+    return (m_supportedProperties.surfaceFormats.empty() != true && m_supportedProperties.presentModes.empty() != true);
+
+}
+
+/*
+ * Gets all the supported properties of the swapchain depending of the logical
+ * device and the window's surface.
+ */
+void Device::findSupportedProperties(
+    const VkPhysicalDevice& physicalDevice,
+    const VkSurfaceKHR& surface,
+    SwapchainSupportedProperties& supportedProperties
+) {
+    // - Surface capabilities.
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice,surface,&supportedProperties.capabilities);
+
+    // - Surface formats
+    uint32_t formatCount;
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+
+    if (formatCount != 0)
+    {
+        supportedProperties.surfaceFormats.resize(formatCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, supportedProperties.surfaceFormats.data());
+    }
+
+    // - Surface Presentation Modes
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
+
+    if (presentModeCount != 0)
+    {
+        supportedProperties.presentModes.resize(presentModeCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, supportedProperties.presentModes.data());
+    }
 }

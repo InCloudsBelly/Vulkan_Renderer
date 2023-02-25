@@ -6,7 +6,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "VulkanRenderer/Window/WindowManager.h"
+#include "VulkanRenderer/Window/Window.h"
+#include "VulkanRenderer/GUI/GUI.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
@@ -26,8 +27,6 @@ public:
 	void run();
 	void addModel(const std::string& meshFile, const std::string& textureFile);
 
-	void initImgui();
-	void imguiRender(const uint8_t currentFrame, const uint8_t imageIndex);
 
 private:
 
@@ -52,6 +51,8 @@ private:
 	void mainLoop();
 	void cleanup();
 
+	void createRenderPass();
+
 	void recordCommandBuffer(
 		const VkFramebuffer& framebuffer,
 		const VkRenderPass& renderPass,
@@ -59,7 +60,7 @@ private:
 		const VkPipeline& graphicsPipeline,
 		const VkPipelineLayout& pipelineLayout,
 		const uint32_t currentFrame,
-		VkCommandBuffer& commandBuffer,
+		const VkCommandBuffer& commandBuffer,
 		CommandPool& commandPool
 	);
 
@@ -70,21 +71,20 @@ private:
 	void createSyncObjects();
 	void destroySyncObjects();
 
-	WindowManager				m_windowM;
+	Window						m_window;
+	std::unique_ptr<GUI>		m_GUI;
 	VkInstance					m_vkInstance;
 	Device						m_device;
 	QueueFamilyIndices			m_qfIndices;
 	QueueFamilyHandles			m_qfHandles;
-	Swapchain					m_swapchain;
+	std::unique_ptr<Swapchain>	m_swapchain;
 	RenderPass					m_renderPass;
 	GraphicsPipelineManager		m_graphicsPipelineM;
 	VkDebugUtilsMessengerEXT	m_debugMessenger;
-	std::vector<CommandPool>	m_commandPools;
-
+	// Command buffer for main drawing commands.
+	CommandPool					m_commandPool;
 	DescriptorPool				m_descriptorPool;
 	DepthBuffer					m_depthBuffer;
-	// Future improv.
-	//CommandPool				m_commandPoolMemoryAlloc;
 
 	// Sync objects(for each frame)
 	std::vector<VkSemaphore>	m_imageAvailableSemaphores;
@@ -95,15 +95,5 @@ private:
 	std::vector<std::unique_ptr<Model>> m_models;
 	VkDescriptorSetLayout		m_descriptorSetLayout;
 
-
-	// Imgui
-	std::vector<VkFramebuffer>  m_framebuffersImgui;
-	CommandPool					m_commandPoolImgui;
-	std::vector<VkCommandBuffer> m_commandBuffersImgui;
-	DescriptorPool				m_descriptorPoolImgui;
-
-	VkRenderPass				m_renderPassImgui;
-
-	// NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
-	std::vector<VkClearValue>	clearValues;
+	std::vector<VkClearValue>	m_clearValues;
 };

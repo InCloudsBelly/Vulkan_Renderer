@@ -11,20 +11,19 @@ class CommandPool
 {
 public:
 	CommandPool();
+	CommandPool(const VkDevice& logicalDevice, const VkCommandPoolCreateFlags& flags, const uint32_t& graphicsFamilyIndex);
 	~CommandPool();
 
-	void createCommandPool(const VkDevice& logicalDevice, const VkCommandPoolCreateFlags& flags, QueueFamilyIndices& queueFamilyIndices);
+	const VkCommandPool& get() const;
 
-	void beginCommandBuffer(const VkCommandBufferUsageFlags& flags,VkCommandBuffer& commandBuffer);
-	void endCommandBuffer(VkCommandBuffer& commandBuffer);
-
-	void destroyCommandPool();
-
-	void allocCommandBuffer(VkCommandBuffer& commandBuffer);
-	void submitCommandBuffer(VkQueue& graphicsQueue,VkCommandBuffer& commandBuffer);
-	void allocAllCommandBuffers();
-
-	VkCommandBuffer& getCommandBuffer(const uint32_t index);
+	void beginCommandBuffer(const VkCommandBufferUsageFlags& flags, const VkCommandBuffer& commandBuffer);
+	void endCommandBuffer(const VkCommandBuffer& commandBuffer);
+	void destroy();
+	void allocCommandBuffer(VkCommandBuffer& commandBuffer, const bool isOneTimeUsage);
+	
+	void allocCommandBuffers(const uint32_t& commandBuffersCount);
+	void submitCommandBuffer(const VkQueue& graphicsQueue,const VkCommandBuffer& commandBuffer);
+	const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
 	
 	void resetCommandBuffer(const uint32_t index);
 
@@ -35,12 +34,11 @@ public:
 
 	VkCommandPool& getCommandPool();
 private:
-	//--------------------------------------------------------------------------
+
+	void createCommandBufferAllocateInfo(const uint32_t& commandBuffersCount,VkCommandBufferAllocateInfo& allocInfo);
 
 	VkCommandPool m_commandPool;
 	VkDevice m_logicalDevice;
-	QueueFamilyIndices m_queueFamilyIndices;
 
-	// For now it will be custom. We'll just have 2.
 	std::vector<VkCommandBuffer> m_commandBuffers;
 };

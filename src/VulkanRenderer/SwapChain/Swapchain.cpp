@@ -1,32 +1,29 @@
 #include "VulkanRenderer/Swapchain/Swapchain.h"
 
 #include <algorithm>
+#include <iostream>
 
 #include <vulkan/vulkan.h>
 #include <stdexcept>
 
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/Images/ImageManager.h"
-#include "VulkanRenderer/Window/WindowManager.h"
+#include "VulkanRenderer/Window/Window.h"
 
 Swapchain::Swapchain() {}
+Swapchain::~Swapchain() {}
 
-void Swapchain::createSwapchain(
+Swapchain::Swapchain(
 	const VkPhysicalDevice& physicalDevice,
 	const VkDevice& logicalDevice,
-	const WindowManager& window)
+	const Window& window,
+	const SwapchainSupportedProperties& supportedProperties )
 {
 	VkSurfaceFormatKHR surfaceFormat;
 	VkPresentModeKHR presentMode;
 	VkExtent2D extent;
 
- 	chooseBestSettings(
-		physicalDevice,
-		window,
-		surfaceFormat,
-		presentMode,
-		extent
-	);
+	chooseBestSettings(window, supportedProperties, surfaceFormat, presentMode, extent);
 
 	m_imageFormat = surfaceFormat.format;
 	m_extent = extent;
@@ -36,13 +33,13 @@ void Swapchain::createSwapchain(
 	// minimum because if we stick to this minimum, it means that we may
 	// sometimes have to wait on the drive to complete internal operations
 	// before we can acquire another imager to render to)
-	m_minImageCount = (m_supportedProperties.value().capabilities.minImageCount);
+	m_minImageCount = (supportedProperties.capabilities.minImageCount);
 	uint32_t imageCount = m_minImageCount + 1;
 
-	bool isMaxResolution = existsMaxNumberOfSupportedImages(m_supportedProperties.value().capabilities);
-	if (isMaxResolution == true &&imageCount > m_supportedProperties.value().capabilities.maxImageCount)
+	bool isMaxResolution = existsMaxNumberOfSupportedImages(supportedProperties.capabilities);
+	if (isMaxResolution == true &&imageCount > supportedProperties.capabilities.maxImageCount)
 	{
-		imageCount = m_supportedProperties.value().capabilities.maxImageCount;
+		imageCount = supportedProperties.capabilities.maxImageCount;
 	}
 
 	VkSwapchainCreateInfoKHR createInfo{};
@@ -75,7 +72,7 @@ void Swapchain::createSwapchain(
 	// We can specify that a certain transform should be applied to images in
 	// the swap chain if it's supported(supportedTransofrms in capabilities),
 	// like a 90 degree clockwsie rotation or horizontal flip.
-	createInfo.preTransform = (m_supportedProperties.value().capabilities.currentTransform);
+	createInfo.preTransform = (supportedProperties.capabilities.currentTransform);
 
 	// Specifies if the alpha channel should be used for mixing with other
    // windows in the window sysem. We'll almost always want to simply ignore
@@ -163,54 +160,20 @@ void Swapchain::createFramebuffers(const VkDevice& logicalDevice, const VkRender
 	}
 }
 
-SwapchainSupportedProperties Swapchain::getSupportedProperties(const VkPhysicalDevice& physicalDevice,const VkSurfaceKHR& surface) 
-{
-	SwapchainSupportedProperties supported;
-
-	// - Surface capabilities.
-	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &supported.capabilities);
-
-	uint32_t formatCount;
-	vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
-
-	if (formatCount != 0)
-	{
-		supported.surfaceFormats.resize(formatCount);
-		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, supported.surfaceFormats.data());
-	}
-
-	// - Surface Presentation Modes
-	uint32_t presentModeCount;
-	vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
-
-	if (presentModeCount != 0)
-	{
-		supported.presentModes.resize(presentModeCount);
-		vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, supported.presentModes.data());
-	}
-	return supported;
-}
-
-VkImageView Swapchain::getImageView(const uint32_t index)
-{
+const VkImageView& Swapchain::getImageView(const uint32_t index) const {
 	return m_imageViews[index];
 }
 
 void Swapchain::chooseBestSettings(
-	const VkPhysicalDevice& physicalDevice,
-	const WindowManager& window,
+	const Window& window,
+	const SwapchainSupportedProperties& supportedProperties,
 	VkSurfaceFormatKHR& surfaceFormat,
 	VkPresentModeKHR& presentMode,
 	VkExtent2D& extent)
 {
-	if (m_supportedProperties.has_value() == false)
-	{
-		m_supportedProperties = getSupportedProperties(physicalDevice, window.getSurface());
-	}
-
-	surfaceFormat = chooseBestSurfaceFormat(m_supportedProperties.value().surfaceFormats);
-	presentMode = chooseBestPresentMode(m_supportedProperties.value().presentModes);
-	extent = chooseBestExtent(m_supportedProperties.value().capabilities,window);
+	surfaceFormat = chooseBestSurfaceFormat(supportedProperties.surfaceFormats);
+	presentMode = chooseBestPresentMode(supportedProperties.presentModes);
+	extent = chooseBestExtent(supportedProperties.capabilities,window);
 }
 
 
@@ -237,7 +200,7 @@ VkPresentModeKHR Swapchain::chooseBestPresentMode(const std::vector<VkPresentMod
 	return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D Swapchain::chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities,const WindowManager& window)
+VkExtent2D Swapchain::chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities,const Window& window)
 {
 	if (window.isAllowedToModifyTheResolution(capabilities) == false)
 		return capabilities.currentExtent;
@@ -267,7 +230,7 @@ const VkExtent2D& Swapchain::getExtent() const
 	return m_extent;
 }
 
-VkFramebuffer& Swapchain::getFramebuffer(const uint32_t imageIndex)
+const VkFramebuffer& Swapchain::getFramebuffer(const uint32_t imageIndex) const
 {
 	return m_framebuffers[imageIndex];
 }
@@ -277,30 +240,22 @@ const VkFormat& Swapchain::getImageFormat() const
 	return m_imageFormat;
 }
 
-VkSwapchainKHR& Swapchain::getSwapchain()
+const VkSwapchainKHR& Swapchain::get() const
 {
 	return m_swapchain;
 }
 
-bool Swapchain::isSwapchainAdequated(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface)
-{
-	if (m_supportedProperties.has_value() == false)
-		m_supportedProperties = getSupportedProperties(physicalDevice, surface);
-
-	return (m_supportedProperties.value().surfaceFormats.empty() != true && m_supportedProperties.value().presentModes.empty() != true);
-}
-
-bool Swapchain::existsMaxNumberOfSupportedImages(const VkSurfaceCapabilitiesKHR& capabilities) 
+const bool Swapchain::existsMaxNumberOfSupportedImages(const VkSurfaceCapabilitiesKHR& capabilities) const
 {
 	return (capabilities.maxImageCount != 0);
 }
 
-uint32_t Swapchain::getImageCount()
+const uint32_t Swapchain::getImageCount() const
 {
 	return m_images.size();
 }
 
-uint32_t Swapchain::getMinImageCount()
+const uint32_t Swapchain::getMinImageCount() const
 {
 	return m_minImageCount;
 }

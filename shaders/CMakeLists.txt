@@ -9,11 +9,14 @@ file (GLOB SHADERS
 
 foreach(SHADER IN LISTS SHADERS)
    get_filename_component(FILENAME ${SHADER} NAME)
+   get_filename_component(NAME_WITHOUT_EXT  ${SHADER} NAME_WE)
 
    get_filename_component(TMP_EXTENSION ${SHADER} EXT)
    string(REPLACE "." "" EXTENSION ${TMP_EXTENSION})
 
-   set(SPV_FILE "${SHADERS_BINARY_DIR}/${EXTENSION}.spv")
+   set(OUTPUT_FILENAME "${EXTENSION}-${NAME_WITHOUT_EXT}")
+
+   set(SPV_FILE "${SHADERS_BINARY_DIR}/${OUTPUT_FILENAME}.spv")
    #add_custom_command(
    #   OUTPUT ${SPV_FILE}
    #   COMMAND ${glslc_executable} -o ${SPV_FILE} ${SHADER}

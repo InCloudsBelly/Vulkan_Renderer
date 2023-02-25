@@ -12,6 +12,7 @@
 #include <glm/gtx/hash.hpp>
 
 #include "VulkanRenderer/Model/Vertex.h"
+#include "VulkanRenderer/Buffers/BufferManager.h"
 
 
 // REMEMBER: LoadObj automatically applies triangularization by default!
@@ -30,15 +31,36 @@ namespace std {
 	};
 };
 
-Model::Model(const char* pathToMesh, const std::string& texture, const std::string& nameMesh) 
+Model::Model(const char* pathToMesh, const std::string& texture, const std::string& modelName
+) : m_name(modelName), m_textureFileName(texture)
 {
-    initExtremeValues();
-
-    name = nameMesh;
-    // We'll read the texture file later(after the creation of a cmd pool and
-    // the queue handles).
-    textureFile = texture;
     loadVertexInfo(pathToMesh);
+}
+
+void Model::updateUBO(const VkDevice& logicalDevice,DescriptorTypes::UniformBufferObject& newUbo,const uint32_t& currentFrame) 
+{
+    void* data;
+    vkMapMemory(logicalDevice, m_ubo.getUniformBufferMemory(currentFrame), 0, sizeof(newUbo), 0, &data);
+        memcpy(data, &newUbo, sizeof(newUbo));
+    vkUnmapMemory(logicalDevice, m_ubo.getUniformBufferMemory(currentFrame));
+}
+
+Model::~Model() {}
+
+void Model::destroy(const VkDevice& logicalDevice)
+{
+    m_ubo.destroyUniformBuffersAndMemories(logicalDevice);
+    m_texture->destroyTexture(logicalDevice);
+    BufferManager::destroyBuffer(logicalDevice, m_vertexBuffer);
+    BufferManager::destroyBuffer(logicalDevice, m_indexBuffer);
+
+    BufferManager::freeMemory(logicalDevice, m_vertexMemory);
+    BufferManager::freeMemory(logicalDevice, m_indexMemory);
+}
+
+const std::string& Model::getName() const
+{
+    return m_name;
 }
 
 
@@ -57,6 +79,8 @@ void Model::loadVertexInfo(const char* pathToMesh)
     if (!status)
         throw std::runtime_error(warn + err);
 
+    initExtremeValues();
+
     std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
     for (const auto& shape : shapes)
@@ -70,6 +94,8 @@ void Model::loadVertexInfo(const char* pathToMesh)
                attrib.vertices[3 * index.vertex_index + 1],
                attrib.vertices[3 * index.vertex_index + 2]
             };
+
+            // These will help us to move model to the center.
             extremeX[0] = std::fmin(vertex.pos.x, extremeX[0]);
             extremeX[1] = std::fmax(vertex.pos.x, extremeX[1]);
             extremeY[0] = std::fmin(vertex.pos.y, extremeY[0]);
@@ -77,6 +103,11 @@ void Model::loadVertexInfo(const char* pathToMesh)
             extremeZ[0] = std::fmin(vertex.pos.z, extremeZ[0]);
             extremeZ[1] = std::fmax(vertex.pos.z, extremeZ[1]);
 
+            vertex.normal = {
+                attrib.normals[3 * index.normal_index + 0],
+                attrib.normals[3 * index.normal_index + 1],
+                attrib.normals[3 * index.normal_index + 2]
+            };
 
             vertex.texCoord = {
                attrib.texcoords[2 * index.texcoord_index + 0],
@@ -90,11 +121,11 @@ void Model::loadVertexInfo(const char* pathToMesh)
             // Avoids vertex duplication
             if (uniqueVertices.count(vertex) == 0)
             {
-                uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-                vertices.push_back(vertex);
+                uniqueVertices[vertex] = static_cast<uint32_t>(m_vertices.size());
+                m_vertices.push_back(vertex);
             }
 
-            indices.push_back(uniqueVertices[vertex]);
+            m_indices.push_back(uniqueVertices[vertex]);
         }
     }
 
@@ -111,30 +142,89 @@ void Model::loadVertexInfo(const char* pathToMesh)
     actualRot = glm::fvec3(0.0f, 0.0f, 0.0f);
 }
 
-/*
- * Creates all the texture resources.
- */
+
+void Model::uploadVertexData(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    VkQueue& graphicsQueue,
+    CommandPool& commandPool
+) {
+    // Vertex Buffer(with staging buffer)
+    BufferManager::createBufferAndTransferToDevice(
+        commandPool,
+        physicalDevice,
+        logicalDevice,
+        m_vertices,
+        graphicsQueue,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        m_vertexMemory,
+        m_vertexBuffer
+    );
+    // Index Buffer(with staging buffer)
+    BufferManager::createBufferAndTransferToDevice(
+        commandPool,
+        physicalDevice,
+        logicalDevice,
+        m_indices,
+        graphicsQueue,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        m_indexMemory,
+        m_indexBuffer
+    );
+}
+
 void Model::createTexture(
     const VkPhysicalDevice& physicalDevice,
     const VkDevice& logicalDevice,
-    const VkFormat& format,
     CommandPool& commandPool,
-    VkQueue& graphicsQueue
+    VkQueue& graphicsQueue,
+    const VkFormat& format
 ) {
-    texture.createTextureImage(
-        (std::string(TEXTURES_DIR) + textureFile).c_str(),
+    m_texture = std::make_unique<Texture>(
         physicalDevice,
         logicalDevice,
+        m_textureFileName,
+        format,
         commandPool,
         graphicsQueue
+        );
+}
+
+void Model::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
+{
+    m_ubo.createUniformBuffers(physicalDevice, logicalDevice, uboCount);
+}
+
+void Model::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout,DescriptorPool& descriptorPool) 
+{
+    m_descriptorSets.createDescriptorSets(
+        logicalDevice,
+        m_texture->getTextureImageView(),
+        m_texture->getTextureSampler(),
+        m_ubo.getUniformBuffers(),
+        descriptorSetLayout,
+        descriptorPool
     );
-    texture.createTextureImageView(logicalDevice,format);
-    texture.createTextureSampler(physicalDevice,logicalDevice);
 }
 
 const VkDescriptorSet& Model::getDescriptorSet(const uint32_t index) const
 {
-    return descriptorSets.getDescriptorSet(index);
+    return m_descriptorSets.getDescriptorSet(index);
+}
+
+VkBuffer& Model::getVertexBuffer()
+{
+    return m_vertexBuffer;
+}
+
+VkBuffer& Model::getIndexBuffer()
+{
+    return m_indexBuffer;
+}
+
+uint32_t Model::getIndexCount()
+{
+    return m_indices.size();
 }
 
 void Model::initExtremeValues()
@@ -152,7 +242,7 @@ void Model::translateToCenter()
 
     initExtremeValues();
 
-    for (auto& vertex : vertices)
+    for (auto& vertex : m_vertices)
     {
         vertex.pos.x += backX;
         vertex.pos.y += backY;
@@ -170,7 +260,7 @@ void Model::makeItSmaller(const float maxZ)
 {
     initExtremeValues();
 
-    for (auto& vertex : vertices)
+    for (auto& vertex : m_vertices)
     {
         vertex.pos.x /= maxZ;
         vertex.pos.y /= maxZ;

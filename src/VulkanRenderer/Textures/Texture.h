@@ -10,9 +10,23 @@
 class Texture
 {
 public:
-	Texture();
-	~Texture();
+	Texture(
+		const VkPhysicalDevice& physicalDevice,
+		const VkDevice& logicalDevice,
+		const std::string& textureFile,
+		const VkFormat& format,
+		CommandPool& commandPool,
+		VkQueue& graphicsQueue
+	);
 
+	~Texture();
+	
+	const VkImageView& getTextureImageView() const;
+	const VkSampler& getTextureSampler() const;
+
+	void destroyTexture(const VkDevice& logicalDevice);
+
+private:
 	void createTextureImage(
 		const char* pathToTexture,
 		const VkPhysicalDevice& physicalDevice, 
@@ -25,13 +39,6 @@ public:
 	void createTextureImageView(const VkDevice& logicalDevice, const VkFormat& format);
 
 	void createTextureSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice);
-
-	const VkImageView& getTextureImageView() const;
-	const VkSampler& getTextureSampler() const;
-
-	void destroyTexture(const VkDevice& logicalDevice);
-
-private:
 
 	void transitionImageLayout(
 		const VkFormat& format,

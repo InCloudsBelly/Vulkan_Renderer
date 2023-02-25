@@ -21,7 +21,6 @@
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
-#include "VulkanRenderer/ShaderManager/ShaderManager.h"
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Commands/CommandUtils.h"
@@ -53,6 +52,7 @@ void Renderer::run()
     m_clearValues.resize(2);
     m_clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
     m_clearValues[1].color = { 1.0f, 0.0f };
+    m_cameraPos = glm::fvec3(2.0f);
 
     if (m_models.size() == 0)
     {
@@ -316,7 +316,7 @@ void Renderer::initVulkan()
         m_device.getLogicalDevice(),
         { 
             {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, VK_SHADER_STAGE_VERTEX_BIT},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT}, 
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT},
         },
         m_descriptorSetLayout
     );
@@ -339,45 +339,6 @@ void Renderer::initVulkan()
     // Allocates all the neccessary cmd buffers in the cmd pool.
     m_commandPool.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
 
-    for (auto& model : m_models)
-    {
-        // Vertex buffer(with staging buffer)
-        BufferManager::createBufferAndTransferToDevice(
-            m_commandPool,
-            m_device.getPhysicalDevice(),
-            m_device.getLogicalDevice(),
-            model->vertices,
-            m_qfHandles.graphicsQueue,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            model->vertexMemory,
-            model->vertexBuffer
-        );
-
-        // Index Buffer(with staging buffer)
-        BufferManager::createBufferAndTransferToDevice(
-            m_commandPool,
-            m_device.getPhysicalDevice(),
-            m_device.getLogicalDevice(),
-            model->indices,
-            m_qfHandles.graphicsQueue,
-            VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            model->indexMemory,
-            model->indexBuffer
-        );
-
-        // Create Textures
-        model->createTexture(
-            m_device.getPhysicalDevice(),
-            m_device.getLogicalDevice(),
-            VK_FORMAT_R8G8B8A8_SRGB,
-            m_commandPool,
-            m_qfHandles.graphicsQueue
-        );
-
-
-        // Uniform Buffers
-        model->ubo.createUniformBuffers(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), Config::MAX_FRAMES_IN_FLIGHT);
-    }
 
     // Descriptor Pool
     m_descriptorPool.createDescriptorPool(
@@ -389,14 +350,38 @@ void Renderer::initVulkan()
         m_models.size() * Config::MAX_FRAMES_IN_FLIGHT
     );
 
-    // Descriptor Sets(of each type of model)
+    // Uploads the data from each model to the gpu.
     for (auto& model : m_models)
     {
-        model->descriptorSets.createDescriptorSets(
+        // Vertex buffer and index buffer(with staging buffer)
+        // (Position, color, texCoord, normal, etc)
+        model->uploadVertexData(
+            m_device.getPhysicalDevice(),
             m_device.getLogicalDevice(),
-            model->texture.getTextureImageView(),
-            model->texture.getTextureSampler(),
-            model->ubo.getUniformBuffers(),
+            m_qfHandles.graphicsQueue,
+            m_commandPool
+        );
+
+        // Creates and uploads the Texture.
+        // (if it hasn't any texture, it will use a default one)
+        model->createTexture(
+            m_device.getPhysicalDevice(),
+            m_device.getLogicalDevice(),
+            m_commandPool,
+            m_qfHandles.graphicsQueue,
+            VK_FORMAT_R8G8B8A8_SRGB
+        );
+
+        // Uniform Buffers
+        model->createUniformBuffers(
+            m_device.getPhysicalDevice(),
+            m_device.getLogicalDevice(),
+            Config::MAX_FRAMES_IN_FLIGHT
+        );
+
+        // Descriptor Sets
+        model->createDescriptorSets(
+            m_device.getLogicalDevice(),
             m_descriptorSetLayout,
             m_descriptorPool
         );
@@ -441,10 +426,10 @@ void Renderer::recordCommandBuffer(
 
     for (const auto& model : m_models)
     {
-        CommandUtils::STATE::bindVertexBuffers({ model->vertexBuffer }, { 0 }, 0, 1, commandBuffer);
-        CommandUtils::STATE::bindIndexBuffer(model->indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
+        CommandUtils::STATE::bindVertexBuffers({ model->getVertexBuffer()}, {0}, 0, 1, commandBuffer);
+        CommandUtils::STATE::bindIndexBuffer(model->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32, commandBuffer);
         CommandUtils::STATE::bindDescriptorSets(pipelineLayout, 0, { model->getDescriptorSet(currentFrame) }, {}, commandBuffer);
-        CommandUtils::ACTION::drawIndexed(model->indices.size(), 1, 0, 0, 0, commandBuffer);
+        CommandUtils::ACTION::drawIndexed(model->getIndexCount(), 1, 0, 0, 0, commandBuffer);
     }
     renderPass.end(commandBuffer);
     commandPool.endCommandBuffer(commandBuffer);
@@ -494,38 +479,29 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    VkSemaphore waitSemaphores[] = {
-       m_imageAvailableSemaphores[currentFrame]
-    };
-    VkPipelineStageFlags waitStages[] = {
-       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-    };
+    VkSemaphore waitSemaphores[] = {m_imageAvailableSemaphores[currentFrame] };
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submitInfo.waitSemaphoreCount = 1;
     // Specifies which semaphores to wait on before execution begins.
     submitInfo.pWaitSemaphores = waitSemaphores;
     // Specifies which stage/s of the pipeline to wait.
     submitInfo.pWaitDstStageMask = waitStages;
-    // These two commands specify which command buffers to actualy submit for
-    // execution.
-    ///////////////////////MAKE IT CUSTOM -> IMGUI!////////////////////////////
-    std::array<VkCommandBuffer, 2> submitCommandBuffers = {
-       m_commandPool.getCommandBuffer(currentFrame),
-       m_GUI->getCommandBuffer(currentFrame)
-    };
-    submitInfo.commandBufferCount = 2;
+    // These two commands specify which command buffers to actualy submit for execution.
+     
+
+
+    // ImGUI added
+    std::array<VkCommandBuffer, 2> submitCommandBuffers = { m_commandPool.getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
+
+    submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
-    // Specifies which semaphores to signal once the command buffer/s have
-    // finished execution.
+    // Specifies which semaphores to signal once the command buffer/s have finished execution.
+
     VkSemaphore signalSemaphores[] = { m_renderFinishedSemaphores[currentFrame] };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
-    auto status = vkQueueSubmit(
-        m_qfHandles.graphicsQueue,
-        1,
-        &submitInfo,
-        m_inFlightFences[currentFrame]
-    );
-    if (status != VK_SUCCESS)
+
+    if (vkQueueSubmit(m_qfHandles.graphicsQueue, 1, &submitInfo, m_inFlightFences[currentFrame]) != VK_SUCCESS)
         throw std::runtime_error("Failed to submit draw command buffer!");
 
 
@@ -557,7 +533,7 @@ void Renderer::mainLoop()
     while (m_window.isWindowClosed() == false)
     {
         m_window.pollEvents();
-        m_GUI->draw(m_models, cameraPos);
+        m_GUI->draw(m_models, m_cameraPos);
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -601,14 +577,16 @@ void Renderer::cleanup()
 
     // UBO(with their uniform buffers and uniform memories)
     for (auto& model : m_models)
-        model->ubo.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
+        model->destroy(m_device.getLogicalDevice());
+    //for (auto& model : m_models)
+    //   model->ubo.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
 
     // Descriptor Pool
     m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
 
     // Textures
-    for (auto& model : m_models)
-        model->texture.destroyTexture(m_device.getLogicalDevice());
+    /*for (auto& model : m_models)
+        model->texture->destroyTexture(m_device.getLogicalDevice());*/
 
     // Descriptor Set Layout
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(
@@ -616,16 +594,16 @@ void Renderer::cleanup()
         m_descriptorSetLayout
     );
 
-    // Bufferss
-    for (auto& model : m_models)
-    {
-        BufferManager::destroyBuffer(m_device.getLogicalDevice(), model->vertexBuffer);
-        BufferManager::destroyBuffer(m_device.getLogicalDevice(), model->indexBuffer);
+    //// Bufferss
+    //for (auto& model : m_models)
+    //{
+    //    BufferManager::destroyBuffer(m_device.getLogicalDevice(), model->vertexBuffer);
+    //    BufferManager::destroyBuffer(m_device.getLogicalDevice(), model->indexBuffer);
 
-        // Buffer Memories
-        BufferManager::freeMemory(m_device.getLogicalDevice(), model->vertexMemory);
-        BufferManager::freeMemory(m_device.getLogicalDevice(), model->indexMemory);
-    }
+    //    // Buffer Memories
+    //    BufferManager::freeMemory(m_device.getLogicalDevice(), model->vertexMemory);
+    //    BufferManager::freeMemory(m_device.getLogicalDevice(), model->indexMemory);
+    //}
 
     // Sync objects
     destroySyncObjects();
@@ -678,6 +656,9 @@ void Renderer::updateUniformBuffer(
     
     ubo.model = glm::mat4(1.0);
     ubo.model = glm::translate(ubo.model, model.actualPos);
+    // Updates the center of the mesh.
+    model.centerPos += model.actualPos;
+
     ubo.model = glm::scale(ubo.model, model.actualSize);
     ubo.model = glm::rotate(ubo.model, model.actualRot.x, glm::vec3(1.0f, 0.0f, 0.0f));
 
@@ -687,7 +668,7 @@ void Renderer::updateUniformBuffer(
 
 
  
-    ubo.view = glm::lookAt(cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(m_cameraPos, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), (extent.width / (float)extent.height), 0.1f, 10.0f);
 
     // GLM was designed for OpenGl, where the Y coordinate of the clip coord. is
@@ -695,9 +676,6 @@ void Renderer::updateUniformBuffer(
     // factor of the Y axis.
     ubo.proj[1][1] *= -1;
 
-    void* data;
-    vkMapMemory(logicalDevice, model.ubo.getUniformBufferMemory(currentFrame),  0, sizeof(ubo), 0, &data);
-    memcpy(data, &ubo, sizeof(ubo));
-    vkUnmapMemory(logicalDevice, model.ubo.getUniformBufferMemory(currentFrame));
+    model.updateUBO(logicalDevice, ubo, currentFrame);
 }
 

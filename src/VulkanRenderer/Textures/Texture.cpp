@@ -12,7 +12,30 @@
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Descriptors/DescriptorTypes/Sampler.h"
 
-Texture::Texture() {}
+Texture::Texture(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    const std::string& textureFile,
+    const VkFormat& format,
+    CommandPool& commandPool,
+    VkQueue& graphicsQueue
+) {
+    createTextureImage(
+        (std::string(TEXTURES_DIR) + textureFile).c_str(),
+        physicalDevice,
+        logicalDevice,
+        commandPool,
+        graphicsQueue
+    );
+    createTextureImageView(
+        logicalDevice,
+        format
+    );
+    createTextureSampler(
+        physicalDevice,
+        logicalDevice
+    );
+}
 
 Texture::~Texture() {}
 

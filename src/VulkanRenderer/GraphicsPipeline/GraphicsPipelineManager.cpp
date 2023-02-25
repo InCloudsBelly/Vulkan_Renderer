@@ -20,10 +20,10 @@ GraphicsPipelineManager::~GraphicsPipelineManager() {}
 void GraphicsPipelineManager::createShaderModules(VkShaderModule& vertexShaderModule,VkShaderModule& fragmentShaderModule,const VkDevice& logicalDevice) 
 {
        const std::vector<char> vertexShaderCode = (
-             ShaderManager::getBinaryDataFromFile("vert")
+             ShaderManager::getBinaryDataFromFile("vert-shader")
        );
        const std::vector<char> fragmentShaderCode = (
-             ShaderManager::getBinaryDataFromFile("frag")
+             ShaderManager::getBinaryDataFromFile("frag-shader")
        );
 
        vertexShaderModule = ShaderManager::createShaderModule(vertexShaderCode, logicalDevice);
@@ -72,13 +72,10 @@ void GraphicsPipelineManager::createDynamicStatesInfo(const std::vector<VkDynami
 
 void GraphicsPipelineManager::createVertexShaderInputInfo(
     const VkVertexInputBindingDescription& bindingDescription,
-    const std::array<VkVertexInputAttributeDescription, 3>&
-    attribDescriptions,
+    const std::vector<VkVertexInputAttributeDescription>&attribDescriptions,
     VkPipelineVertexInputStateCreateInfo& vertexInputInfo
 ) {
-    vertexInputInfo.sType = (
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
-        );
+    vertexInputInfo.sType = (VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
     // Bindings: Number of vertex bindings descriptions provided in
     //           pVertexBindingDescriptions
     vertexInputInfo.vertexBindingDescriptionCount = 1;
@@ -263,9 +260,9 @@ void GraphicsPipelineManager::createGraphicsPipeline(const VkDevice& logicalDevi
     VkPipelineViewportStateCreateInfo viewportStateInfo{};
     createViewportStateInfo(viewportStateInfo);
 
-    // -Vertex input
+    // -Vertex input (attributes)
     VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-    std::array<VkVertexInputAttributeDescription, 3> attribDescriptions = Vertex::getAttributeDescriptions();
+    std::vector<VkVertexInputAttributeDescription> attribDescriptions = Vertex::getAttributeDescriptions();
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     createVertexShaderInputInfo(bindingDescription, attribDescriptions, vertexInputInfo);
 

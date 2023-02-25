@@ -25,7 +25,7 @@ class Renderer
 public:
 
 	void run();
-	void addModel(const std::string& name, const std::string& meshFile, const std::string& textureFile);
+	void addModel(const std::string& name, const std::string& meshFile, const std::string& textureFile = "default.jpg");
 
 
 private:
@@ -75,7 +75,7 @@ private:
 	VkDebugUtilsMessengerEXT	m_debugMessenger;
 	// Command buffer for main drawing commands.
 	CommandPool					m_commandPool;
-	DescriptorPool				m_descriptorPool;
+
 	DepthBuffer					m_depthBuffer;
 
 	// Sync objects(for each frame)
@@ -85,7 +85,10 @@ private:
 
 	// Models
 	std::vector<std::shared_ptr<Model>> m_models;
+
+	DescriptorPool				m_descriptorPool;
 	VkDescriptorSetLayout		m_descriptorSetLayout;
 
 	std::vector<VkClearValue>	m_clearValues;
+	glm::fvec3					m_cameraPos;
 };

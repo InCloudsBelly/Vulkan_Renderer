@@ -4,6 +4,8 @@
 #include <array>
 #include <string>
 
+#include <glm/glm.hpp>
+
 #include "VulkanRenderer/Model/Vertex.h"
 #include "VulkanRenderer/Textures/Texture.h"
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
@@ -13,7 +15,7 @@
 
 struct Model
 {
-	Model(const char* pathToMesh, const std::string& texture);
+	Model(const char* pathToMesh, const std::string& texture, const std::string& nameMesh);
 	
 	void loadVertexInfo(const char* pathToMesh);
 
@@ -24,14 +26,16 @@ struct Model
 		CommandPool& commandPool,
 		VkQueue& graphicsQueue
 	);
+	void translateToCenter();
+	void initExtremeValues();
+	void makeItSmaller(const float maxZ);
 
 	const VkDescriptorSet& getDescriptorSet(const uint32_t index) const;
 
+	std::string name;
+
 	std::vector<Vertex>				vertices;
 	std::vector<uint32_t>			indices;
-	float							extremeX[2];
-	float							extremeY[2];
-	float							extremeZ[2];
 
 	VkBuffer						vertexBuffer;
 	VkDeviceMemory					vertexMemory;
@@ -45,4 +49,12 @@ struct Model
 	// Descriptors
 	UBO								ubo;
 	DescriptorSets					descriptorSets;
+
+	// Info to update UBO.
+	float							extremeX[2];
+	float							extremeY[2];
+	float							extremeZ[2];
+	glm::fvec3						actualPos;
+	glm::fvec3						actualSize;
+	glm::fvec3						actualRot;
 };

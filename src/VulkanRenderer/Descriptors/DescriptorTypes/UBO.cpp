@@ -41,6 +41,10 @@ std::vector<VkBuffer>& UBO::getUniformBuffers()
     return m_uniformBuffers;
 }
 
+VkDeviceMemory& UBO::getUniformBufferMemory(const uint32_t index)
+{
+    return m_uniformBufferMemories[index];
+}
 void UBO::destroyUniformBuffersAndMemories(const VkDevice& logicalDevice)
 {
     for (size_t i = 0; i < m_uniformBuffers.size(); i++)

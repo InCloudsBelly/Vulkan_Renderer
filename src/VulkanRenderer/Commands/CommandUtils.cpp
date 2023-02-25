@@ -54,13 +54,7 @@ void CommandUtils::STATE::bindVertexBuffers(
     const uint32_t& bindingCount,
     const VkCommandBuffer& commandBuffer
 ) {
-    vkCmdBindVertexBuffers(
-        commandBuffer,
-        indexOfFirstBinding,
-        bindingCount,
-        vertexBuffers.data(),
-        offsets.data()
-    );
+    vkCmdBindVertexBuffers(commandBuffer, indexOfFirstBinding, bindingCount, vertexBuffers.data(), offsets.data());
 }
 
 void CommandUtils::STATE::bindIndexBuffer(
@@ -70,12 +64,7 @@ void CommandUtils::STATE::bindIndexBuffer(
     const VkCommandBuffer& commandBuffer
 ) {
 
-    vkCmdBindIndexBuffer(
-        commandBuffer,
-        indexBuffer,
-        0,
-        VK_INDEX_TYPE_UINT32
-    );
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 }
 
 void CommandUtils::STATE::setViewport(

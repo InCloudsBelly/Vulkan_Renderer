@@ -1,5 +1,7 @@
 #include "VulkanRenderer/GUI/GUI.h"
 
+#include <cstring>
+
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imstb_rectpack.h>
@@ -15,6 +17,7 @@
 #include "VulkanRenderer/SwapChain/Swapchain.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
+#include "VulkanRenderer/Model/Model.h"
 
 
 GUI::GUI(
@@ -25,7 +28,7 @@ GUI::GUI(
     const uint32_t& graphicsFamilyIndex,
     const VkQueue& graphicsQueue,
     Window& window
-) : m_opSwapchain(&swapchain) {
+) : m_opSwapchain(&swapchain), m_opLogicalDevice(&logicalDevice) {
     // -Descriptor Pool
 
     // (calculates the total size of the pool depending of the descriptors
@@ -51,8 +54,146 @@ GUI::GUI(
         1000 * 11
     );
 
-    // -RenderPass
-    //{ TEST THIS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // - RenderPass
+    createRenderPass();
+
+    // - Imgui init
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    (void)io;
+
+    //ImGui::StyleColorsDark();
+    applyStyle();
+
+    ImGui_ImplGlfw_InitForVulkan(window.m_window, true);
+    ImGui_ImplVulkan_InitInfo initInfo = {};
+    initInfo.Instance = vkInstance;
+    initInfo.PhysicalDevice = physicalDevice;
+    initInfo.Device = logicalDevice;
+    initInfo.QueueFamily = graphicsFamilyIndex;
+    initInfo.Queue = graphicsQueue;
+    initInfo.PipelineCache = VK_NULL_HANDLE;
+    initInfo.DescriptorPool = m_descriptorPool.getDescriptorPool();
+    initInfo.Allocator = nullptr;
+    initInfo.MinImageCount = m_opSwapchain->getMinImageCount();
+    initInfo.ImageCount = m_opSwapchain->getImageCount();
+    initInfo.CheckVkResultFn = nullptr;
+    ImGui_ImplVulkan_Init(&initInfo, m_renderPass.get());
+
+
+    // -Creation of command buffers and command pool
+    m_commandPool = CommandPool(logicalDevice, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, graphicsFamilyIndex);
+
+    m_commandPool.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+
+    uploadFonts(graphicsQueue);
+
+    createFrameBuffers();
+}
+
+
+void GUI::applyStyle()
+{
+    auto& style = ImGui::GetStyle();
+    style.FrameRounding = 4.0f;
+    style.WindowBorderSize = 0.0f;
+    style.PopupBorderSize = 0.0f;
+    style.GrabRounding = 4.0f;
+
+    ImVec4* colors = ImGui::GetStyle().Colors;
+    colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled] = ImVec4(0.73f, 0.75f, 0.74f, 1.00f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.09f, 0.09f, 0.09f, 0.94f);
+    colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.94f);
+    colors[ImGuiCol_Border] = ImVec4(0.20f, 0.20f, 0.20f, 0.50f);
+    colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_FrameBg] = ImVec4(0.71f, 0.39f, 0.39f, 0.54f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.84f, 0.66f, 0.66f, 0.40f);
+    colors[ImGuiCol_FrameBgActive] = ImVec4(0.84f, 0.66f, 0.66f, 0.67f);
+    colors[ImGuiCol_TitleBg] = ImVec4(0.47f, 0.22f, 0.22f, 0.67f);
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.47f, 0.22f, 0.22f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.47f, 0.22f, 0.22f, 0.67f);
+    colors[ImGuiCol_MenuBarBg] = ImVec4(0.34f, 0.16f, 0.16f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
+    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.31f, 0.31f, 0.31f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
+    colors[ImGuiCol_CheckMark] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_SliderGrab] = ImVec4(0.71f, 0.39f, 0.39f, 1.00f);
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.84f, 0.66f, 0.66f, 1.00f);
+    colors[ImGuiCol_Button] = ImVec4(0.47f, 0.22f, 0.22f, 0.65f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.71f, 0.39f, 0.39f, 0.65f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.20f, 0.20f, 0.20f, 0.50f);
+    colors[ImGuiCol_Header] = ImVec4(0.71f, 0.39f, 0.39f, 0.54f);
+    colors[ImGuiCol_HeaderHovered] = ImVec4(0.84f, 0.66f, 0.66f, 0.65f);
+    colors[ImGuiCol_HeaderActive] = ImVec4(0.84f, 0.66f, 0.66f, 0.00f);
+    colors[ImGuiCol_Separator] = ImVec4(0.43f, 0.43f, 0.50f, 0.50f);
+    colors[ImGuiCol_SeparatorHovered] = ImVec4(0.71f, 0.39f, 0.39f, 0.54f);
+    colors[ImGuiCol_SeparatorActive] = ImVec4(0.71f, 0.39f, 0.39f, 0.54f);
+    colors[ImGuiCol_ResizeGrip] = ImVec4(0.71f, 0.39f, 0.39f, 0.54f);
+    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.84f, 0.66f, 0.66f, 0.66f);
+    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.84f, 0.66f, 0.66f, 0.66f);
+    colors[ImGuiCol_Tab] = ImVec4(0.71f, 0.39f, 0.39f, 0.54f);
+    colors[ImGuiCol_TabHovered] = ImVec4(0.84f, 0.66f, 0.66f, 0.66f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.84f, 0.66f, 0.66f, 0.66f);
+    colors[ImGuiCol_TabUnfocused] = ImVec4(0.07f, 0.10f, 0.15f, 0.97f);
+    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.14f, 0.26f, 0.42f, 1.00f);
+    colors[ImGuiCol_PlotLines] = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(0.26f, 0.59f, 0.98f, 0.35f);
+    colors[ImGuiCol_DragDropTarget] = ImVec4(1.00f, 1.00f, 0.00f, 0.90f);
+    colors[ImGuiCol_NavHighlight] = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
+    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
+}
+    
+/*
+ * -Uploads the fonts to the GPU.
+ */
+void GUI::uploadFonts(const VkQueue& graphicsQueue)
+{
+    // (one time command buffer)
+    VkCommandBuffer newCommandBuffer;
+
+    m_commandPool.allocCommandBuffer(newCommandBuffer, true);
+    m_commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, newCommandBuffer);
+
+    ImGui_ImplVulkan_CreateFontsTexture(newCommandBuffer);
+
+    m_commandPool.endCommandBuffer(newCommandBuffer);
+    m_commandPool.submitCommandBuffer(graphicsQueue, newCommandBuffer);
+}
+
+void GUI::createFrameBuffers()
+{
+    m_framebuffers.resize(m_opSwapchain->getImageCount());
+
+    VkImageView attachment[1];
+    VkFramebufferCreateInfo info = {};
+    info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    info.renderPass = m_renderPass.get();
+    info.attachmentCount = 1;
+    info.pAttachments = attachment;
+    info.width = m_opSwapchain->getExtent().width;
+    info.height = m_opSwapchain->getExtent().height;
+    // The layers is 1 because our imageViews are single images and not
+    // arrays.
+    info.layers = 1;
+    for (uint32_t i = 0; i < m_opSwapchain->getImageCount(); i++)
+    {
+        attachment[0] = m_opSwapchain->getImageView(i);
+        vkCreateFramebuffer(*m_opLogicalDevice, &info, nullptr, &m_framebuffers[i]);
+    }
+}
+
+void GUI::createRenderPass()
+{
+    // - Attachments
     VkAttachmentDescription attachment = {};
     AttachmentUtils::createAttachmentDescriptionWithStencil(
         m_opSwapchain->getImageFormat(),
@@ -73,23 +214,18 @@ GUI::GUI(
         attachment
     );
 
-    // -- Attachments
     VkAttachmentReference colorAttachment = {};
     AttachmentUtils::createAttachmentReference(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorAttachment);
 
+    // This vector is neccessary because if not, it will crash.
+    // (some mysterious bug....)
     std::vector<VkAttachmentReference> allAttachments = {colorAttachment};
 
-    // -- Subpass
+    // - Subpass
     VkSubpassDescription subpass = {};
-    SubPassUtils::createSubPassDescription(
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        allAttachments,
-        nullptr,
-        subpass
-    );
-    std::vector<VkSubpassDescription> subpasses = { subpass };
+    SubPassUtils::createSubPassDescription(VK_PIPELINE_BIND_POINT_GRAPHICS, allAttachments, nullptr, subpass);
 
-    // --Synch. between this render pass and the one from the renderer.
+    // -Synch. between this render pass and the one from the renderer.
     VkSubpassDependency dependency = {};
     SubPassUtils::createSubPassDependency(
         // - Source parameters.
@@ -111,117 +247,24 @@ GUI::GUI(
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         dependency
     );
-    std::vector<VkSubpassDependency> dependencies = { dependency };
 
-    std::vector<VkAttachmentDescription> attachments = { attachment };
-    m_renderPass = RenderPass(logicalDevice, attachments, subpasses, dependencies);
-    //}
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-
-    ImGui::StyleColorsDark();
-
-    ImGui_ImplGlfw_InitForVulkan(window.m_window, true);
-    ImGui_ImplVulkan_InitInfo initInfo = {};
-    initInfo.Instance = vkInstance;
-    initInfo.PhysicalDevice = physicalDevice;
-    initInfo.Device = logicalDevice;
-    initInfo.QueueFamily = graphicsFamilyIndex;
-    initInfo.Queue = graphicsQueue;
-    initInfo.PipelineCache = VK_NULL_HANDLE;
-    initInfo.DescriptorPool = m_descriptorPool.getDescriptorPool();
-    initInfo.Allocator = nullptr;
-    initInfo.MinImageCount = m_opSwapchain->getMinImageCount();
-    initInfo.ImageCount = m_opSwapchain->getImageCount();
-    initInfo.CheckVkResultFn = nullptr;
-    ImGui_ImplVulkan_Init(&initInfo, m_renderPass.get());
-
-
-    // -Creation of command buffers and command pool
-    // Improve this!
-    m_commandPool = CommandPool(logicalDevice, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, graphicsFamilyIndex);
-
-    // (CHANGE THIS -> BEGIN COMMAND BUFFER TO UTILS! IT HAST NOTHING TO DO
-    // WITH COMMANDPOOL.h)
-    // (one time usage command buffer...)
-    m_commandPool.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
-    {
-        // AGREGAR UNA FUNCION QUE SEA PARA ALLOCATE ONE TIME CMD BUFFER
-        // -Uploading the fonts to the GPU
-        // (one time command buffer)
-        // We can just use any commandBuffer.
-        VkCommandBuffer newCommandBuffer;
-
-        m_commandPool.allocCommandBuffer(newCommandBuffer, true);
-        m_commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, newCommandBuffer);
-
-        ImGui_ImplVulkan_CreateFontsTexture(newCommandBuffer);
-
-        m_commandPool.endCommandBuffer(newCommandBuffer);
-        m_commandPool.submitCommandBuffer(graphicsQueue,newCommandBuffer);
-    }
-
-    // FrameBuffer
-    {
-        m_framebuffers.resize(m_opSwapchain->getImageCount());
-
-        VkImageView attachment[1];
-        VkFramebufferCreateInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        info.renderPass = m_renderPass.get();
-        info.attachmentCount = 1;
-        info.pAttachments = attachment;
-        info.width = m_opSwapchain->getExtent().width;
-        info.height = m_opSwapchain->getExtent().height;
-        // The layers is 1 because our imageViews are single images and not
-        // arrays.
-        info.layers = 1;
-        for (uint32_t i = 0; i < m_opSwapchain->getImageCount(); i++)
-        {
-            attachment[0] = m_opSwapchain->getImageView(i);
-            vkCreateFramebuffer(logicalDevice,&info,nullptr,&m_framebuffers[i]);
-        }
-    }
+    m_renderPass = RenderPass(*m_opLogicalDevice, { attachment }, { subpass }, { dependency });
 }
+
 
 
 void GUI::recordCommandBuffer(const uint8_t currentFrame,const uint8_t imageIndex,const std::vector<VkClearValue>& clearValues) 
 {
-    // - Resets a command pool and starts to record command into a command buffer
-    // (because the UI can change...e.g buttons will be added on the fly, window
-    // resizing, etc)
-    {
-        vkResetCommandBuffer(m_commandPool.getCommandBuffer(currentFrame), 0);
-        VkCommandBufferBeginInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkBeginCommandBuffer(m_commandPool.getCommandBuffer(currentFrame), &info);
-    }
+    const VkCommandBuffer& commandBuffer = (m_commandPool.getCommandBuffer(currentFrame));
 
-    // Starts the render pass
-    {
-        VkRenderPassBeginInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        info.renderPass = m_renderPass.get();
-        info.framebuffer = m_framebuffers[imageIndex];
-        info.renderArea.extent.width = m_opSwapchain->getExtent().width;
-        info.renderArea.extent.height = m_opSwapchain->getExtent().height;
-        info.clearValueCount = 1;
-        // no se si usar imageIndex or currentFrame
-        info.pClearValues = &(clearValues[currentFrame]);
-        vkCmdBeginRenderPass(
-            m_commandPool.getCommandBuffer(currentFrame),
-            &info,
-            VK_SUBPASS_CONTENTS_INLINE
-        );
+    m_commandPool.resetCommandBuffer(currentFrame);
+    m_commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, currentFrame);
 
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),m_commandPool.getCommandBuffer(currentFrame));
-        vkCmdEndRenderPass(m_commandPool.getCommandBuffer(currentFrame));
-        vkEndCommandBuffer(m_commandPool.getCommandBuffer(currentFrame));
-    }
+        m_renderPass.begin(m_framebuffers[imageIndex], m_opSwapchain->getExtent(), { clearValues[currentFrame] }, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+        m_renderPass.end(commandBuffer);
+
+    m_commandPool.endCommandBuffer(commandBuffer);
 }
 
 const VkCommandBuffer& GUI::getCommandBuffer(const uint32_t index) const
@@ -230,42 +273,65 @@ const VkCommandBuffer& GUI::getCommandBuffer(const uint32_t index) const
 }
 
 
-void GUI::draw()
+void GUI::draw(std::vector<std::shared_ptr<Model>> models,glm::fvec3& cameraPos) 
 {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    //ImGui::ShowDemoWindow();
-    {
-        static float f = 0.0f;
-        static int counter = 0;
-        ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-        bool show_demo_window;
+    
+    modelsWindow(models);
+    cameraWindow(cameraPos);
 
-        ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-        ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-        ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-
-        //ImGui::SliderFloat("float1", &rotX, -100.0f, 360.0f);
-        //ImGui::SliderFloat("float2", &rotY, -100.0f, 360.0f);
-        //ImGui::SliderFloat("float3", &rotZ, -100.0f, 360.0f);
-        //ImGui::SliderFloat("float4", &movX, -30.0f, 10.0f);
-        //ImGui::SliderFloat("float5", &movY, -30.0f, 10.0f);
-        //ImGui::SliderFloat("float6", &movZ, -30.0f, 10.0f);
-
-        ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-        if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-            counter++;
-        ImGui::SameLine();
-        ImGui::Text("counter = %d", counter);
-
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::End();
-
-    }
     ImGui::Render();
+}
+
+void GUI::modelsWindow(std::vector<std::shared_ptr<Model>> models)
+{
+    ImGui::Begin("Models");
+
+    for (auto& model : models)
+    {
+        if (ImGui::TreeNode((model.get()->name).c_str()))
+        {
+            if (ImGui::TreeNode(("Position##TRANSLATION::" + model.get()->name).c_str())) 
+            {
+                ImGui::SliderFloat(("X##TRANSLATION::" + model.get()->name).c_str(), &(model.get()->actualPos.x), -10.0f, 10.0f);
+                ImGui::SliderFloat(("Y##TRANSLATION::" + model.get()->name).c_str(), &(model.get()->actualPos.y), -10.0f, 10.0f);
+                ImGui::SliderFloat(("Z##TRANSLATION::" + model.get()->name).c_str(), &(model.get()->actualPos.z), -10.0f, 10.0f);
+                ImGui::TreePop();
+                ImGui::Separator();
+            }
+            if (ImGui::TreeNode(("Size##SIZE::" + model.get()->name).c_str())) 
+            {
+                ImGui::SliderFloat(("X##SCALE::" + model.get()->name).c_str(), &(model.get()->actualSize.x), 0.0f, 1.0f);
+                ImGui::SliderFloat(("Y##SCALE" + model.get()->name).c_str(), &(model.get()->actualSize.y), 0.0f, 1.0f);
+                ImGui::SliderFloat(("Z##SCALE" + model.get()->name).c_str(), &(model.get()->actualSize.z), 0.0f, 1.0f);
+                ImGui::TreePop();
+                ImGui::Separator();
+            }
+            if (ImGui::TreeNode(("Rotation##ROTATION::" + model.get()->name).c_str())) 
+            {
+                ImGui::SliderFloat(("X##ROTATION::" + model.get()->name).c_str(), &(model.get()->actualRot.x), -5.0f, 5.0f);
+                ImGui::SliderFloat(("Y##ROTATION" + model.get()->name).c_str(), &(model.get()->actualRot.y), -5.0f, 5.0f);
+                ImGui::SliderFloat(("Z##ROTATION" + model.get()->name).c_str(), &(model.get()->actualRot.z), -5.0f, 5.0f);
+                ImGui::TreePop();
+                ImGui::Separator();
+            }
+            ImGui::TreePop();
+            ImGui::Separator();
+        }
+    }
+
+    ImGui::End();
+}
+
+void GUI::cameraWindow(glm::fvec3& cameraPos)
+{
+    ImGui::Begin("Camera");
+    ImGui::SliderFloat("X##POSITION::CAMERA", &cameraPos.x, -5.0f, 5.0f);
+    ImGui::SliderFloat("Y##POSITION::CAMERA", &cameraPos.y, -5.0f, 5.0f);
+    ImGui::SliderFloat("Z##POSITION::CAMERA", &cameraPos.z, -5.0f, 5.0f);
+    ImGui::End();
 }
 
 void GUI::destroy(const VkDevice& logicalDevice)

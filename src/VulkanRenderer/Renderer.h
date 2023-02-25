@@ -25,26 +25,18 @@ class Renderer
 public:
 
 	void run();
-	void addModel(const std::string& meshFile, const std::string& textureFile);
+	void addModel(const std::string& name, const std::string& meshFile, const std::string& textureFile);
 
 
 private:
 
 	// Modify this
-	void updateUniformBuffer1(
+	void updateUniformBuffer(
 		const VkDevice& logicalDevice,
 		const uint8_t currentFrame,
 		const VkExtent2D extent,
-		std::vector<VkDeviceMemory>& uniformBufferMemories
+		Model& model
 	);
-	// Modify this
-	void updateUniformBuffer2(
-		const VkDevice& logicalDevice,
-		const uint8_t currentFrame,
-		const VkExtent2D extent,
-		std::vector<VkDeviceMemory>& uniformBufferMemories
-	);
-
 
 	void initWindow();
 	void initVulkan();
@@ -55,7 +47,7 @@ private:
 
 	void recordCommandBuffer(
 		const VkFramebuffer& framebuffer,
-		const VkRenderPass& renderPass,
+		const RenderPass& renderPass,
 		const VkExtent2D& extent,
 		const VkPipeline& graphicsPipeline,
 		const VkPipelineLayout& pipelineLayout,
@@ -92,7 +84,7 @@ private:
 	std::vector<VkFence>		m_inFlightFences;
 
 	// Models
-	std::vector<std::unique_ptr<Model>> m_models;
+	std::vector<std::shared_ptr<Model>> m_models;
 	VkDescriptorSetLayout		m_descriptorSetLayout;
 
 	std::vector<VkClearValue>	m_clearValues;

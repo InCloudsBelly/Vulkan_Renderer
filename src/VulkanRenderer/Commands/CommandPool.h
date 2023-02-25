@@ -17,6 +17,7 @@ public:
 	const VkCommandPool& get() const;
 
 	void beginCommandBuffer(const VkCommandBufferUsageFlags& flags, const VkCommandBuffer& commandBuffer);
+	void beginCommandBuffer(const VkCommandBufferUsageFlags& flags, const uint32_t& cmdBufferIndex);
 	void endCommandBuffer(const VkCommandBuffer& commandBuffer);
 	void destroy();
 	void allocCommandBuffer(VkCommandBuffer& commandBuffer, const bool isOneTimeUsage);
@@ -29,10 +30,6 @@ public:
 
 	void freeCommandBuffer(VkCommandBuffer& commandBuffer);
 
-	void createRenderPassBeginInfo(const VkRenderPass& renderPass, const VkFramebuffer& framebuffer,
-		const VkExtent2D& extent, const std::vector<VkClearValue>& clearValues, VkRenderPassBeginInfo& renderPassInfo);
-
-	VkCommandPool& getCommandPool();
 private:
 
 	void createCommandBufferAllocateInfo(const uint32_t& commandBuffersCount,VkCommandBufferAllocateInfo& allocInfo);

@@ -11,7 +11,7 @@ int main()
 
     try
     {
-        app.addModel("viking_room.obj", "viking_room.png");
+        app.addModel("Viking room", "viking_room.obj", "viking_room.png");
         //app.addModel("bunny.obj", "bunny-atlas.jpg");
         app.run();
     }

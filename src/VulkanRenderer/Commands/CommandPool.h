@@ -11,8 +11,9 @@ class CommandPool
 {
 public:
 	CommandPool();
-	CommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queueFamilyIndices);
 	~CommandPool();
+
+	void createCommandPool(const VkDevice& logicalDevice, const VkCommandPoolCreateFlags& flags, QueueFamilyIndices& queueFamilyIndices);
 
 	void beginCommandBuffer(const VkCommandBufferUsageFlags& flags,VkCommandBuffer& commandBuffer);
 	void endCommandBuffer(VkCommandBuffer& commandBuffer);
@@ -32,7 +33,7 @@ public:
 	void createRenderPassBeginInfo(const VkRenderPass& renderPass, const VkFramebuffer& framebuffer,
 		const VkExtent2D& extent, const std::vector<VkClearValue>& clearValues, VkRenderPassBeginInfo& renderPassInfo);
 
-
+	VkCommandPool& getCommandPool();
 private:
 	//--------------------------------------------------------------------------
 

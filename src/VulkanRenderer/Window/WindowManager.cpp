@@ -1,13 +1,13 @@
-#include "VulkanRenderer/Window/Window.h"
+#include "VulkanRenderer/Window/WindowManager.h"
 
 #include <iostream>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-Window::Window() {}
+WindowManager::WindowManager() {}
 
-void Window::createWindow(
+void WindowManager::createWindow(
     const uint16_t width,
     const uint16_t height,
     const char* title
@@ -34,46 +34,51 @@ void Window::createWindow(
     );
 }
 
-const VkSurfaceKHR Window::getSurface() const
+const VkSurfaceKHR WindowManager::getSurface() const
 {
     return m_surface;
 }
 
-void Window::getResolutionInPixels(int& width, int& height) const
+GLFWwindow* WindowManager::getWindow()
+{
+    return m_window;
+}
+
+void WindowManager::getResolutionInPixels(int& width, int& height) const
 {
     glfwGetFramebufferSize(m_window, &width, &height);
 }
 
-void Window::createSurface(const VkInstance& instance)
+void WindowManager::createSurface(const VkInstance& instance)
 {
     if (glfwCreateWindowSurface(instance, m_window, nullptr, &m_surface) != VK_SUCCESS)
         throw std::runtime_error("Failed to create a window surface");
 }
 
-bool Window::isWindowClosed() const
+bool WindowManager::isWindowClosed() const
 {
     return glfwWindowShouldClose(m_window);
 }
 
-bool Window::isAllowedToModifyTheResolution(const VkSurfaceCapabilitiesKHR& capabilities) const 
+bool WindowManager::isAllowedToModifyTheResolution(const VkSurfaceCapabilitiesKHR& capabilities) const
 {
     return (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max());
 }
 
-void Window::pollEvents()
+void WindowManager::pollEvents()
 {
     glfwPollEvents();
 }
 
-void Window::destroySurface(const VkInstance& instance)
+void WindowManager::destroySurface(const VkInstance& instance)
 {
     vkDestroySurfaceKHR(instance, m_surface, nullptr);
 }
 
-void Window::destroyWindow()
+void WindowManager::destroyWindow()
 {
     glfwDestroyWindow(m_window);
     glfwTerminate();
 }
 
-Window::~Window() {}
+WindowManager::~WindowManager() {}

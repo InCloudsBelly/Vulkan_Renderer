@@ -51,6 +51,30 @@ add_subdirectory(${GLM_DIR} EXCLUDE_FROM_ALL)
 set(STB_DIR "${PROJECT_LIBRARIES_DIR}/stb_image")
 add_subdirectory(${STB_DIR} EXCLUDE_FROM_ALL)
 
+# -ImGUI
+# (compiles it as an static library)
+set (IMGUI_DIR "${PROJECT_LIBRARIES_DIR}/imgui")
+file(GLOB IMGUI_SOURCES
+   ${IMGUI_DIR}/*.cpp
+   ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp 
+   ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp 
+)
+add_library(imgui ${IMGUI_SOURCES})
+target_include_directories(
+   imgui
+   PUBLIC
+      ${IMGUI_DIR}
+      ${IMGUI_DIR}/backends
+      ${Vulkan_INCLUDE_DIRS}
+      ${GLFW_INCLUDE_DIRS}
+)
+target_link_libraries(
+    imgui
+PUBLIC
+    glfw 
+    ${Vulkan_LIBRARIES}
+)
+
 # -TinyObjLoader
 set(TINY_OBJ_LOADER_DIR "${PROJECT_LIBRARIES_DIR}/tiny_objloader")
 add_subdirectory(${TINY_OBJ_LOADER_DIR})
@@ -92,6 +116,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
    glm
    stb_image
    tinyobjloader
+   imgui
    PRIVATE ${CMAKE_DL_LIBS}
 )
 

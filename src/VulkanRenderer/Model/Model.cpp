@@ -33,7 +33,12 @@ Model::Model(const char* pathToMesh, const std::string& texture)
     // We'll read the texture file later(after the creation of a cmd pool and
     // the queue handles).
     textureFile = texture;
+    loadVertexInfo(pathToMesh);
+}
 
+
+void Model::loadVertexInfo(const char* pathToMesh)
+{
     // Holds all the positions, normals and texture coordinates.
     tinyobj::attrib_t attrib;
     // Contains all the objects and their faces.

@@ -12,7 +12,9 @@
 
 CommandPool::CommandPool() {}
 
-CommandPool::CommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queueFamilyIndices)
+CommandPool::~CommandPool() {}
+
+void CommandPool::createCommandPool(const VkDevice& logicalDevice, const VkCommandPoolCreateFlags& flags, QueueFamilyIndices& queueFamilyIndices)
 {
 	m_logicalDevice = logicalDevice;
 	m_queueFamilyIndices = queueFamilyIndices;
@@ -20,12 +22,18 @@ CommandPool::CommandPool(const VkDevice& logicalDevice, QueueFamilyIndices& queu
 
 	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+	poolInfo.flags = flags;
 	poolInfo.queueFamilyIndex = m_queueFamilyIndices.graphicsFamily.value();
 
 	if (vkCreateCommandPool(m_logicalDevice, &poolInfo, nullptr, &m_commandPool) != VK_SUCCESS)
 		throw std::runtime_error("Failed to create command pool!");
 }
+
+VkCommandPool& CommandPool::getCommandPool()
+{
+	return m_commandPool;
+}
+
 
 void CommandPool::destroyCommandPool()
 {
@@ -147,4 +155,3 @@ void CommandPool::freeCommandBuffer(VkCommandBuffer& commandBuffer)
 	vkFreeCommandBuffers(m_logicalDevice, m_commandPool, 1, &commandBuffer);
 }
 
-CommandPool::~CommandPool() {}

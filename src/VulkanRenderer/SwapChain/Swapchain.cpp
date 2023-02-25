@@ -7,14 +7,14 @@
 
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/Images/ImageManager.h"
-#include "VulkanRenderer/Window/Window.h"
+#include "VulkanRenderer/Window/WindowManager.h"
 
 Swapchain::Swapchain() {}
 
 void Swapchain::createSwapchain(
 	const VkPhysicalDevice& physicalDevice,
 	const VkDevice& logicalDevice,
-	const Window& window)
+	const WindowManager& window)
 {
 	VkSurfaceFormatKHR surfaceFormat;
 	VkPresentModeKHR presentMode;
@@ -36,7 +36,8 @@ void Swapchain::createSwapchain(
 	// minimum because if we stick to this minimum, it means that we may
 	// sometimes have to wait on the drive to complete internal operations
 	// before we can acquire another imager to render to)
-	uint32_t imageCount = m_supportedProperties.value().capabilities.minImageCount + 1;
+	m_minImageCount = (m_supportedProperties.value().capabilities.minImageCount);
+	uint32_t imageCount = m_minImageCount + 1;
 
 	bool isMaxResolution = existsMaxNumberOfSupportedImages(m_supportedProperties.value().capabilities);
 	if (isMaxResolution == true &&imageCount > m_supportedProperties.value().capabilities.maxImageCount)
@@ -190,10 +191,14 @@ SwapchainSupportedProperties Swapchain::getSupportedProperties(const VkPhysicalD
 	return supported;
 }
 
+VkImageView Swapchain::getImageView(const uint32_t index)
+{
+	return m_imageViews[index];
+}
 
 void Swapchain::chooseBestSettings(
 	const VkPhysicalDevice& physicalDevice,
-	const Window& window,
+	const WindowManager& window,
 	VkSurfaceFormatKHR& surfaceFormat,
 	VkPresentModeKHR& presentMode,
 	VkExtent2D& extent)
@@ -232,7 +237,7 @@ VkPresentModeKHR Swapchain::chooseBestPresentMode(const std::vector<VkPresentMod
 	return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D Swapchain::chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities,const Window& window) 
+VkExtent2D Swapchain::chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities,const WindowManager& window)
 {
 	if (window.isAllowedToModifyTheResolution(capabilities) == false)
 		return capabilities.currentExtent;
@@ -288,4 +293,14 @@ bool Swapchain::isSwapchainAdequated(const VkPhysicalDevice& physicalDevice, con
 bool Swapchain::existsMaxNumberOfSupportedImages(const VkSurfaceCapabilitiesKHR& capabilities) 
 {
 	return (capabilities.maxImageCount != 0);
+}
+
+uint32_t Swapchain::getImageCount()
+{
+	return m_images.size();
+}
+
+uint32_t Swapchain::getMinImageCount()
+{
+	return m_minImageCount;
 }

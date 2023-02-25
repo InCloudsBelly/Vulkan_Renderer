@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Window/Window.h"
+#include "VulkanRenderer/Window/WindowManager.h"
 #include "VulkanRenderer/DepthBuffer/DepthBuffer.h"
 
 
@@ -33,7 +33,7 @@ public:
 	void createSwapchain(
 		const VkPhysicalDevice& physicalDevice,
 		const VkDevice& logicalDevice,
-		const Window& windowM
+		const WindowManager& windowM
 	);
 
 	void createAllImageViews(const VkDevice& logicalDevice);
@@ -48,19 +48,24 @@ public:
 	VkFramebuffer& getFramebuffer(const uint32_t imageIndex);
 	VkSwapchainKHR& getSwapchain();
 
+	uint32_t getImageCount();
+	uint32_t getMinImageCount();
+	VkImageView getImageView(const uint32_t index);
+
+
 	// Used in isPhysicalDeviceSuitable function.
 	bool isSwapchainAdequated(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface);
 
 
 private:
-	void chooseBestSettings(const VkPhysicalDevice& physicalDevice,const Window& window,
+	void chooseBestSettings(const VkPhysicalDevice& physicalDevice,const WindowManager& window,
 			VkSurfaceFormatKHR& surfaceFormat,VkPresentModeKHR& presentMode,VkExtent2D& extent);
 
 	VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
 	VkPresentModeKHR chooseBestPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
-	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const Window& window);
+	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const WindowManager& window);
 
 	
 
@@ -70,16 +75,18 @@ private:
 
 
 private:
-	VkSwapchainKHR m_swapchain;
-	std::vector<VkImage> m_images;
+	VkSwapchainKHR					m_swapchain;
+	std::vector<VkImage>			m_images;
+	// Used for the creation of the Imgui instance.
+	uint32_t						m_minImageCount;
 
 	// Describes how to access the images and which part of the images to
 	// access.
-	std::vector<VkImageView> m_imageViews;
+	std::vector<VkImageView>		m_imageViews;
 
 	std::optional<SwapchainSupportedProperties> m_supportedProperties;
-	VkFormat m_imageFormat;
-	VkExtent2D m_extent;
+	VkFormat						m_imageFormat;
+	VkExtent2D						m_extent;
 
-	std::vector<VkFramebuffer> m_framebuffers;
+	std::vector<VkFramebuffer>		m_framebuffers;
 };

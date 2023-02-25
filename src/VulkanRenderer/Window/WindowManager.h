@@ -3,10 +3,12 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-class Window
+// Make it Singleton!
+class WindowManager
 {
 public:
-	Window();
+	WindowManager();
+   ~WindowManager();
 	
 	void createWindow(const uint16_t width, const uint16_t height, const char* title);
 
@@ -23,7 +25,7 @@ public:
 
 	void pollEvents();
 
-	~Window();
+	GLFWwindow* getWindow();
 
 private:
 

@@ -4,9 +4,9 @@
 [submodule "libs/glfw"]
 	path = libs/glfw
 	url = https://github.com/glfw/glfw
-[submodule "libs/tiny_objloader"]
-	path = libs/tiny_objloader
-	url = https://github.com/tinyobjloader/tinyobjloader.git
 [submodule "libs/imgui"]
 	path = libs/imgui
 	url = https://github.com/ocornut/imgui.git
+[submodule "libs/assimp"]
+	path = libs/assimp
+	url = https://github.com/assimp/assimp.git

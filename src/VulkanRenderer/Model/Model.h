@@ -6,6 +6,10 @@
 #include <optional>
 
 #include <glm/glm.hpp>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 
 #include "VulkanRenderer/Model/Vertex.h"
 #include "VulkanRenderer/Textures/Texture.h"
@@ -61,7 +65,11 @@ public:
 	glm::fvec3 actualRot;
 	glm::fvec4 lightColor;
 
+	DescriptorTypes::Material materials;
+
 private:
+	void loadMaterial(aiMaterial* material);
+
 	void loadVertexInfo(const char* pathToMesh);
 	void makeBasicTransformations();
 	void initExtremeValues();

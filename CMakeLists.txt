@@ -75,9 +75,9 @@ PUBLIC
     ${Vulkan_LIBRARIES}
 )
 
-# -TinyObjLoader
-set(TINY_OBJ_LOADER_DIR "${PROJECT_LIBRARIES_DIR}/tiny_objloader")
-add_subdirectory(${TINY_OBJ_LOADER_DIR})
+# -Assimp
+set(ASSIMP_DIR "${PROJECT_LIBRARIES_DIR}/assimp")
+add_subdirectory(${ASSIMP_DIR})
 
 # - PThreads
 set(THREADS_PREFER_PTRHEAD_FLAG ON)
@@ -115,7 +115,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
    Threads::Threads  # Needed by GLFW.
    glm
    stb_image
-   tinyobjloader
+   assimp
    imgui
    PRIVATE ${CMAKE_DL_LIBS}
 )

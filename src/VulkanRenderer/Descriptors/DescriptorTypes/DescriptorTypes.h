@@ -5,8 +5,18 @@
 
 namespace DescriptorTypes
 {
+    struct alignas(16) Material
+    {
+        glm::vec4 ambient;
+        glm::vec4 diffuse;
+        glm::vec4 specular;
+        int shininess;
+    };
+
+
     namespace UniformBufferObject
     {
+
         struct alignas(16) Normal
         {
             glm::mat4 model;
@@ -14,6 +24,8 @@ namespace DescriptorTypes
             glm::mat4 proj;
             glm::vec4 lightPositions[10];
             glm::vec4 lightColors[10];
+            glm::vec4 cameraPos;
+            Material material;
             int lightsCount;
         };
         struct alignas(16) Light

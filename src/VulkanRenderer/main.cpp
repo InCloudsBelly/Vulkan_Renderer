@@ -19,6 +19,7 @@ int main()
         app.addLightModel("Light2","lightSphere.obj",glm::fvec4(1.0f, 0.0f, 0.0f, 1.0f));
 
         app.addNormalModel("Bunny", "stanford-bunny.obj");
+
         app.run();
     }
     catch (const std::exception& e)

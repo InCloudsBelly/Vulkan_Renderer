@@ -9,10 +9,8 @@ UBO::UBO() {}
 
 UBO::~UBO() {}
 
-void UBO::createUniformBuffers(const VkPhysicalDevice physicalDevice,const VkDevice logicalDevice,const uint32_t nSets) 
+void UBO::createUniformBuffers(const VkPhysicalDevice physicalDevice,const VkDevice logicalDevice,const uint32_t nSets, const size_t size)
 {
-    VkDeviceSize size = sizeof(DescriptorTypes::UniformBufferObject);
-
     m_uniformBuffers.resize(nSets);
     m_uniformBufferMemories.resize(nSets);
 
@@ -21,7 +19,7 @@ void UBO::createUniformBuffers(const VkPhysicalDevice physicalDevice,const VkDev
         BufferManager::createBuffer(
             physicalDevice,
             logicalDevice,
-            size,
+            (VkDeviceSize)size,
             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,

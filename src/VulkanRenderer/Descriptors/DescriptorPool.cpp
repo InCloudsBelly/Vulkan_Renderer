@@ -8,10 +8,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Descriptors/DescriptorTypes/DescriptorTypes.h"
-#include "VulkanRenderer/Buffers/BufferManager.h"
-#include "VulkanRenderer/Settings/config.h"
-
 DescriptorPool::DescriptorPool() {}
 DescriptorPool::~DescriptorPool() {}
 

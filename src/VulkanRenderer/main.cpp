@@ -15,9 +15,10 @@ int main()
         * Normal Model -> Model that interacts with light.
         * Light Model  -> Model that produces light.
         */
-        app.addNormalModel("Bunny", "stanford-bunny.obj");
-        app.addLightModel("Light", "lightSphere.obj");
+        app.addLightModel("Light1","lightSphere.obj",glm::fvec4(0.0f, 0.0f, 1.0f, 1.0f));
+        app.addLightModel("Light2","lightSphere.obj",glm::fvec4(1.0f, 0.0f, 0.0f, 1.0f));
 
+        app.addNormalModel("Bunny", "stanford-bunny.obj");
         app.run();
     }
     catch (const std::exception& e)

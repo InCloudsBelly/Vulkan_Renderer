@@ -11,7 +11,7 @@
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
-#include "VulkanRenderer/GraphicsPipeline/GraphicsPipelineManager.h"
+#include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Device/Device.h"
@@ -26,12 +26,14 @@ public:
 
 	void run();
 	void addNormalModel(const std::string& name, const std::string& meshFile, const std::string& textureFile = "default.jpg");
-	void addLightModel(const std::string& name, const std::string& meshFile, const std::string& textureFile = "default.jpg");
+	void addLightModel(const std::string& name, const std::string& meshFile, const glm::fvec4& lightColor, const std::string& textureFile = "default.jpg");
 
 
 private:
-	void addModel(const std::string& name, const std::string& meshFile, const std::string& textureFile);
+	void addModel(const std::string& name, const std::string& meshFile, const bool isLightModel,const glm::fvec4& lightColor, const std::string& textureFile);
 
+	void createGraphicsPipelines();
+	void uploadAllData();
 	// Modify this
 	void updateUniformBuffer(
 		const VkDevice& logicalDevice,
@@ -40,19 +42,23 @@ private:
 		Model& model
 	);
 
+	void updateLightData(DescriptorTypes::UniformBufferObject::Normal& ubo);
+	glm::mat4 getUpdatedModelMatrix(const glm::fvec4 actualPos,const glm::fvec3 actualRot,const glm::fvec3 actualSize);
+	glm::mat4 getUpdatedViewMatrix(const glm::fvec3& cameraPos,const glm::fvec3& centerPos,const glm::fvec3& upAxis);
+	glm::mat4 getUpdatedProjMatrix(const float vfov,const float aspect,const float nearZ,const float farZ);
+
 	void initWindow();
 	void initVulkan();
 	void mainLoop();
 	void cleanup();
 
 	void createRenderPass();
-
+	void createDescriptorSetLayouts();
 	void recordCommandBuffer(
 		const VkFramebuffer& framebuffer,
 		const RenderPass& renderPass,
 		const VkExtent2D& extent,
-		const VkPipeline& graphicsPipeline,
-		const VkPipelineLayout& pipelineLayout,
+		const std::vector<GraphicsPipeline>& graphicsPipelines,
 		const uint32_t currentFrame,
 		const VkCommandBuffer& commandBuffer,
 		CommandPool& commandPool
@@ -74,7 +80,8 @@ private:
 	std::unique_ptr<Swapchain>	m_swapchain;
 	RenderPass					m_renderPass;
 	VkDebugUtilsMessengerEXT	m_debugMessenger;
-	GraphicsPipelineManager		m_graphicsPipelineM;
+	GraphicsPipeline            m_graphicsPipelineNormalM;
+	GraphicsPipeline            m_graphicsPipelineLightM;
 	// Command buffer for main drawing commands.
 	CommandPool					m_commandPool;
 
@@ -94,8 +101,9 @@ private:
 	std::vector<size_t> m_normalModelIndices;
 
 	DescriptorPool				m_descriptorPool;
-	VkDescriptorSetLayout		m_descriptorSetLayout;
+	VkDescriptorSetLayout       m_descriptorSetLayoutNormalM;
+	VkDescriptorSetLayout       m_descriptorSetLayoutLightM;
 
 	std::vector<VkClearValue>	m_clearValues;
-	glm::fvec3					m_cameraPos;
+	glm::fvec4					m_cameraPos;
 };

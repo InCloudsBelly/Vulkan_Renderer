@@ -54,7 +54,7 @@ void Renderer::run()
     m_clearValues[1].color = { 1.0f, 0.0f };
     m_cameraPos = glm::fvec3(2.0f);
 
-    if (m_models.size() == 0)
+    if (m_allModels.size() == 0)
     {
         std::cout << "Nothing to render..\n";
         return;
@@ -314,9 +314,9 @@ void Renderer::initVulkan()
 
     DescriptorSetLayoutUtils::createDescriptorSetLayout(
         m_device.getLogicalDevice(),
-        { 
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, VK_SHADER_STAGE_VERTEX_BIT},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT},
+        {
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,  (VkShaderStageFlagBits)(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT}
         },
         m_descriptorSetLayout
     );
@@ -344,14 +344,14 @@ void Renderer::initVulkan()
     m_descriptorPool.createDescriptorPool(
         m_device.getLogicalDevice(),
         {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)}
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)}
         },
-        m_models.size() * Config::MAX_FRAMES_IN_FLIGHT
+        m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT
     );
 
     // Uploads the data from each model to the gpu.
-    for (auto& model : m_models)
+    for (auto& model : m_allModels)
     {
         // Vertex buffer and index buffer(with staging buffer)
         // (Position, color, texCoord, normal, etc)
@@ -424,7 +424,7 @@ void Renderer::recordCommandBuffer(
     CommandUtils::STATE::setViewport(0.0f, 0.0f, extent, 0.0f, 1.0f, 0, 1, commandBuffer);
     CommandUtils::STATE::setScissor({ 0, 0 }, extent, 0, 1, commandBuffer);
 
-    for (const auto& model : m_models)
+    for (const auto& model : m_allModels)
     {
         CommandUtils::STATE::bindVertexBuffers({ model->getVertexBuffer()}, {0}, 0, 1, commandBuffer);
         CommandUtils::STATE::bindIndexBuffer(model->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32, commandBuffer);
@@ -449,7 +449,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     //------------------------Updates uniform buffer----------------------------
-    for (auto& model : m_models)
+    for (auto& model : m_allModels)
     {
         updateUniformBuffer(m_device.getLogicalDevice(), currentFrame, m_swapchain->getExtent(), *model);
     }
@@ -533,7 +533,7 @@ void Renderer::mainLoop()
     while (m_window.isWindowClosed() == false)
     {
         m_window.pollEvents();
-        m_GUI->draw(m_models, m_cameraPos);
+        m_GUI->draw(m_allModels, m_cameraPos);
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -575,35 +575,18 @@ void Renderer::cleanup()
     // Render pass
     m_renderPass.destroy(m_device.getLogicalDevice());
 
-    // UBO(with their uniform buffers and uniform memories)
-    for (auto& model : m_models)
+    // Models -> Buffers, Memories and Textures.
+    for (auto& model : m_allModels)
         model->destroy(m_device.getLogicalDevice());
-    //for (auto& model : m_models)
-    //   model->ubo.destroyUniformBuffersAndMemories(m_device.getLogicalDevice());
-
+   
     // Descriptor Pool
     m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
-
-    // Textures
-    /*for (auto& model : m_models)
-        model->texture->destroyTexture(m_device.getLogicalDevice());*/
 
     // Descriptor Set Layout
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(
         m_device.getLogicalDevice(),
         m_descriptorSetLayout
     );
-
-    //// Bufferss
-    //for (auto& model : m_models)
-    //{
-    //    BufferManager::destroyBuffer(m_device.getLogicalDevice(), model->vertexBuffer);
-    //    BufferManager::destroyBuffer(m_device.getLogicalDevice(), model->indexBuffer);
-
-    //    // Buffer Memories
-    //    BufferManager::freeMemory(m_device.getLogicalDevice(), model->vertexMemory);
-    //    BufferManager::freeMemory(m_device.getLogicalDevice(), model->indexMemory);
-    //}
 
     // Sync objects
     destroySyncObjects();
@@ -635,9 +618,21 @@ void Renderer::cleanup()
 }
 
 
+void Renderer::addNormalModel(const std::string& name, const std::string& meshFile, const std::string& textureFile)
+{
+    addModel(name, meshFile, textureFile);
+    m_normalModelIndices.push_back(m_allModels.size() - 1);
+}
+
+void Renderer::addLightModel(const std::string& name, const std::string& meshFile, const std::string& textureFile)
+{
+    addModel(name, meshFile, textureFile);
+    m_lightModelIndices.push_back(m_allModels.size() - 1);
+}
+
 void Renderer::addModel(const std::string& name, const std::string& meshFile, const std::string& textureFile)
 {
-    m_models.push_back(std::make_shared<Model>((std::string(MODEL_DIR) + meshFile).c_str(),textureFile,name));
+    m_allModels.push_back(std::make_shared<Model>((std::string(MODEL_DIR) + meshFile).c_str(),textureFile,name));
 }
 
 
@@ -656,8 +651,6 @@ void Renderer::updateUniformBuffer(
     
     ubo.model = glm::mat4(1.0);
     ubo.model = glm::translate(ubo.model, model.actualPos);
-    // Updates the center of the mesh.
-    model.centerPos += model.actualPos;
 
     ubo.model = glm::scale(ubo.model, model.actualSize);
     ubo.model = glm::rotate(ubo.model, model.actualRot.x, glm::vec3(1.0f, 0.0f, 0.0f));
@@ -675,6 +668,16 @@ void Renderer::updateUniformBuffer(
     // inverted. To compensate for that, we have to flip the sign on the scaling
     // factor of the Y axis.
     ubo.proj[1][1] *= -1;
+
+    ubo.lightsCount = 1;
+    ubo.lightPositions = m_allModels[m_lightModelIndices[0]]->actualPos;
+    //std::cout << "POS: " << m_models[m_lightModels[0]]->actualPos.x << " " << m_models[m_lightModels[0]]->actualPos.y << " " << m_models[m_lightModels[0]]->actualPos.z << std::endl;
+    //for (size_t i = 0; i < ubo.lightsCount; i++)
+    //{
+    //   ubo.lightPositions = m_models[m_lightModels[i]]->centerPos;
+    //   //ubo.lightPosition = m_lightModels[i].centerPos;
+    //}
+
 
     model.updateUBO(logicalDevice, ubo, currentFrame);
 }

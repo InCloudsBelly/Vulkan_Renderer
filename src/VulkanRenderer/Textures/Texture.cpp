@@ -144,7 +144,7 @@ void Texture::transitionImageLayout(
 
 void Texture::createTextureSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice) 
 {
-    m_textureSampler.createSampler(physicalDevice, logicalDevice, m_mipLevels);
+    m_textureSampler = Sampler(physicalDevice, logicalDevice, m_mipLevels);
 }
 
 void Texture::createTextureImageView(const VkDevice& logicalDevice, const VkFormat& format)  

@@ -75,7 +75,6 @@ void Renderer::run()
     m_clearValues.resize(2);
     m_clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
     m_clearValues[1].color = { 1.0f, 0.0f };
-    m_cameraPos = glm::fvec4(0.0f, 0.0f, -5.0f, 0.0f);
 
     if (m_allModels.size() == 0)
     {
@@ -91,6 +90,7 @@ void Renderer::run()
 
     m_camera = std::make_shared<Arcball>(
             m_window.get(),
+            glm::fvec4(0.0f, 0.0f, 5.0f, 1.0f),
             Config::FOV,
             (m_swapchain->getExtent().width / (float)m_swapchain->getExtent().height),
             Config::Z_NEAR,
@@ -594,17 +594,17 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         if (model->getType() == ModelType::SKYBOX)
         {
             if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
-                pModel->updateUBO(m_device.getLogicalDevice(), m_cameraPos, m_swapchain->getExtent(), currentFrame);
+                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(),m_camera->getViewM(), m_swapchain->getExtent(), currentFrame);
         }
         if (model->getType() == ModelType::NORMAL_PBR)
         {
             if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
-                pModel->updateUBO(m_device.getLogicalDevice(), m_cameraPos,m_camera->getProjectionM(),m_allModels,m_directionalLightIndices,currentFrame);
+                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(),m_camera->getProjectionM(),m_allModels,m_directionalLightIndices,currentFrame);
         }
         if (model->getType() == ModelType::DIRECTIONAL_LIGHT)
         {
             if (auto pModel = std::dynamic_pointer_cast<DirectionalLight>(model))
-                pModel->updateUBO(m_device.getLogicalDevice(), m_cameraPos, m_camera->getProjectionM(), currentFrame);
+                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), currentFrame);
 
         }
     }
@@ -712,10 +712,7 @@ void Renderer::handleInput()
                 // TODO: Make it dynamic.
                 glm::mat4 newRot = glm::mat4(1.0);
 
-                pCamera->updateCameraPos(
-                    UBOutils::getUpdatedViewMatrix(glm::vec3(m_cameraPos), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)), newRot);
-                
-                m_cameraPos = newRot * m_cameraPos;
+                pCamera->updateCameraPos(newRot);
             }
         }
         else
@@ -733,7 +730,7 @@ void Renderer::mainLoop()
     while (m_window.isWindowClosed() == false)
     {
         handleInput();
-        m_GUI->draw(m_allModels, m_cameraPos, m_normalModelIndices, m_directionalLightIndices);
+        m_GUI->draw(m_allModels, m_camera->getPos(), m_normalModelIndices, m_directionalLightIndices);
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -821,14 +818,33 @@ void Renderer::addSkybox(const std::string& name, const std::string& textureFold
     m_skyboxModelIndices.push_back(m_allModels.size() - 1);
 }
 
-void Renderer::addObjectPBR(const std::string& name,const std::string& modelFileName) 
+void Renderer::addObjectPBR(const std::string& name, const std::string& modelFileName,
+    const glm::fvec3& pos,
+    const glm::fvec3& rot,
+    const glm::fvec3& size ) 
 {
-    m_allModels.push_back(std::make_shared<NormalPBR>(name, modelFileName));
+    m_allModels.push_back(std::make_shared<NormalPBR>(name, modelFileName, glm::fvec4(pos, 1.0f), rot, size));
+
     m_normalModelIndices.push_back(m_allModels.size() - 1);
 }
 
-void Renderer::addDirectionalLight(const std::string& name,const std::string& modelFileName) 
-{
-    m_allModels.push_back(std::make_shared<DirectionalLight>(name, modelFileName));
+void Renderer::addDirectionalLight(
+    const std::string& name,
+    const std::string& modelFileName,
+    const glm::fvec3& color,
+    const glm::fvec3& pos,
+    const glm::fvec3& rot,
+    const glm::fvec3& size
+) {
+    m_allModels.push_back(
+        std::make_shared<DirectionalLight>(
+            name,
+            modelFileName,
+            glm::fvec4(color, 1.0f),
+            glm::fvec4(pos, 1.0f),
+            rot,
+            size
+            )
+    );
     m_directionalLightIndices.push_back(m_allModels.size() - 1);
 }

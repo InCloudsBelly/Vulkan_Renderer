@@ -7,7 +7,7 @@
 Sampler::Sampler() {}
 Sampler::~Sampler() {}
 
-void Sampler::createSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t mipLevels)
+Sampler::Sampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t mipLevels)
 {
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

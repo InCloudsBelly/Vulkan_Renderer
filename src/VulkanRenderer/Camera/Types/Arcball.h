@@ -11,18 +11,19 @@ class Arcball : public Camera
 public:
 
     Arcball(
-        GLFWwindow*     window,
-        const float     FOV,
-        const float     ratio,
-        const float     zNear,
-        const float     zFar
+        GLFWwindow*         window,
+        const glm::fvec4&   pos,
+        const float         FOV,
+        const float         ratio,
+        const float         zNear,
+        const float         zFar
     );
 
     ~Arcball() override;
 
     void saveCursorPos();
 
-    void updateCameraPos(const glm::mat4& view, glm::mat4& newRot);
+    void updateCameraPos(glm::mat4& newRot);
 
 private:
 

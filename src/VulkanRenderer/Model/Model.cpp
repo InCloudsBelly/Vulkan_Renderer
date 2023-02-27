@@ -18,7 +18,11 @@
 #include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
 
 
-Model::Model(const std::string& name,const ModelType& type) : m_name(name), m_type(type) {}
+Model::Model(const std::string& name, const ModelType& type,
+    const glm::fvec4& pos,
+    const glm::fvec3& rot,
+    const glm::fvec3& size
+) : m_name(name), m_type(type), m_pos(pos), m_rot(rot), m_size(size) {}
 
 Model::~Model() {}
 
@@ -68,4 +72,34 @@ void Model::loadModel(const char* pathToModel)
         throw std::runtime_error("ERROR::ASSIMP::" + std::string(importer.GetErrorString()));
     }
     processNode(scene->mRootNode, scene);
+}
+
+const glm::fvec4& Model::getPos() const
+{
+    return m_pos;
+}
+
+const glm::fvec3& Model::getRot() const
+{
+    return m_rot;
+}
+
+const glm::fvec3& Model::getSize() const
+{
+    return m_size;
+}
+
+void Model::setPos(const glm::fvec4& newPos)
+{
+    m_pos = newPos;
+}
+
+void Model::setRot(const glm::fvec3& newRot)
+{
+    m_rot = newRot;
+}
+
+void Model::setSize(const glm::fvec3& newSize)
+{
+    m_size = newSize;
 }

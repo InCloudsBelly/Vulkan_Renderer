@@ -28,7 +28,7 @@ public:
 
     void recordCommandBuffer(const uint8_t currentFrame, const uint8_t imageIndex, const std::vector<VkClearValue>& clearValues);
 
-    void draw(const std::vector<std::shared_ptr<Model>>& models,glm::fvec4& cameraPos,const std::vector<size_t> normalModelIndices,const std::vector<size_t> lightModelIndices);
+    void draw(const std::vector<std::shared_ptr<Model>>& models,glm::fvec4& cameraPos, const std::vector<size_t>& normalModelIndices,const std::vector<size_t>& lightModelIndices);
 
     const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
 

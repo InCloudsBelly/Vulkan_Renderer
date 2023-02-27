@@ -157,14 +157,14 @@ void Skybox::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevic
 void Skybox::updateUBO(
     const VkDevice& logicalDevice,
     const glm::vec4& cameraPos,
+    const glm::mat4& view,
     const VkExtent2D& extent,
     const uint32_t& currentFrame
 ) {
     DescriptorTypes::UniformBufferObject::Skybox newUBO;
 
     newUBO.model = glm::translate(glm::mat4(1.0f),glm::vec3(cameraPos));
-    newUBO.view = UBOutils::getUpdatedViewMatrix(glm::vec3(cameraPos),glm::vec3(0.0f, 0.0f, 0.0f),glm::vec3(0.0f, 1.0f, 0.0f));
-
+    newUBO.view = view;
     newUBO.proj = UBOutils::getUpdatedProjMatrix(glm::radians(75.0f),extent.width / (float)extent.height,0.01f,40.0f);
 
     UBOutils::updateUBO(m_ubo, logicalDevice, newUBO, currentFrame);

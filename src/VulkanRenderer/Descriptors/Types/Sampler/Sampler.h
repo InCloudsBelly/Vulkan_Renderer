@@ -6,9 +6,9 @@ class Sampler
 {
 public:
     Sampler();
+    Sampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t mipLevels);
+    
     ~Sampler();
-
-    void createSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t mipLevels);
 
     const VkSampler& getSampler() const;
     void destroySampler(const VkDevice& logicalDevice);

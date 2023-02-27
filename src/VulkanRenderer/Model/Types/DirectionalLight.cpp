@@ -8,8 +8,13 @@
 
 DirectionalLight::DirectionalLight(
     const std::string& name,
-    const std::string& modelFileName
-) : Model(name, ModelType::DIRECTIONAL_LIGHT) {
+    const std::string& modelFileName,
+    const glm::fvec4& lightColor,
+    const glm::fvec4& pos,
+    const glm::fvec3& rot,
+    const glm::fvec3& size
+) : Model(name, ModelType::DIRECTIONAL_LIGHT, pos, rot, size),m_color(lightColor)
+{
 
     loadModel((std::string(MODEL_DIR) + modelFileName).c_str());
 
@@ -19,10 +24,7 @@ DirectionalLight::DirectionalLight(
         mesh.m_texturesToLoadInfo.push_back({"textures/default.jpg",VK_FORMAT_R8G8B8A8_SRGB});
     }
 
-    // TODO: Load scene settings.
-    actualPos = glm::fvec4(0.0f);
-    actualSize = glm::fvec3(1.0f);
-    actualRot = glm::fvec3(0.0f);
+    m_rot = glm::fvec3(0.0f);
 }
 
 DirectionalLight::~DirectionalLight() {}
@@ -157,18 +159,25 @@ void DirectionalLight::createTextures(const VkPhysicalDevice& physicalDevice,con
     }
 }
 
-void DirectionalLight::updateUBO(const VkDevice& logicalDevice,const glm::vec4& cameraPos,const glm::mat4& proj,const uint32_t& currentFrame) 
+void DirectionalLight::updateUBO(const VkDevice& logicalDevice,const glm::vec4& cameraPos, const glm::mat4& view, const glm::mat4& proj,const uint32_t& currentFrame)
 {
 
     DescriptorTypes::UniformBufferObject::Light newUBO;
 
-    newUBO.model = UBOutils::getUpdatedModelMatrix(actualPos, actualRot, actualSize);
-
-    newUBO.view = UBOutils::getUpdatedViewMatrix(glm::vec3(cameraPos), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
+    newUBO.model = UBOutils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
+    newUBO.view = view;
     newUBO.proj = proj;
-
-    newUBO.lightColor = color;
+    newUBO.lightColor = m_color;
 
     UBOutils::updateUBO(m_ubo, logicalDevice, newUBO, currentFrame);
+}
+
+const glm::fvec4& DirectionalLight::getColor() const
+{
+    return m_color;
+}
+
+void DirectionalLight::setColor(const glm::fvec4& newColor)
+{
+    m_color = newColor;
 }

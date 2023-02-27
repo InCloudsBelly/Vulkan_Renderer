@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <stdexcept>
 
+#include "VulkanRenderer/Textures/MipmapUtils.h"
 #include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
@@ -24,24 +25,30 @@ Texture::Texture(
     VkQueue& graphicsQueue
 ): m_isCubemap(isCubemap) 
 {
-    createTextureImage(
-        (isCubemap) ?
-            (std::string(SKYBOX_DIR) + textureInfo.name).c_str() :
+    if (m_isCubemap)
+    {
+        createTextureImageCubemap(
+            (std::string(SKYBOX_DIR) + textureInfo.name).c_str(),
+            textureInfo.format,
+            physicalDevice,
+            logicalDevice,
+            commandPool,
+            graphicsQueue
+        );
+    }
+    else
+    {
+        createTextureImage(
             (std::string(MODEL_DIR) + textureInfo.name).c_str(),
-        textureInfo.format,
-        physicalDevice,
-        logicalDevice,
-        commandPool,
-        graphicsQueue
-    );
-    createTextureImageView(
-        logicalDevice,
-        textureInfo.format
-    );
-    createTextureSampler(
-        physicalDevice,
-        logicalDevice
-    );
+            textureInfo.format,
+            physicalDevice,
+            logicalDevice,
+            commandPool,
+            graphicsQueue
+        );
+    }
+    createTextureImageView(logicalDevice, textureInfo.format);
+    createTextureSampler(physicalDevice, logicalDevice);
 }
 
 Texture::~Texture() {}
@@ -72,14 +79,19 @@ void Texture::transitionImageLayout(
         imgMemoryBarrier.image = m_textureImage;
         imgMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         imgMemoryBarrier.subresourceRange.baseMipLevel = 0;
-        imgMemoryBarrier.subresourceRange.levelCount = 1;
         // In this case, our image is not an array(it has 2D coords -> texel).
         imgMemoryBarrier.subresourceRange.baseArrayLayer = 0;
         
         if (m_isCubemap)
+        {
             imgMemoryBarrier.subresourceRange.layerCount = 6;
+            imgMemoryBarrier.subresourceRange.levelCount = 1;
+        }
         else
+        {
+            imgMemoryBarrier.subresourceRange.levelCount = m_mipLevels;
             imgMemoryBarrier.subresourceRange.layerCount = 1;
+        }
         //Barriers are primarily used for synchronization purposes, so you must
         //specify which types of operations that involve the resource must happen
         //before the barrier, and which operations that involve the resource must
@@ -132,16 +144,12 @@ void Texture::transitionImageLayout(
 
 void Texture::createTextureSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice) 
 {
-    m_textureSampler.createSampler(
-        physicalDevice,
-        logicalDevice
-    );
-   
+    m_textureSampler.createSampler(physicalDevice, logicalDevice, m_mipLevels);
 }
 
 void Texture::createTextureImageView(const VkDevice& logicalDevice, const VkFormat& format)  
 {
-    ImageManager::createImageView(logicalDevice, format, m_textureImage, VK_IMAGE_ASPECT_COLOR_BIT, m_isCubemap, m_textureImageView);
+    ImageManager::createImageView(logicalDevice, format, m_textureImage, VK_IMAGE_ASPECT_COLOR_BIT, m_isCubemap, m_mipLevels, m_textureImageView);
 }
 
 void Texture::createTextureImage(
@@ -157,93 +165,134 @@ void Texture::createTextureImage(
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
 
-    if (m_isCubemap)
+    stbi_uc* pixels = stbi_load(pathToTexture, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    if (!pixels)
     {
-        stbi_uc* pixels[6];
-        for (size_t i = 0; i < 6; i++)
-        {
-            pixels[i] = stbi_load(
-                (std::string(pathToTexture) + "/" +Config::TEXTURE_CUBEMAP_NAMING_CONV[i] +"." +Config::TEXTURE_CUBEMAP_FORMAT).c_str(),
-                &texWidth,
-                &texHeight,
-                &texChannels,
-                STBI_rgb_alpha
-            );
-
-            if (!pixels[i])
-            {
-                throw std::runtime_error("Failed to load texture image: " +
-                    std::string(pathToTexture) + "/" +Config::TEXTURE_CUBEMAP_NAMING_CONV[i] +"." +Config::TEXTURE_CUBEMAP_FORMAT);
-            }
-        }
-
-        // 4 -> rgbA
-        // 6 -> since we've 6 layers because of the cubemap.
-        imageSize = texWidth * texHeight * 4 * 6;
-
-        BufferManager::createBuffer(
-            physicalDevice,
-            logicalDevice,
-            imageSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBufferMemory,
-            stagingBuffer
-        );
-
-        VkDeviceSize layerSize = imageSize / 6;
-        for (size_t i = 0; i < 6; i++)
-        {
-            BufferManager::fillBuffer(
-                logicalDevice,
-                pixels[i],
-                layerSize * i,
-                layerSize,
-                stagingBufferMemory
-            );
-            stbi_image_free(pixels[i]);
-        }
+        throw std::runtime_error("Failed to load texture image: " + std::string(pathToTexture));
     }
-    else
+    m_mipLevels = MipmapUtils::getAmountOfSupportedMipLevels(texWidth, texHeight);
+    // *4 -> Because we are forcing the image to have RGBA.
+    imageSize = texWidth * texHeight * 4;
+
+    BufferManager::createBuffer(
+        physicalDevice,
+        logicalDevice,
+        imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBufferMemory,
+        stagingBuffer
+    );
+
+    BufferManager::fillBuffer(logicalDevice, pixels, 0, imageSize, stagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    // Creates an empty Image object of determined properties.
+    ImageManager::createImage(
+        physicalDevice,
+        logicalDevice,
+        texWidth,
+        texHeight,
+        format,
+        VK_IMAGE_TILING_OPTIMAL,
+        (VK_IMAGE_USAGE_TRANSFER_SRC_BIT |VK_IMAGE_USAGE_TRANSFER_DST_BIT |VK_IMAGE_USAGE_SAMPLED_BIT),
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        false,
+        m_mipLevels,
+        m_textureImage,
+        m_textureImageMemory
+    );
+
+    // We will transfer the pixels to the image object with a cmd buffer.
+   // (staging buffer to the image obj)
+    transitionImageLayout(
+        format,
+        // Since the image was created with the VK_IMAGE_LAYOUT_UNDEFINED
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        commandPool,
+        graphicsQueue
+    );
+
+    ImageManager::copyBufferToImage(
+        static_cast<uint32_t>(texWidth),
+        static_cast<uint32_t>(texHeight),
+        false,
+        graphicsQueue,
+        commandPool,
+        stagingBuffer,
+        m_textureImage
+    );
+
+    vkDestroyBuffer(logicalDevice,stagingBuffer,nullptr);
+    vkFreeMemory(logicalDevice,stagingBufferMemory,nullptr);
+    
+    MipmapUtils::generateMipmaps(
+        physicalDevice,
+        commandPool,
+        graphicsQueue,
+        m_textureImage,
+        texWidth,
+        texHeight,
+        format,
+        m_mipLevels
+    );
+}
+
+void Texture::createTextureImageCubemap(
+    const char* pathToTexture,
+    const VkFormat& format,
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    CommandPool& commandPool,
+    VkQueue& graphicsQueue ) 
+{
+    int texWidth, texHeight, texChannels;
+    VkDeviceSize imageSize;
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    stbi_uc* pixels[6];
+
+    for (size_t i = 0; i < 6; i++)
     {
-        stbi_uc* pixels = stbi_load(
-            pathToTexture,
+        pixels[i] = stbi_load(
+            (std::string(pathToTexture) + "/" + Config::TEXTURE_CUBEMAP_NAMING_CONV[i] + "." + Config::TEXTURE_CUBEMAP_FORMAT).c_str(),
             &texWidth,
             &texHeight,
             &texChannels,
             STBI_rgb_alpha
         );
-        if (!pixels)
+
+        if (!pixels[i])
         {
-            throw std::runtime_error(
-                "Failed to load texture image: " + std::string(pathToTexture)
-            );
+            throw std::runtime_error("Failed to load texture image: " + std::string(pathToTexture) + "/" + Config::TEXTURE_CUBEMAP_NAMING_CONV[i] + "." + Config::TEXTURE_CUBEMAP_FORMAT);
         }
+    }
+    m_mipLevels = 1;
 
-        // *4 -> Because we are forcing the image to have RGBA.
-        imageSize = texWidth * texHeight * 4;
+    // 4 -> rgbA
+    // 6 -> since we've 6 layers because of the cubemap.
+    imageSize = texWidth * texHeight * 4 * 6;
 
-        BufferManager::createBuffer(
-            physicalDevice,
-            logicalDevice,
-            imageSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            stagingBufferMemory,
-            stagingBuffer
-        );
+    BufferManager::createBuffer(
+        physicalDevice,
+        logicalDevice,
+        imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBufferMemory,
+        stagingBuffer
+    );
 
-        BufferManager::fillBuffer(
-            logicalDevice,
-            pixels,
-            0,
-            imageSize,
-            stagingBufferMemory
-        );
+    VkDeviceSize layerSize = imageSize / 6;
 
-        stbi_image_free(pixels);
+    for (size_t i = 0; i < 6; i++)
+    {
+        BufferManager::fillBuffer(logicalDevice, pixels[i], layerSize * i, layerSize, stagingBufferMemory);
+        stbi_image_free(pixels[i]);
     }
 
     // Creates an empty Image object of determined properties.
@@ -256,7 +305,8 @@ void Texture::createTextureImage(
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        m_isCubemap,
+        true,
+        m_mipLevels,
         m_textureImage,
         m_textureImageMemory
     );
@@ -275,7 +325,7 @@ void Texture::createTextureImage(
     ImageManager::copyBufferToImage(
         static_cast<uint32_t>(texWidth),
         static_cast<uint32_t>(texHeight),
-        m_isCubemap,
+        true,
         graphicsQueue,
         commandPool,
         stagingBuffer,

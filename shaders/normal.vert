@@ -1,18 +1,14 @@
 #version 450
 
-layout(std140,binding = 0) uniform UniformBufferObject
+layout(std140, binding = 0) uniform UniformBufferObject
 {
    mat4 model;
    mat4 view;
    mat4 proj;
-
    vec4 lightPositions[10];
    vec4 lightColors[10];
-   
    vec4 cameraPos;
-   
    int  lightsCount;
-
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
@@ -29,16 +25,18 @@ layout(location = 4) out vec3 outBitangent;
 
 void main()
 {
-    gl_Position     = (ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0));
+   gl_Position = (
+         ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0)
+   );
 
-    outPosition     = vec3(ubo.model * vec4(inPosition, 1.0));
-    outTexCoord     = inTexCoord;
+   outPosition = vec3(ubo.model * vec4(inPosition, 1.0));
+   outTexCoord = inTexCoord;
 
-    mat3 normalM    = transpose(inverse(mat3(ubo.model)));
-    outTangent      = normalize(normalM * inTangent);
-    outNormal       = normalize(normalM * inNormal);
+   outTangent   = normalize(mat3(ubo.model) * inTangent);
+   outNormal    = normalize(mat3(ubo.model) * inNormal);
 
-    outTangent      = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
-    outBitangent    = cross(outNormal, outTangent);
+   // Gram-Schmidt -> reorthogonalization
+   outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
 
+   outBitangent = cross(outNormal, outTangent);
 }

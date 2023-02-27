@@ -51,10 +51,6 @@ public:
 	const uint32_t getMinImageCount() const;
 	const VkImageView& getImageView(const uint32_t index) const;
 
-	// Used in isPhysicalDeviceSuitable function.
-	bool isSwapchainAdequated(const VkPhysicalDevice& physicalDevice, const VkSurfaceKHR& surface);
-
-
 private:
 	void chooseBestSettings(const Window& window,const SwapchainSupportedProperties& supportedProperties,
 			VkSurfaceFormatKHR& surfaceFormat,VkPresentModeKHR& presentMode,VkExtent2D& extent);

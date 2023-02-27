@@ -16,6 +16,7 @@ namespace ImageManager {
         const VkImageUsageFlags& usage,
         const VkMemoryPropertyFlags& memoryProperties,
         const bool isCubemap,
+        const uint32_t mipLevels,
         VkImage& image,
         VkDeviceMemory& memory
     );
@@ -25,6 +26,7 @@ namespace ImageManager {
         const VkImage& image,
         const VkImageAspectFlags& aspectFlags,
         const bool isCubemap,
+        const uint32_t mipLevels,
         VkImageView& imageView
     );
     void copyBufferToImage(

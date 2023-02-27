@@ -57,6 +57,15 @@ private:
 		VkQueue& graphicsQueue
 	);
 
+	void createTextureImageCubemap(
+		const char* pathToTexture,
+		const VkFormat& format,
+		const VkPhysicalDevice& physicalDevice,
+		const VkDevice& logicalDevice,
+		CommandPool& commandPool,
+		VkQueue& graphicsQueue
+	);
+
 	VkImage        m_textureImage;
 	VkDeviceMemory m_textureImageMemory;
 	VkImageView    m_textureImageView;
@@ -65,4 +74,6 @@ private:
 	Sampler        m_textureSampler;
 
 	bool           m_isCubemap;
+
+	uint32_t       m_mipLevels;
 };

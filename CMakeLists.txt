@@ -13,8 +13,8 @@ set(PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src")
 set(SHADER_DIR "${CMAKE_SOURCE_DIR}/shaders")
 set(SHADERS_BINARY_DIR "${PROJECT_BIN_DIR}/shaders")
 set(PROJECT_LIBRARIES_DIR "${CMAKE_SOURCE_DIR}/libs")
-set(TEXTURES_DIR "${CMAKE_SOURCE_DIR}/assets/textures")
 set(MODEL_DIR "${CMAKE_SOURCE_DIR}/assets/models")
+set(SKYBOX_DIR  "${CMAKE_SOURCE_DIR}/assets/skybox")
 
 # 递归查找文件夹下的 .h .hpp. ini 文件保存到 HEADER_FILES
 file(GLOB_RECURSE HEADER_FILES  ${PROJECT_SOURCE_DIR}/*.h ${PROJECT_SOURCE_DIR}/*.hpp ${PROJECT_SOURCE_DIR}/*.ini) 
@@ -78,6 +78,7 @@ PUBLIC
 # -Assimp
 set(ASSIMP_DIR "${PROJECT_LIBRARIES_DIR}/assimp")
 add_subdirectory(${ASSIMP_DIR})
+set(ASSIMP_BUILD_TESTS OFF)
 
 # - PThreads
 set(THREADS_PREFER_PTRHEAD_FLAG ON)
@@ -95,6 +96,7 @@ add_definitions(-DSHADERS_BINARY_DIR="${SHADERS_BINARY_DIR}")
 
 add_definitions(-DTEXTURES_DIR="${TEXTURES_DIR}/")
 add_definitions(-DMODEL_DIR="${MODEL_DIR}/")
+add_definitions(-DSKYBOX_DIR="${SKYBOX_DIR}/")
 
 #################################Executable####################################
 

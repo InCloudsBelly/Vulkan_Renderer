@@ -9,6 +9,7 @@
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Window/Window.h"
+#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthBuffer.h"
 
 Swapchain::Swapchain() {}
 Swapchain::~Swapchain() {}
@@ -129,6 +130,7 @@ void Swapchain::createAllImageViews(const VkDevice& logicalDevice)
 			m_imageFormat,
 			m_images[i],
 			VK_IMAGE_ASPECT_COLOR_BIT,
+			false,
 			m_imageViews[i]
 		);
 	}
@@ -181,6 +183,7 @@ VkSurfaceFormatKHR Swapchain::chooseBestSurfaceFormat(const std::vector<VkSurfac
 {
 	for (const auto& availableFormat : availableFormats)
 	{
+		// sRGB -> gamma correction.
 		if (availableFormat.format == VK_FORMAT_R8G8B8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
 		{
 			return availableFormat;

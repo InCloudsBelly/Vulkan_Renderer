@@ -4,21 +4,29 @@
 #include <array>
 
 #include <vulkan/vulkan.h>
-
+#include "VulkanRenderer/Descriptors/DescriptorInfo.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
-#include "VulkanRenderer/Descriptors/DescriptorTypes/DescriptorTypesUtils.h"
+#include "VulkanRenderer/Descriptors/Types/DescriptorTypesUtils.h"
 #include "VulkanRenderer/Settings/Config.h"
 
 
 // Creates, allocates and configures the descriptor sets.
 void DescriptorSets::createDescriptorSets(
-    const VkDevice logicalDevice,
-    const VkImageView& textureImageView,
-    const VkSampler& textureSampler,
-    std::vector<VkBuffer>& uniformBuffers,
-    const VkDescriptorSetLayout& descriptorSetLayout,
-    DescriptorPool& descriptorPool )
+    const VkDevice                      logicalDevice,
+    const std::vector<DescriptorInfo>&  uboInfo,
+    const std::vector<DescriptorInfo>&  samplersInfo,
+    const std::vector<Texture>&         textures,
+    std::vector<VkBuffer>&              uniformBuffers,
+    const VkDescriptorSetLayout&        descriptorSetLayout,
+    DescriptorPool&                     descriptorPool )
 {
+    // TODO: Improve this, since all the descriptors sets
+    // are the same, just copy it instead of creating them
+    // many times.
+
+    std::vector<VkDescriptorImageInfo> imageInfos;
+    imageInfos.resize(textures.size());
+
     m_descriptorSets.resize(Config::MAX_FRAMES_IN_FLIGHT);
     m_descriptorSetLayouts.resize(Config::MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
 
@@ -30,18 +38,27 @@ void DescriptorSets::createDescriptorSets(
 
         VkDescriptorBufferInfo bufferInfo{};
         DescriptorTypesUtils::createDescriptorBufferInfo(uniformBuffers[i], bufferInfo);
-        VkDescriptorImageInfo imageInfo{};
-        DescriptorTypesUtils::createDescriptorImageInfo(textureImageView, textureSampler, imageInfo);
 
-        // Describes how to update the descriptors.
-        // (how and which buffer/image use to bind with the each descriptor)
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        for (size_t j = 0; j < imageInfos.size(); j++)
+        {
+            DescriptorTypesUtils::createDescriptorImageInfo(textures[j].getTextureImageView(), textures[j].getTextureSampler(), imageInfos[j]);
+        }
+        
+        std::vector<VkWriteDescriptorSet> descriptorWrites;
+        descriptorWrites.resize(uboInfo.size() + samplersInfo.size());
 
-        // Another
-        createDescriptorWriteInfo(bufferInfo, m_descriptorSets[i], 0, 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, descriptorWrites[0]);
+        // UBOs
+        for (size_t j = 0; j < uboInfo.size(); j++)
+        {
+            createDescriptorWriteInfo(bufferInfo,m_descriptorSets[i],uboInfo[j].bindingNumber,0,uboInfo[j].descriptorType,descriptorWrites[j]);
+        }
 
-        // Another
-        createDescriptorWriteInfo(imageInfo, m_descriptorSets[i], 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorWrites[1]);
+        // Samplers
+        for (size_t j = 0; j < samplersInfo.size(); j++)
+        {
+            createDescriptorWriteInfo(imageInfos[j],m_descriptorSets[i],samplersInfo[j].bindingNumber,0,samplersInfo[j].descriptorType,descriptorWrites[uboInfo.size() + j]);
+        }
+
 
         vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
@@ -49,12 +66,12 @@ void DescriptorSets::createDescriptorSets(
 
 template<typename T>
 void DescriptorSets::createDescriptorWriteInfo(
-    const T& descriptorInfo,
-    const VkDescriptorSet& descriptorSet,
-    const uint32_t& dstBinding,
-    const uint32_t& dstArrayElement,
+    const T&                descriptorInfo,
+    const VkDescriptorSet&  descriptorSet,
+    const uint32_t&         dstBinding,
+    const uint32_t&         dstArrayElement,
     const VkDescriptorType& type,
-    VkWriteDescriptorSet& descriptorWrite)
+    VkWriteDescriptorSet&   descriptorWrite)
 {
     descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptorWrite.dstSet = descriptorSet;
@@ -70,31 +87,7 @@ void DescriptorSets::createDescriptorWriteInfo(
 
 }
 
-//////////////////////////////////////Instances////////////////////////////////
-
-template void DescriptorSets::createDescriptorWriteInfo<VkDescriptorBufferInfo>(
-    const VkDescriptorBufferInfo& descriptorInfo,
-    const VkDescriptorSet& descriptorSet,
-    const uint32_t& dstBinding,
-    const uint32_t& dstArrayElement,
-    const VkDescriptorType& type,
-    VkWriteDescriptorSet& descriptorWrite
-    );
-
-template void DescriptorSets::createDescriptorWriteInfo<VkDescriptorImageInfo>(
-    const VkDescriptorImageInfo& descriptorInfo,
-    const VkDescriptorSet& descriptorSet,
-    const uint32_t& dstBinding,
-    const uint32_t& dstArrayElement,
-    const VkDescriptorType& type,
-    VkWriteDescriptorSet& descriptorWrite
-    );
-
-
-///////////////////////////////////////////////////////////////////////////////
-
-const VkDescriptorSet& DescriptorSets::getDescriptorSet(
-    const uint32_t index
-) const {
+const VkDescriptorSet& DescriptorSets::get(const uint32_t index) const 
+{
     return m_descriptorSets[index];
 }

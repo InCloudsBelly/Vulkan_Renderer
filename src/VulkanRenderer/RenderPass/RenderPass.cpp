@@ -4,7 +4,7 @@
 #include <array>
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/DepthBuffer/DepthUtils.h"
+#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthUtils.h"
 
 
 RenderPass::RenderPass() {}

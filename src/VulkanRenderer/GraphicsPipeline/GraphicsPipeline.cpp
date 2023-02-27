@@ -9,8 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
-#include "VulkanRenderer/Model/Vertex.h"
-#include "VulkanRenderer/DepthBuffer/DepthUtils.h"
+#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthUtils.h"
 
 GraphicsPipeline::GraphicsPipeline() {}
 
@@ -20,13 +19,16 @@ GraphicsPipeline::~GraphicsPipeline() {}
 // param. with a vector containing the ShadrModules to create)
 GraphicsPipeline::GraphicsPipeline(
     const VkDevice& logicalDevice,
+    const GraphicsPipelineType type,
     const VkExtent2D& extent,
     const VkRenderPass& renderPass,
     const VkDescriptorSetLayout& descriptorSetLayout,
     const std::string& vertexShaderFileName,
     const std::string& fragmentShaderFileName,
+    VkVertexInputBindingDescription vertexBindingDescriptions,
+    std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
     std::vector<size_t>* modelIndices )
-    : m_opModelIndices(modelIndices)
+    : m_type(type), m_opModelIndices(modelIndices)
 {
     // -------------------Shader Modules--------------------
     VkShaderModule vertexShaderModule;
@@ -59,8 +61,8 @@ GraphicsPipeline::GraphicsPipeline(
 
     // -Vertex input(attributes)
     // Gets the binding and descriptions of the triangle's vertices and vertex attributes(one array containing both).
-    VkVertexInputBindingDescription bindingDescription = (Vertex::getBindingDescription());
-    std::vector<VkVertexInputAttributeDescription> attribDescriptions = (Vertex::getAttributeDescriptions());
+    VkVertexInputBindingDescription bindingDescription = (vertexBindingDescriptions);
+    std::vector<VkVertexInputAttributeDescription> attribDescriptions = (vertexAttribDescriptions);
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     createVertexShaderInputInfo(bindingDescription, attribDescriptions, vertexInputInfo);
 
@@ -89,7 +91,7 @@ GraphicsPipeline::GraphicsPipeline(
 
     // Depth and stencil
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
-    DepthUtils::createDepthStencilStateInfo(depthStencil);
+    DepthUtils::createDepthStencilStateInfo(m_type, depthStencil);
 
     // --------------Graphics pipeline creation------------
     VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -264,7 +266,11 @@ void GraphicsPipeline::createRasterizerInfo(VkPipelineRasterizationStateCreateIn
     rasterizerInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizerInfo.lineWidth = 1.0f;
     // Determines the type of face culling to use.
-    rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+    if (m_type == GraphicsPipelineType::SKYBOX)
+        rasterizerInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
+    else
+        rasterizerInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+
     rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
     // Alters the depth values by adding a constant value or biasing them based
@@ -297,7 +303,7 @@ void GraphicsPipeline::createMultisamplingInfo(VkPipelineMultisampleStateCreateI
 }
 
 // Contains the the configuration per attached framebuffer.
-// (For now, we won't use both config.)
+// (For now, we won't use both Config.)
 void GraphicsPipeline::createColorBlendingAttachment(VkPipelineColorBlendAttachmentState& colorBlendAttachment)
 {
     colorBlendAttachment.colorWriteMask = (
@@ -347,6 +353,7 @@ const VkPipeline& GraphicsPipeline::get() const
     return m_graphicsPipeline;
 }
 
+// TODO: make this safer.
 const std::vector<size_t>& GraphicsPipeline::getModelIndices() const
 {
     return *m_opModelIndices;
@@ -362,4 +369,9 @@ void GraphicsPipeline::destroy(const VkDevice& logicalDevice)
 {
     vkDestroyPipeline(logicalDevice, m_graphicsPipeline, nullptr);
     vkDestroyPipelineLayout(logicalDevice, m_pipelineLayout, nullptr);
+}
+
+const GraphicsPipelineType GraphicsPipeline::getType() const
+{
+    return m_type;
 }

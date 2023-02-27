@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Window/Window.h"
-#include "VulkanRenderer/DepthBuffer/DepthBuffer.h"
+#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthBuffer.h"
 
 
 struct SwapchainSupportedProperties

@@ -15,6 +15,7 @@ void ImageManager::createImage(
     const VkImageTiling& tiling,
     const VkImageUsageFlags& usage,
     const VkMemoryPropertyFlags& memoryProperties,
+    const bool isCubemap,
     VkImage& image,
     VkDeviceMemory& memory
 ) {
@@ -27,7 +28,18 @@ void ImageManager::createImage(
     imageInfo.extent.height = height;
     imageInfo.extent.depth = 1;
     imageInfo.mipLevels = 1;
-    imageInfo.arrayLayers = 1;
+    
+    if (isCubemap)
+    {
+        imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+        imageInfo.arrayLayers = 6;
+    }
+    else
+    {
+        imageInfo.flags = 0;
+        imageInfo.arrayLayers = 1;
+    }
+
     imageInfo.format = format;
     // Specifies how texels are laid out.
     imageInfo.tiling = tiling;
@@ -41,8 +53,7 @@ void ImageManager::createImage(
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     // Related to multisampling.
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    // Optional.
-    imageInfo.flags = 0;
+
 
     auto status = vkCreateImage(logicalDevice, &imageInfo, nullptr, &image);
 
@@ -74,6 +85,7 @@ void ImageManager::createImageView(
     const VkFormat& format,
     const VkImage& image,
     const VkImageAspectFlags& aspectFlags,
+    const bool isCubemap,
     VkImageView& imageView
 ) {
     VkImageViewCreateInfo createInfo{};
@@ -81,7 +93,12 @@ void ImageManager::createImageView(
     createInfo.image = image;
     // Specifies how to treat images, as 1D textures, 2D textures, 3D
     // textures and cube maps.
-    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+   
+    if (isCubemap)
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    else
+        createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
     createInfo.format = format;
     // Specifies how we want to map all the color channels of the images
     // (E.g: map all of the channels to the red channel for a monochrome
@@ -97,7 +114,10 @@ void ImageManager::createImageView(
     createInfo.subresourceRange.baseMipLevel = 0;
     createInfo.subresourceRange.levelCount = 1;
     createInfo.subresourceRange.baseArrayLayer = 0;
-    createInfo.subresourceRange.layerCount = 1;
+    if (isCubemap)
+        createInfo.subresourceRange.layerCount = 6;
+    else
+        createInfo.subresourceRange.layerCount = 1;
 
     const auto status = vkCreateImageView(logicalDevice, &createInfo, nullptr, &imageView);
 
@@ -109,6 +129,7 @@ void ImageManager::createImageView(
 void ImageManager::copyBufferToImage(
     const uint32_t width,
     const uint32_t height,
+    const bool isCubemap,
     VkQueue& graphicsQueue,
     CommandPool& commandPool,
     VkBuffer& buffer,
@@ -134,7 +155,10 @@ void ImageManager::copyBufferToImage(
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.mipLevel = 0;
     region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
+    if (isCubemap)
+        region.imageSubresource.layerCount = 6;
+    else
+        region.imageSubresource.layerCount = 1;
 
     region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { width,height,1 };

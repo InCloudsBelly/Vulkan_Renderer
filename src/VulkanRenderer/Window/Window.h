@@ -25,7 +25,7 @@ public:
 
 	void pollEvents();
 
-	const GLFWwindow* get() const;
+	GLFWwindow* get();
 
 private:
 

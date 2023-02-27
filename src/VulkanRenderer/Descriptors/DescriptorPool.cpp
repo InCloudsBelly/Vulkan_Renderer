@@ -11,10 +11,7 @@
 DescriptorPool::DescriptorPool() {}
 DescriptorPool::~DescriptorPool() {}
 
-void DescriptorPool::createDescriptorPool(
-	const VkDevice& logicalDevice,
-	const std::vector<VkDescriptorPoolSize> poolSizes,
-	const uint32_t descriptorSetsCount)
+void DescriptorPool::createDescriptorPool(const VkDevice& logicalDevice, const std::vector<VkDescriptorPoolSize> poolSizes, const uint32_t descriptorSetsCount) 
 {
 	if (poolSizes.size() == 0)
 		throw std::runtime_error("Failed to create descriptor pool!");

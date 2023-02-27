@@ -28,9 +28,12 @@ public:
 
     void recordCommandBuffer(const uint8_t currentFrame, const uint8_t imageIndex, const std::vector<VkClearValue>& clearValues);
 
-    void draw(std::vector<std::shared_ptr<Model>> models,glm::fvec4& cameraPos,const std::vector<size_t> normalModelIndices,const std::vector<size_t> lightModelIndices);
+    void draw(const std::vector<std::shared_ptr<Model>>& models,glm::fvec4& cameraPos,const std::vector<size_t> normalModelIndices,const std::vector<size_t> lightModelIndices);
 
     const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
+
+    const bool isCursorPositionInGUI() const;
+
     void destroy(const VkDevice& logicalDevice);
 
 private:
@@ -38,7 +41,7 @@ private:
     void createLightsWindow(std::vector<std::shared_ptr<Model>> models, const std::vector<size_t> indices);
     void createModelsWindow(std::vector<std::shared_ptr<Model>> models, const std::vector<size_t> indices);
     void createCameraWindow(const std::string& name, glm::fvec4& cameraPos);
-    void createTransformationsInfo(std::shared_ptr<Model> model,const std::string& modelName);
+    void createTransformationsInfo(glm::vec4& pos,glm::vec3& rot, glm::vec3& size, const std::string& modelName);
     void createTranslationSliders(const std::string& name, glm::fvec4& pos, const float minR, const float maxR);
     void createRotationSliders(const std::string& name,glm::fvec3& pos,const float minR,const float maxR);
     void createSizeSliders(const std::string& name, glm::fvec3& pos, const float minR, const float maxR);

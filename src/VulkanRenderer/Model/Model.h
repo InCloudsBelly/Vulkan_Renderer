@@ -11,88 +11,66 @@
 #include <assimp/postprocess.h>
 
 
-#include "VulkanRenderer/Model/Vertex.h"
+#include "VulkanRenderer/Model/Mesh.h"
 #include "VulkanRenderer/Textures/Texture.h"
+#include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Descriptors/DescriptorInfo.h"
+#include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
-#include "VulkanRenderer/Descriptors/DescriptorTypes/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptors/DescriptorTypes/UBO.h"
 
-// REMEMBER: LoadObj automatically applies triangularization by default!
+enum class ModelType
+{
+	NONE = 0,
+	NORMAL_PBR = 1,
+	DIRECTIONAL_LIGHT = 2,
+	SKYBOX = 3
+};
+
 
 class Model
 {
 public:
-	Model(const char* pathToMesh, const std::string& texture, const std::string& modelName, const bool lightModel, const glm::fvec4& lightColor);
+	Model(const std::string& name, const ModelType& type);
 
-	~Model();
+	virtual ~Model() = 0;
+	virtual void destroy(const VkDevice& logicalDevice) = 0;
 
-	void destroy(const VkDevice& logicalDevice);
-
-	template<typename T>
-	void updateUBO(const VkDevice& logicalDevice, T& newUbo, const uint32_t& currentFrame);
-
-	void uploadVertexData(
+	virtual void uploadVertexData(
 		const VkPhysicalDevice& physicalDevice,
-		const VkDevice& logicalDevice,
-		VkQueue& graphicsQueue,
-		CommandPool& commandPool
-	);
+		const VkDevice&			logicalDevice,
+		VkQueue&				graphicsQueue,
+		CommandPool&			commandPool
+	) = 0;
 
-	void createTexture(
+	virtual void createTextures(
 		const VkPhysicalDevice& physicalDevice,
-		const VkDevice& logicalDevice,
-		CommandPool& commandPool,
-		VkQueue& graphicsQueue,
-		const VkFormat& format
-	);
+		const VkDevice&			logicalDevice,
+		CommandPool&			commandPool,
+		VkQueue&				graphicsQueue
+	) = 0;
 
-	void createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorPool& descriptorPool);
-	void createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount);
+	virtual void createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorPool& descriptorPool) = 0;
+	virtual void createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount) = 0;
 
 	const std::string& getName() const;
-	const VkDescriptorSet& getDescriptorSet(const uint32_t index) const;
-	VkBuffer& getVertexBuffer();
-	VkBuffer& getIndexBuffer();
-	uint32_t getIndexCount();
-	const bool isLightModel() const;
+	const ModelType& getType() const;
 
 	// Info to update UBO.
-	float extremeX[2];
-	float extremeY[2];
-	float extremeZ[2];
-	glm::fvec4  actualPos;
-	glm::fvec3 actualSize;
-	glm::fvec3 actualRot;
-	glm::fvec4 lightColor;
+	float			extremeX[2];
+	float			extremeY[2];
+	float			extremeZ[2];
+	glm::fvec4		actualPos;
+	glm::fvec3		actualSize;
+	glm::fvec3		actualRot;
 
-	DescriptorTypes::Material materials;
+protected:
+	virtual void processMesh(aiMesh* mesh, const aiScene* scene) = 0;
+	void loadModel(const char* pathToModel);
+
+	std::string			m_name;
+	ModelType			m_type;
+	UBO					m_ubo;
 
 private:
-	void loadMaterial(aiMaterial* material);
-
-	void loadVertexInfo(const char* pathToMesh);
-	void makeBasicTransformations();
-	void initExtremeValues();
-
-	std::string m_name;
-
-	std::vector<Vertex>				m_vertices;
-	std::vector<uint32_t>			m_indices;
-
-	VkBuffer						m_vertexBuffer;
-	VkDeviceMemory					m_vertexMemory;
-
-	VkBuffer						m_indexBuffer;
-	VkDeviceMemory					m_indexMemory;
-
-	// Texture
-	std::string						m_textureFileName;
-	std::unique_ptr<Texture>		m_texture;
-	// Also Sampler from Texture obj.
-	DescriptorSets					m_descriptorSets;
-
-	// Descriptors
-	UBO								m_ubo;
-
-	bool							m_isLightModel;
+	void processNode(aiNode* node, const aiScene* scene);
 };

@@ -16,30 +16,52 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "VulkanRenderer/Settings/config.h"
+#include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Settings/VkLayersConfig.h"
+
 #include "VulkanRenderer/ValidationLayersManager/vlManager.h"
+
 #include "VulkanRenderer/Window/Window.h"
+
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
+
 #include "VulkanRenderer/Swapchain/Swapchain.h"
-#include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
+
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Commands/CommandUtils.h"
+
 #include "VulkanRenderer/Extensions/ExtensionsUtils.h"
+
 #include "VulkanRenderer/Buffers/BufferManager.h"
 #include "VulkanRenderer/Buffers/BufferUtils.h"
-#include "VulkanRenderer/Model/Vertex.h"
+
+#include "VulkanRenderer/Model/Model.h"
+#include "VulkanRenderer/Model/Attributes.h"
+#include "VulkanRenderer/Model/Types/NormalPBR.h"
+#include "VulkanRenderer/Model/Types/Skybox.h"
+#include "VulkanRenderer/Model/Types/DirectionalLight.h"
+
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Descriptors/DescriptorSetLayoutUtils.h"
-#include "VulkanRenderer/Descriptors/DescriptorTypes/UBO.h"
-#include "VulkanRenderer/Descriptors/DescriptorTypes/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
+#include "VulkanRenderer/Descriptors/Types/UBO/UBOutils.h"
+#include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
+
 #include "VulkanRenderer/Textures/Texture.h"
-#include "VulkanRenderer/DepthBuffer/DepthBuffer.h"
-#include "VulkanRenderer/DepthBuffer/DepthUtils.h"
+
+#include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
+#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthBuffer.h"
+#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthUtils.h"
+
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
+
+#include "VulkanRenderer/Camera/Camera.h"
+#include "VulkanRenderer/Camera/Types/Arcball.h" 
+
 #include "VulkanRenderer/GUI/GUI.h"
 
 
@@ -48,7 +70,7 @@ glm::fvec3 cameraPos = glm::fvec3(2.0f, 2.0f, 2.0f);
 
 void Renderer::run()
 {
-    // Improve this!
+    // TODO: Improve this!
     // NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
     m_clearValues.resize(2);
     m_clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
@@ -61,13 +83,22 @@ void Renderer::run()
         return;
     }
 
-    if (m_lightModelIndices.size() == 0)
-    {
-        std::cout << "No lights to render! Add at least one light model.\n";
-    }
-
     initWindow();
     initVulkan();
+
+    // Keyword and mouse settings
+    m_isMouseInMotion = false;
+
+    m_camera = std::make_shared<Arcball>(
+            m_window.get(),
+            Config::FOV,
+            (m_swapchain->getExtent().width / (float)m_swapchain->getExtent().height),
+            Config::Z_NEAR,
+            Config::Z_FAR
+        );
+
+    glfwSetWindowUserPointer(m_window.get(), m_camera.get());
+    glfwSetScrollCallback(m_window.get(), scrollCallback);
 
     m_GUI = std::make_unique<GUI>(
         m_device.getPhysicalDevice(),
@@ -311,57 +342,105 @@ void Renderer::uploadAllData()
         model->uploadVertexData(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_qfHandles.graphicsQueue, m_commandPool);
 
         // Creates and uploads the Texture.
-        model->createTexture(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_commandPool, m_qfHandles.graphicsQueue, VK_FORMAT_R8G8B8A8_SRGB);
+        model->createTextures(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_commandPool, m_qfHandles.graphicsQueue);
 
         // Uniform Buffers
         model->createUniformBuffers(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), Config::MAX_FRAMES_IN_FLIGHT);
 
+        // TODO: Improve this
         // Descriptor Sets
-        model->createDescriptorSets(m_device.getLogicalDevice(),((model->isLightModel()) ?m_descriptorSetLayoutLightM :m_descriptorSetLayoutNormalM),m_descriptorPool);
+        switch (model->getType())
+        {
+            case ModelType::SKYBOX:
+            {
+                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox, m_descriptorPool);
+                break;
+            }
+            case ModelType::NORMAL_PBR:
+            {
+                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR, m_descriptorPool);
+                break;
+            }
+            case ModelType::DIRECTIONAL_LIGHT:
+            {
+                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutDirectionalLight, m_descriptorPool);
+                break;
+            }
+            case ModelType::NONE:
+            {
+                break;
+            }
+        }
     }
 }
 
 void Renderer::createGraphicsPipelines()
 {
-    m_graphicsPipelineNormalM = GraphicsPipeline(
+    m_graphicsPipelineSkybox = GraphicsPipeline(
         m_device.getLogicalDevice(),
+        GraphicsPipelineType::SKYBOX,
         m_swapchain->getExtent(),
         m_renderPass.get(),
-        m_descriptorSetLayoutNormalM,
+        m_descriptorSetLayoutSkybox,
+        "skybox",
+        "skybox",
+        Attributes::SKYBOX::getBindingDescription(),
+        Attributes::SKYBOX::getAttributeDescriptions(),
+        &m_skyboxModelIndices
+    );
+
+    m_graphicsPipelinePBR = GraphicsPipeline(
+        m_device.getLogicalDevice(),
+        GraphicsPipelineType::PBR,
+        m_swapchain->getExtent(),
+        m_renderPass.get(),
+        m_descriptorSetLayoutNormalPBR,
         "normal",
         "normal",
+        Attributes::PBR::getBindingDescription(),
+        Attributes::PBR::getAttributeDescriptions(),
         &m_normalModelIndices
     );
 
-    m_graphicsPipelineLightM = GraphicsPipeline(
+    m_graphicsPipelineDirectionalLight = GraphicsPipeline(
         m_device.getLogicalDevice(),
+        GraphicsPipelineType::LIGHT,
         m_swapchain->getExtent(),
         m_renderPass.get(),
-        m_descriptorSetLayoutLightM,
+        m_descriptorSetLayoutDirectionalLight,
         "light",
         "light",
-        &m_lightModelIndices
+        Attributes::LIGHT::getBindingDescription(),
+        Attributes::LIGHT::getAttributeDescriptions(),
+        &m_directionalLightIndices
     );
 }
 
+/*
+ * Specifies all the neccessary descriptors, their bindings and their
+ * shader stages.
+ */
 void Renderer::createDescriptorSetLayouts()
 {
     DescriptorSetLayoutUtils::createDescriptorSetLayout(
         m_device.getLogicalDevice(),
-        {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0,  (VkShaderStageFlagBits)(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT}
-        },
-        m_descriptorSetLayoutNormalM
+        GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
+        GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
+        m_descriptorSetLayoutSkybox
     );
 
     DescriptorSetLayoutUtils::createDescriptorSetLayout(
         m_device.getLogicalDevice(),
-        {
-           {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,0,(VkShaderStageFlagBits)(VK_SHADER_STAGE_VERTEX_BIT)},
-           {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT}
-        },
-        m_descriptorSetLayoutLightM
+        GRAPHICS_PIPELINE::PBR::UBOS_INFO,
+        GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO,
+        m_descriptorSetLayoutNormalPBR
+    );
+
+    DescriptorSetLayoutUtils::createDescriptorSetLayout(
+        m_device.getLogicalDevice(),
+        GRAPHICS_PIPELINE::LIGHT::UBOS_INFO,
+        GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO,
+        m_descriptorSetLayoutDirectionalLight
     );
 }
 
@@ -387,10 +466,12 @@ void Renderer::initVulkan()
     m_descriptorPool.createDescriptorPool(
         m_device.getLogicalDevice(),
         {
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)}
+            // TODO: Make the size more precise.
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 30/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 30/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
         },
-        m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT
+        30
+        /*m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT*/
     );
 
     createDescriptorSetLayouts();
@@ -413,6 +494,24 @@ void Renderer::initVulkan()
     uploadAllData();
 
     createSyncObjects();
+}
+
+template <typename T>
+void Renderer::bindAllMeshesData(
+    const std::shared_ptr<T>& model,
+    const GraphicsPipeline& graphicsPipeline,
+    const VkCommandBuffer& commandBuffer,
+    const uint32_t currentFrame) 
+{
+    for (auto& mesh : model->m_meshes)
+    {
+        CommandUtils::STATE::bindVertexBuffers({ mesh.m_vertexBuffer }, { 0 }, 0, 1, commandBuffer);
+        CommandUtils::STATE::bindIndexBuffer(mesh.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
+
+        CommandUtils::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), 0, { mesh.m_descriptorSets.get(currentFrame) }, {}, commandBuffer);
+
+        CommandUtils::ACTION::drawIndexed(mesh.m_indices.size(), 1, 0, 0, 0, commandBuffer);
+    }
 }
 
 void Renderer::recordCommandBuffer(
@@ -455,12 +554,21 @@ void Renderer::recordCommandBuffer(
 
             const auto& model = m_allModels[i];
 
-            CommandUtils::STATE::bindVertexBuffers({ model->getVertexBuffer() }, { 0 }, 0, 1, commandBuffer);
-            CommandUtils::STATE::bindIndexBuffer(model->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32, commandBuffer);
-
-            CommandUtils::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), 0, { model->getDescriptorSet(currentFrame) }, {}, commandBuffer);
-
-            CommandUtils::ACTION::drawIndexed(model->getIndexCount(), 1, 0, 0, 0, commandBuffer);
+            if (model->getType() == ModelType::SKYBOX)
+            {
+                if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
+                    bindAllMeshesData<Skybox>( pModel, graphicsPipeline, commandBuffer, currentFrame);
+            }
+            if (model->getType() == ModelType::NORMAL_PBR)
+            {
+                if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+                    bindAllMeshesData<NormalPBR>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+            }
+            if (model->getType() == ModelType::DIRECTIONAL_LIGHT)
+            {
+                if (auto pModel = std::dynamic_pointer_cast<DirectionalLight>(model))
+                    bindAllMeshesData<DirectionalLight>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+            }
         }
     }
     renderPass.end(commandBuffer);
@@ -483,7 +591,22 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     //------------------------Updates uniform buffer----------------------------
     for (auto& model : m_allModels)
     {
-        updateUniformBuffer(m_device.getLogicalDevice(), currentFrame, m_swapchain->getExtent(), *model);
+        if (model->getType() == ModelType::SKYBOX)
+        {
+            if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
+                pModel->updateUBO(m_device.getLogicalDevice(), m_cameraPos, m_swapchain->getExtent(), currentFrame);
+        }
+        if (model->getType() == ModelType::NORMAL_PBR)
+        {
+            if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+                pModel->updateUBO(m_device.getLogicalDevice(), m_cameraPos,m_camera->getProjectionM(),m_allModels,m_directionalLightIndices,currentFrame);
+        }
+        if (model->getType() == ModelType::DIRECTIONAL_LIGHT)
+        {
+            if (auto pModel = std::dynamic_pointer_cast<DirectionalLight>(model))
+                pModel->updateUBO(m_device.getLogicalDevice(), m_cameraPos, m_camera->getProjectionM(), currentFrame);
+
+        }
     }
 
     //--------------------Acquires an image from the swapchain------------------
@@ -497,7 +620,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         m_swapchain->getFramebuffer(imageIndex),
         m_renderPass,
         m_swapchain->getExtent(),
-        { m_graphicsPipelineNormalM, m_graphicsPipelineLightM },
+        { m_graphicsPipelineDirectionalLight,m_graphicsPipelinePBR, m_graphicsPipelineSkybox },
         currentFrame,
         m_commandPool.getCommandBuffer(currentFrame),
         m_commandPool
@@ -556,6 +679,52 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 }
 
 
+void Renderer::scrollCallback(GLFWwindow* window,double xoffset,double yoffset) 
+{
+    Camera* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window));
+
+    float actualFOV = camera->getFOV();
+    float newFOV = actualFOV + yoffset * -1.0f;
+
+    if (newFOV || newFOV)
+        camera->setFOV(newFOV);
+}
+
+void Renderer::handleInput()
+{
+    m_window.pollEvents();
+    // Avoids any input when we're touching the IMGUI.
+    if (m_GUI->isCursorPositionInGUI())
+        return;
+
+    if (m_camera->getType() == CameraType::ARCBALL)
+    {
+        if (glfwGetMouseButton(m_window.get(), GLFW_MOUSE_BUTTON_LEFT) ==GLFW_PRESS) 
+        {
+            auto pCamera = std::dynamic_pointer_cast<Arcball>(m_camera);
+            if (!m_isMouseInMotion)
+            {
+                pCamera->saveCursorPos();
+                m_isMouseInMotion = true;
+            }
+            else 
+            {
+                // TODO: Make it dynamic.
+                glm::mat4 newRot = glm::mat4(1.0);
+
+                pCamera->updateCameraPos(
+                    UBOutils::getUpdatedViewMatrix(glm::vec3(m_cameraPos), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)), newRot);
+                
+                m_cameraPos = newRot * m_cameraPos;
+            }
+        }
+        else
+        {
+            m_isMouseInMotion = false;
+        }
+    }
+}
+
 void Renderer::mainLoop()
 {
     // Tells us in which frame we are,
@@ -563,8 +732,8 @@ void Renderer::mainLoop()
     uint8_t currentFrame = 0;
     while (m_window.isWindowClosed() == false)
     {
-        m_window.pollEvents();
-        m_GUI->draw(m_allModels, m_cameraPos, m_normalModelIndices, m_lightModelIndices);
+        handleInput();
+        m_GUI->draw(m_allModels, m_cameraPos, m_normalModelIndices, m_directionalLightIndices);
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -598,8 +767,9 @@ void Renderer::cleanup()
     m_swapchain->destroySwapchain(m_device.getLogicalDevice());
 
     // Graphics Pipelines
-    m_graphicsPipelineNormalM.destroy(m_device.getLogicalDevice());
-    m_graphicsPipelineLightM.destroy(m_device.getLogicalDevice());
+    m_graphicsPipelinePBR.destroy(m_device.getLogicalDevice());
+    m_graphicsPipelineSkybox.destroy(m_device.getLogicalDevice());
+    m_graphicsPipelineDirectionalLight.destroy(m_device.getLogicalDevice());
 
     // Render pass
     m_renderPass.destroy(m_device.getLogicalDevice());
@@ -612,8 +782,9 @@ void Renderer::cleanup()
     m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
 
     // Descriptor Set Layouts
-    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(),m_descriptorSetLayoutNormalM);
-    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutLightM);
+    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR);
+    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox);
+    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(),m_descriptorSetLayoutDirectionalLight);
 
     // Sync objects
     destroySyncObjects();
@@ -644,107 +815,20 @@ void Renderer::cleanup()
     m_window.destroyWindow();
 }
 
-
-void Renderer::addNormalModel(const std::string& name, const std::string& meshFile, const std::string& textureFile)
+void Renderer::addSkybox(const std::string& name, const std::string& textureFolderName)
 {
-    addModel(name, meshFile, false, glm::fvec4(1.0), textureFile);
+    m_allModels.push_back(std::make_shared<Skybox>(name,textureFolderName));
+    m_skyboxModelIndices.push_back(m_allModels.size() - 1);
+}
+
+void Renderer::addObjectPBR(const std::string& name,const std::string& modelFileName) 
+{
+    m_allModels.push_back(std::make_shared<NormalPBR>(name, modelFileName));
     m_normalModelIndices.push_back(m_allModels.size() - 1);
 }
 
-void Renderer::addLightModel(const std::string& name, const std::string& meshFile, const glm::fvec4& lightColor, const std::string& textureFile)
+void Renderer::addDirectionalLight(const std::string& name,const std::string& modelFileName) 
 {
-    addModel(name, meshFile, true, lightColor, textureFile);
-    m_lightModelIndices.push_back(m_allModels.size() - 1);
+    m_allModels.push_back(std::make_shared<DirectionalLight>(name, modelFileName));
+    m_directionalLightIndices.push_back(m_allModels.size() - 1);
 }
-
-void Renderer::addModel(const std::string& name, const std::string& meshFile, const bool isLightModel,const glm::fvec4& lightColor, const std::string& textureFile)
-{
-    m_allModels.push_back(std::make_shared<Model>((std::string(MODEL_DIR) + meshFile).c_str(), textureFile, name, isLightModel, lightColor));
-}
-
-
-void Renderer::updateMaterialData(const Model& model,DescriptorTypes::UniformBufferObject::Normal& ubo) 
-{
-    ubo.material.ambient = model.materials.ambient;
-    ubo.material.diffuse = model.materials.diffuse;
-    ubo.material.specular = model.materials.specular;
-    ubo.material.shininess = model.materials.shininess;
-}
-
-void Renderer::updateLightData(DescriptorTypes::UniformBufferObject::Normal& ubo)
-{
-    ubo.lightsCount = m_lightModelIndices.size();
-    for (int i = 0; i < ubo.lightsCount; i++)
-    {
-        ubo.lightPositions[i] = (
-            m_allModels[m_lightModelIndices[i]]->actualPos
-            );
-        ubo.lightColors[i] = m_allModels[m_lightModelIndices[i]]->lightColor;
-    }
-}
-
-/*
- * Remember that the correct order is SRT!
- */
-glm::mat4 Renderer::getUpdatedModelMatrix(const glm::fvec4 actualPos,const glm::fvec3 actualRot,const glm::fvec3 actualSize) 
-{
-    glm::mat4 model = glm::mat4(1.0);
-    model = glm::translate(model,glm::vec3(actualPos));
-    model = glm::rotate(model,actualRot.x,glm::vec3(1.0f, 0.0f, 0.0f));
-    model = glm::rotate(model,actualRot.y,glm::vec3(0.0f, 1.0f, 0.0f));
-    model = glm::rotate(model,actualRot.z,glm::vec3(0.0f, 0.0f, 1.0f));
-    model = glm::scale(model, actualSize);
-    return model;
-}
-
-
-glm::mat4 Renderer::getUpdatedViewMatrix(const glm::fvec3& cameraPos,const glm::fvec3& centerPos,const glm::fvec3& upAxis) 
-{
-    return glm::lookAt(cameraPos, centerPos, upAxis);
-}
-
-
-glm::mat4 Renderer::getUpdatedProjMatrix(const float vfov, const float aspect, const float nearZ, const float farZ)
-{
-    glm::mat4 proj = glm::perspective(vfov, aspect, nearZ, farZ);
-    proj[1][1] *= -1;
-    return proj;
-}
-
-void Renderer::updateUniformBuffer(const VkDevice& logicalDevice, const uint8_t currentFrame, const VkExtent2D extent, Model& model)
-{
-    /* static auto startTime = std::chrono::high_resolution_clock::now();
-     auto currentTime = std::chrono::high_resolution_clock::now();
-     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();*/
-
-    glm::mat4 modelMat = getUpdatedModelMatrix(model.actualPos, model.actualRot, model.actualSize);
-    glm::mat4 viewMat = getUpdatedViewMatrix(glm::vec3(m_cameraPos), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 projMat = getUpdatedProjMatrix(glm::radians(45.0f), extent.width / (float)extent.height, 0.01f, 10.0f);
-
-    if (model.isLightModel())
-    {
-        DescriptorTypes::UniformBufferObject::Light ubo;
-
-        ubo.model = modelMat;
-        ubo.view = viewMat;
-        ubo.proj = projMat;
-
-        ubo.lightColor = model.lightColor;
-        model.updateUBO(logicalDevice, ubo, currentFrame);
-    }
-    else
-    {
-        DescriptorTypes::UniformBufferObject::Normal ubo;
-
-        ubo.model = modelMat;
-        ubo.view = viewMat;
-        ubo.proj = projMat;
-
-        ubo.cameraPos = m_cameraPos;
-        updateLightData(ubo);
-        updateMaterialData(model, ubo);
-        model.updateUBO(logicalDevice, ubo, currentFrame);
-
-    }
-}
-   

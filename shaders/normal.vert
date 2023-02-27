@@ -1,13 +1,5 @@
 #version 450
 
-struct Material
-{
-   vec4 ambient;
-   vec4 diffuse;
-   vec4 specular;
-   int shininess;
-};
-
 layout(std140,binding = 0) uniform UniformBufferObject
 {
    mat4 model;
@@ -18,29 +10,35 @@ layout(std140,binding = 0) uniform UniformBufferObject
    vec4 lightColors[10];
    
    vec4 cameraPos;
-   Material material;
    
    int  lightsCount;
 
 } ubo;
 
 layout(location = 0) in vec3 inPosition;
-layout(location = 1) in vec3 inColor;
-layout(location = 2) in vec2 inTexCoord;
-layout(location = 3) in vec3 inNormal;
+layout(location = 1) in vec2 inTexCoord;
+layout(location = 2) in vec3 inNormal;
+layout(location = 3) in vec3 inTangent;
+layout(location = 4) in vec3 inBitangent;
 
 layout(location = 0) out vec3 outPosition;
-layout(location = 1) out vec3 outColor;
-layout(location = 2) out vec2 outTexCoord;
-layout(location = 3) out vec3 outNormal;
+layout(location = 1) out vec2 outTexCoord;
+layout(location = 2) out vec3 outNormal;
+layout(location = 3) out vec3 outTangent;
+layout(location = 4) out vec3 outBitangent;
 
 void main()
 {
-    gl_Position = (
-         ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0)
-   );
-    outPosition = vec3(ubo.model * vec4(inPosition, 1.0));
-   outColor = inColor;
-   outTexCoord = inTexCoord;
-   outNormal = normalize(vec3(transpose(inverse(ubo.model)) * vec4(inNormal, 0.0)));
+    gl_Position     = (ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0));
+
+    outPosition     = vec3(ubo.model * vec4(inPosition, 1.0));
+    outTexCoord     = inTexCoord;
+
+    mat3 normalM    = transpose(inverse(mat3(ubo.model)));
+    outTangent      = normalize(normalM * inTangent);
+    outNormal       = normalize(normalM * inNormal);
+
+    outTangent      = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
+    outBitangent    = cross(outNormal, outTangent);
+
 }

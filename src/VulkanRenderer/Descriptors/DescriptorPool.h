@@ -11,16 +11,16 @@ public:
 	~DescriptorPool();
 
 	void createDescriptorPool(
-		const VkDevice& logicalDevice, 
+		const VkDevice&							logicalDevice, 
 		const std::vector<VkDescriptorPoolSize> poolSizes,
-		const uint32_t descriptorSetsCount
+		const uint32_t							descriptorSetsCount
 	);
 
 	const VkDescriptorPool& getDescriptorPool() const;
 
 	void allocDescriptorSets(
-		const VkDevice& logicalDevice,
-		std::vector<VkDescriptorSet>& descriptorSets,
+		const VkDevice&						logicalDevice,
+		std::vector<VkDescriptorSet>&		descriptorSets,
 		std::vector<VkDescriptorSetLayout>& descriptorSetLayouts
 	);
 

@@ -1,4 +1,4 @@
-#include "VulkanRenderer/Model/Types/DirectionalLight.h"
+#include "VulkanRenderer/Model/Types/Light.h"
 
 #include "VulkanRenderer/Settings/config.h"
 #include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
@@ -6,14 +6,17 @@
 #include "VulkanRenderer/Settings/graphicsPipelineConfig.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
 
-DirectionalLight::DirectionalLight(
+Light::Light(
     const std::string& name,
     const std::string& modelFileName,
+    const LightType& lightType,
     const glm::fvec4& lightColor,
     const glm::fvec4& pos,
     const glm::fvec3& rot,
-    const glm::fvec3& size
-) : Model(name, ModelType::DIRECTIONAL_LIGHT, pos, rot, size),m_color(lightColor)
+    const glm::fvec3& size,
+    const float attenuation,
+    const float radius
+) : Model(name, ModelType::LIGHT, pos, rot, size),m_color(lightColor), m_lightType(lightType), m_attenuation(attenuation), m_radius(radius)
 {
 
     loadModel((std::string(MODEL_DIR) + modelFileName).c_str());
@@ -27,9 +30,9 @@ DirectionalLight::DirectionalLight(
     m_rot = glm::fvec3(0.0f);
 }
 
-DirectionalLight::~DirectionalLight() {}
+Light::~Light() {}
 
-void DirectionalLight::destroy(const VkDevice& logicalDevice)
+void Light::destroy(const VkDevice& logicalDevice)
 {
     m_ubo.destroyUniformBuffersAndMemories(logicalDevice);
 
@@ -46,7 +49,7 @@ void DirectionalLight::destroy(const VkDevice& logicalDevice)
     }
 }
 
-void DirectionalLight::processMesh(aiMesh* mesh, const aiScene* scene)
+void Light::processMesh(aiMesh* mesh, const aiScene* scene)
 {
     Mesh<Attributes::LIGHT::Vertex> newMesh;
 
@@ -86,28 +89,30 @@ void DirectionalLight::processMesh(aiMesh* mesh, const aiScene* scene)
     m_meshes.push_back(newMesh);
 }
 
-void DirectionalLight::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
+void Light::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
 {
     m_ubo.createUniformBuffers(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::Light));
 }
 
-void DirectionalLight::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout,DescriptorPool& descriptorPool) 
+void Light::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout,DescriptorPool& descriptorPool) 
 {
+    std::vector<UBO*> opUBOs = { &m_ubo };
+
     for (auto& mesh : m_meshes)
     {
-        mesh.m_descriptorSets.createDescriptorSets(
+        mesh.m_descriptorSets = DescriptorSets(
             logicalDevice,
             GRAPHICS_PIPELINE::LIGHT::UBOS_INFO,
             GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO,
             mesh.m_textures,
-            m_ubo.getUniformBuffers(),
+            opUBOs,
             descriptorSetLayout,
             descriptorPool
         );
     }
 }
 
-void DirectionalLight::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue,CommandPool& commandPool) 
+void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue,CommandPool& commandPool) 
 {
 
     for (auto& mesh : m_meshes)
@@ -140,7 +145,7 @@ void DirectionalLight::uploadVertexData(const VkPhysicalDevice& physicalDevice,c
     }
 }
 
-void DirectionalLight::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,CommandPool& commandPool,VkQueue& graphicsQueue) 
+void Light::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, CommandPool& commandPool,VkQueue& graphicsQueue)
 {
     for (auto& mesh : m_meshes)
     {
@@ -152,6 +157,7 @@ void DirectionalLight::createTextures(const VkPhysicalDevice& physicalDevice,con
                 mesh.m_texturesToLoadInfo[i],
                 // isSkybox
                 false,
+                samplesCount,
                 commandPool,
                 graphicsQueue
             );
@@ -159,7 +165,7 @@ void DirectionalLight::createTextures(const VkPhysicalDevice& physicalDevice,con
     }
 }
 
-void DirectionalLight::updateUBO(const VkDevice& logicalDevice,const glm::vec4& cameraPos, const glm::mat4& view, const glm::mat4& proj,const uint32_t& currentFrame)
+void Light::updateUBO(const VkDevice& logicalDevice,const glm::vec4& cameraPos, const glm::mat4& view, const glm::mat4& proj,const uint32_t& currentFrame)
 {
 
     DescriptorTypes::UniformBufferObject::Light newUBO;
@@ -169,15 +175,40 @@ void DirectionalLight::updateUBO(const VkDevice& logicalDevice,const glm::vec4& 
     newUBO.proj = proj;
     newUBO.lightColor = m_color;
 
-    UBOutils::updateUBO(m_ubo, logicalDevice, newUBO, currentFrame);
+    size_t size = sizeof(newUBO);
+    UBOutils::updateUBO(logicalDevice, m_ubo, size, &newUBO, currentFrame);
 }
 
-const glm::fvec4& DirectionalLight::getColor() const
+const glm::fvec4& Light::getColor() const
 {
     return m_color;
 }
 
-void DirectionalLight::setColor(const glm::fvec4& newColor)
+const float& Light::getAttenuation() const
+{
+    return m_attenuation;
+}
+
+const float& Light::getRadius() const
+{
+    return m_radius;
+}
+
+const LightType& Light::getLightType() const
+{
+    return m_lightType;
+}
+
+void Light::setColor(const glm::fvec4& newColor)
 {
     m_color = newColor;
+}
+void Light::setAttenuation(const float& attenuation)
+{
+    m_attenuation = attenuation;
+}
+
+void Light::setRadius(const float& radius)
+{
+    m_radius = radius;
 }

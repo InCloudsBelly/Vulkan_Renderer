@@ -24,6 +24,5 @@ namespace UBOutils
         const float         farZ
     );
 
-    template<typename T>
-    void updateUBO(UBO& ubo, const VkDevice& logicalDevice, T& newUbo, const uint32_t& currentFrame);
+    void updateUBO(const VkDevice& logicalDevice, UBO & ubo, const size_t size, void * dataToSend, const uint32_t& currentFrame);
 };

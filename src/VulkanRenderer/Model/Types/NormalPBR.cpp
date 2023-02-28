@@ -8,7 +8,7 @@
 #include "VulkanRenderer/Descriptors/Types/UBO/UBOutils.h"
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
-#include "VulkanRenderer/Model/Types/DirectionalLight.h"
+#include "VulkanRenderer/Model/Types/Light.h"
 
 
 NormalPBR::NormalPBR(const std::string& name, const std::string& modelFileName,
@@ -31,6 +31,7 @@ NormalPBR::~NormalPBR() {}
 void NormalPBR::destroy(const VkDevice& logicalDevice)
 {
 	m_ubo.destroyUniformBuffersAndMemories(logicalDevice);
+	m_uboLights.destroyUniformBuffersAndMemories(logicalDevice);
 
 	for (auto& mesh : m_meshes)
 	{
@@ -45,7 +46,7 @@ void NormalPBR::destroy(const VkDevice& logicalDevice)
 	}
 }
 
-std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextureType& type,const std::string& typeName) 
+std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextureType& type,const std::string& typeName, const std::string& defaultTextureFile)
 {
 	if (material->GetTextureCount(type) > 0)
 	{
@@ -63,10 +64,9 @@ std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextu
 
 	}
 	else {
-		std::cout << "LEYENDO DEFAULT PORQ NO EXISTE LA TEXTURE\n";
-		std::cout << "NO SE PUDO " << typeName << std::endl;
-		// TODO!
-		return "textures/default.jpg";
+		if (typeName == "NORMALS")
+			std::cout << " NSADSADSADSA NO HAY NORMALS\n";
+		return defaultTextureFile;
 	}
 }
 
@@ -78,17 +78,37 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 	{
 		Attributes::PBR::Vertex vertex{};
 
+		//Position
 		vertex.pos = {mesh->mVertices[i].x,mesh->mVertices[i].y,mesh->mVertices[i].z};
-		vertex.normal = {mesh->mNormals[i].x,mesh->mNormals[i].y,mesh->mNormals[i].z};
-		vertex.normal = glm::normalize(vertex.normal);
+		if (mesh->mNormals != NULL)
+		{
+			vertex.normal = glm::normalize(glm::fvec3(mesh->mNormals[i].x,mesh->mNormals[i].y,mesh->mNormals[i].z));
+		}
+		else {
+			std::cout << " NO HAY NORMALS !\n";
+			vertex.normal = glm::fvec3(1.0f);
+		}
 
-		vertex.texCoord = {mesh->mTextureCoords[0][i].x,mesh->mTextureCoords[0][i].y,};
-		glm::vec3 tangent = {mesh->mTangents[i].x,mesh->mTangents[i].y,mesh->mTangents[i].z};
-		tangent = glm::normalize(tangent);
-		
-		//glm::vec3 bitangent = glm::cross(vertex.normal, tangent);
+		//TexCoords
+		if (mesh->mTextureCoords[0] != NULL)
+		{
+			vertex.texCoord = {mesh->mTextureCoords[0][i].x,mesh->mTextureCoords[0][i].y,};
+			newMesh.m_hasTextureCoords = true;
+		}
+		else
+		{
+			vertex.texCoord = glm::fvec3(1.0f);
+			newMesh.m_hasTextureCoords = false;
+		}
 
-		vertex.tangent = tangent;
+		//Tangents
+		if (mesh->mTangents != NULL)
+		{
+			vertex.tangent = glm::normalize(glm::fvec3(mesh->mTangents[i].x,mesh->mTangents[i].y,mesh->mTangents[i].z));
+		}
+		else
+			vertex.tangent = glm::fvec3(1.0f);
+
 
 		newMesh.m_vertices.push_back(vertex);
 	}
@@ -106,16 +126,15 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
 		TextureToLoadInfo info;
-		info.name = getMaterialTextureName(material, aiTextureType_DIFFUSE, "DIFFUSE");
+		info.name = getMaterialTextureName(material, aiTextureType_DIFFUSE, "DIFFUSE", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_SRGB;
 		newMesh.m_texturesToLoadInfo.push_back(info);
 
-
-		info.name = getMaterialTextureName(material,aiTextureType_UNKNOWN,"METALIC_ROUGHNESS");
+		info.name = getMaterialTextureName(material,aiTextureType_UNKNOWN,"METALIC_ROUGHNESS", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_SRGB;
 		newMesh.m_texturesToLoadInfo.push_back(info);
 
-		info.name = getMaterialTextureName(material,aiTextureType_NORMALS,"NORMALS");
+		info.name = getMaterialTextureName(material,aiTextureType_NORMALS,"NORMALS", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_UNORM;
 		newMesh.m_texturesToLoadInfo.push_back(info);
 	}
@@ -125,18 +144,21 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
 {
 	m_ubo.createUniformBuffers(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::NormalPBR));
+	m_uboLights.createUniformBuffers(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10);
 }
 
 void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout,DescriptorPool& descriptorPool) 
 {
+	std::vector<UBO*> opUBOs = { &m_ubo, &m_uboLights };
+
 	for (auto& mesh : m_meshes)
 	{
-		mesh.m_descriptorSets.createDescriptorSets(
+		mesh.m_descriptorSets = DescriptorSets(
 			logicalDevice,
 			GRAPHICS_PIPELINE::PBR::UBOS_INFO,
 			GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO,
 			mesh.m_textures,
-			m_ubo.getUniformBuffers(),
+			opUBOs,
 			descriptorSetLayout,
 			descriptorPool
 		);
@@ -176,10 +198,13 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const Vk
 	}
 }
 
-void NormalPBR::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,CommandPool& commandPool, VkQueue& graphicsQueue)
+void NormalPBR::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, CommandPool& commandPool, VkQueue& graphicsQueue)
 {
 	for (auto& mesh : m_meshes)
 	{
+		if (!mesh.m_hasTextureCoords)
+			continue;
+
 		for (size_t i = 0; i < mesh.m_textures.size(); i++)
 		{
 			mesh.m_textures[i] = Texture(
@@ -188,6 +213,7 @@ void NormalPBR::createTextures(const VkPhysicalDevice& physicalDevice,const VkDe
 				mesh.m_texturesToLoadInfo[i],
 				// isSkybox
 				false,
+				samplesCount,
 				commandPool,
 				graphicsQueue
 			);
@@ -200,38 +226,42 @@ void NormalPBR::updateUBO(
 	const glm::vec4&			cameraPos,
 	const glm::mat4&			view,
 	const glm::mat4&			proj,
+	const int&					lightsCount,
 	const std::vector<std::shared_ptr<Model>>& models,
-	const std::vector<size_t>	directionalLightIndices,
 	const uint32_t&				currentFrame
 ) {
 
-	DescriptorTypes::UniformBufferObject::NormalPBR newUBO;
+	m_basicInfo.model = UBOutils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
+	m_basicInfo.view = view;
+	m_basicInfo.proj = proj;
 
-	newUBO.model = UBOutils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
-	newUBO.view = view;
-	newUBO.proj = proj;
+	m_basicInfo.cameraPos = cameraPos;
+	m_basicInfo.lightsCount = lightsCount;
 
-	newUBO.cameraPos = cameraPos;
-
-	updateLightData(newUBO, models, directionalLightIndices);
-
-	UBOutils::updateUBO(m_ubo, logicalDevice, newUBO, currentFrame);
+	size_t size = sizeof(m_basicInfo);
+	UBOutils::updateUBO(logicalDevice, m_ubo, size, &m_basicInfo, currentFrame);
 }
 
-void NormalPBR::updateLightData(
-	DescriptorTypes::UniformBufferObject::NormalPBR& ubo,
+void NormalPBR::updateUBOlightsInfo(
+	const VkDevice& logicalDevice,
+	const std::vector<size_t> lightModelIndices,
 	const std::vector<std::shared_ptr<Model>>& models,
-	const std::vector<size_t> directionalLightIndices
+	const uint32_t& currentFrame
 ) {
-	ubo.lightsCount = directionalLightIndices.size();
-
-	for (int i = 0; i < ubo.lightsCount; i++)
+	for (size_t i = 0; i < lightModelIndices.size(); i++)
 	{
-		auto& model = models[directionalLightIndices[i]];
-		if (auto pModel = std::dynamic_pointer_cast<DirectionalLight>(model))
+		size_t j = lightModelIndices[i];
+
+		if (auto pModel = std::dynamic_pointer_cast<Light>(models[j]))
 		{
-			ubo.lightPositions[i] = (pModel->getPos());
-			ubo.lightColors[i] = pModel->getColor();
+			m_lightsInfo[i].pos = pModel->getPos();
+			m_lightsInfo[i].color = pModel->getColor();
+			m_lightsInfo[i].attenuation = pModel->getAttenuation();
+			m_lightsInfo[i].radius = pModel->getRadius();
+			m_lightsInfo[i].type = (int)pModel->getLightType();
 		}
 	}
+	size_t size = sizeof(m_lightsInfo[0]) * 10;
+
+	UBOutils::updateUBO(logicalDevice,m_uboLights,size,&m_lightsInfo,currentFrame);
 }

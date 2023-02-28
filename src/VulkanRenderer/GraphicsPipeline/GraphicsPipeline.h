@@ -27,6 +27,7 @@ public:
 		const VkDescriptorSetLayout& descriptorSetLayout,
 		const std::string& vertexShaderFileName,
 		const std::string& fragmentShaderFileName,
+		const VkSampleCountFlagBits& samplesCount,
 		VkVertexInputBindingDescription vertexBindingDescriptions,
 		std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
 		std::vector<size_t>* modelIndices
@@ -63,7 +64,7 @@ private:
 	void createScissor(VkRect2D& scissor, const VkExtent2D& extent);
 	void createViewportStateInfo(VkPipelineViewportStateCreateInfo& viewportStateInfo);
 	void createRasterizerInfo(VkPipelineRasterizationStateCreateInfo& rasterizerInfo);
-	void createMultisamplingInfo(VkPipelineMultisampleStateCreateInfo& multisamplingInfo);
+	void createMultisamplingInfo(const VkSampleCountFlagBits& samplesCount, VkPipelineMultisampleStateCreateInfo& multisamplingInfo);
 	void createColorBlendingAttachment(VkPipelineColorBlendAttachmentState& colorBlendAttachment);
 	void createColorBlendingGlobalInfo(const VkPipelineColorBlendAttachmentState& colorBlendAttachment, VkPipelineColorBlendStateCreateInfo& colorBlendingInfo);
 	void createPipelineLayout(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout);

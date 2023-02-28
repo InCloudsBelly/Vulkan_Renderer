@@ -40,7 +40,7 @@
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Model/Types/NormalPBR.h"
 #include "VulkanRenderer/Model/Types/Skybox.h"
-#include "VulkanRenderer/Model/Types/DirectionalLight.h"
+#include "VulkanRenderer/Model/Types/Light.h"
 
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Descriptors/DescriptorSetLayoutUtils.h"
@@ -52,8 +52,8 @@
 #include "VulkanRenderer/Textures/Texture.h"
 
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
-#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthBuffer.h"
-#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthUtils.h"
+#include "VulkanRenderer/GraphicsPipeline/RenderTarget.h"
+#include "VulkanRenderer/GraphicsPipeline/RenderTargetUtils.h"
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
@@ -64,6 +64,7 @@
 
 #include "VulkanRenderer/GUI/GUI.h"
 
+#include "VulkanRenderer/Features/ShadowMap.h"
 
 glm::fvec3 cameraPos = glm::fvec3(2.0f, 2.0f, 2.0f);
 
@@ -225,11 +226,26 @@ void Renderer::createVkInstance()
 void Renderer::createRenderPass()
 {
     // -Attachments
+    
+    // ShadowMap
+    //VkAttachmentDescription shadowMapAttachment{};
+    //attachmentUtils::createAttachmentDescriptionWithStencil(
+    //      m_depthBuffer.getFormat(),
+    //      VK_SAMPLE_COUNT_1_BIT,
+    //      VK_ATTACHMENT_LOAD_OP_CLEAR,
+    //      VK_ATTACHMENT_STORE_OP_STORE,
+    //      VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    //      VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    //      VK_IMAGE_LAYOUT_UNDEFINED,
+    //      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    //      shadowMapAttachment
+    //);
+
     // Color Attachment
     VkAttachmentDescription colorAttachment{};
     AttachmentUtils::createAttachmentDescription(
         m_swapchain->getImageFormat(),
-        VK_SAMPLE_COUNT_1_BIT,
+        m_msaa.getSamplesCount(),
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         VK_ATTACHMENT_STORE_OP_STORE,
         VK_IMAGE_LAYOUT_UNDEFINED,
@@ -238,20 +254,10 @@ void Renderer::createRenderPass()
     );
 
     // Depth Attachment
-    VkFormat depthFormat = DepthUtils::findSupportedFormat(
-        m_device.getPhysicalDevice(),
-        {
-         VK_FORMAT_D32_SFLOAT,
-         VK_FORMAT_D32_SFLOAT_S8_UINT,
-         VK_FORMAT_D24_UNORM_S8_UINT
-        },
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-    );
     VkAttachmentDescription depthAttachment{};
     AttachmentUtils::createAttachmentDescriptionWithStencil(
-        depthFormat,
-        VK_SAMPLE_COUNT_1_BIT,
+        m_depthBuffer.getFormat(),
+        m_msaa.getSamplesCount(),
         VK_ATTACHMENT_LOAD_OP_CLEAR,
         // We don't care about storing the depth data, because it will not be
         // used after drawing has finished.
@@ -265,8 +271,29 @@ void Renderer::createRenderPass()
         depthAttachment
     );
 
+    // Color Resolve Attachment(needed by MSAA)
+    VkAttachmentDescription colorResolveAttachment{};
+    AttachmentUtils::createAttachmentDescriptionWithStencil(
+        m_swapchain->getImageFormat(),
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        // Here is not
+        // 'VK_IMAGE_LAYOUT_PRESENT_SRC_KHR'
+        // because the GUI will be the last and the one
+        // to present.
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        colorResolveAttachment
+    );
+
     // Attachment references
 
+    //VkAttachmentReference shadowMapAttachmentRef{};
+    //attachmentUtils::createAttachmentReference
+    
     VkAttachmentReference colorAttachmentRef{};
     AttachmentUtils::createAttachmentReference(
         0,
@@ -281,6 +308,14 @@ void Renderer::createRenderPass()
         depthAttachmentRef
     );
 
+    VkAttachmentReference colorResolveAttachmentRef{};
+    AttachmentUtils::createAttachmentReference(
+        2,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        colorResolveAttachmentRef
+    );
+
+
     // Subpasses
 
     std::vector<VkAttachmentReference> allAttachments = {
@@ -289,8 +324,9 @@ void Renderer::createRenderPass()
     VkSubpassDescription subPassDescript{};
     SubPassUtils::createSubPassDescription(
         VK_PIPELINE_BIND_POINT_GRAPHICS,
-        allAttachments,
+        &colorAttachmentRef,
         &depthAttachmentRef,
+        &colorResolveAttachmentRef,
         subPassDescript
     );
 
@@ -324,7 +360,7 @@ void Renderer::createRenderPass()
 
     m_renderPass = RenderPass(
         m_device.getLogicalDevice(),
-        { colorAttachment, depthAttachment },
+        { colorAttachment, depthAttachment, colorResolveAttachment },
         { subPassDescript },
         { dependency }
     );
@@ -342,7 +378,7 @@ void Renderer::uploadAllData()
         model->uploadVertexData(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_qfHandles.graphicsQueue, m_commandPool);
 
         // Creates and uploads the Texture.
-        model->createTextures(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_commandPool, m_qfHandles.graphicsQueue);
+        model->createTextures(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), VK_SAMPLE_COUNT_1_BIT, m_commandPool, m_qfHandles.graphicsQueue);
 
         // Uniform Buffers
         model->createUniformBuffers(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), Config::MAX_FRAMES_IN_FLIGHT);
@@ -361,9 +397,9 @@ void Renderer::uploadAllData()
                 model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR, m_descriptorPool);
                 break;
             }
-            case ModelType::DIRECTIONAL_LIGHT:
+            case ModelType::LIGHT:
             {
-                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutDirectionalLight, m_descriptorPool);
+                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutLight, m_descriptorPool);
                 break;
             }
             case ModelType::NONE:
@@ -384,6 +420,7 @@ void Renderer::createGraphicsPipelines()
         m_descriptorSetLayoutSkybox,
         "skybox",
         "skybox",
+        m_msaa.getSamplesCount(),
         Attributes::SKYBOX::getBindingDescription(),
         Attributes::SKYBOX::getAttributeDescriptions(),
         &m_skyboxModelIndices
@@ -397,22 +434,24 @@ void Renderer::createGraphicsPipelines()
         m_descriptorSetLayoutNormalPBR,
         "normal",
         "normal",
+        m_msaa.getSamplesCount(),
         Attributes::PBR::getBindingDescription(),
         Attributes::PBR::getAttributeDescriptions(),
-        &m_normalModelIndices
+        &m_objectModelIndices
     );
 
-    m_graphicsPipelineDirectionalLight = GraphicsPipeline(
+    m_graphicsPipelineLight = GraphicsPipeline(
         m_device.getLogicalDevice(),
         GraphicsPipelineType::LIGHT,
         m_swapchain->getExtent(),
         m_renderPass.get(),
-        m_descriptorSetLayoutDirectionalLight,
+        m_descriptorSetLayoutLight,
         "light",
         "light",
+        m_msaa.getSamplesCount(),
         Attributes::LIGHT::getBindingDescription(),
         Attributes::LIGHT::getAttributeDescriptions(),
-        &m_directionalLightIndices
+        &m_lightModelIndices
     );
 }
 
@@ -422,6 +461,9 @@ void Renderer::createGraphicsPipelines()
  */
 void Renderer::createDescriptorSetLayouts()
 {
+
+// ---------------------------------Models----------------------------------
+
     DescriptorSetLayoutUtils::createDescriptorSetLayout(
         m_device.getLogicalDevice(),
         GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
@@ -440,8 +482,19 @@ void Renderer::createDescriptorSetLayouts()
         m_device.getLogicalDevice(),
         GRAPHICS_PIPELINE::LIGHT::UBOS_INFO,
         GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO,
-        m_descriptorSetLayoutDirectionalLight
+        m_descriptorSetLayoutLight
     );
+
+
+
+    // ---------------------------------Features--------------------------------
+
+    //descriptorSetLayoutUtils::createDescriptorSetLayout(
+    //      m_device.getLogicalDevice(),
+    //      GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
+    //      GRAPHICS_PIPELINE::SHADOWMAP::SAMPLERS_INFO,
+    //      m_descriptorSetLayoutShadowMap
+    //);
 }
 
 void Renderer::initVulkan()
@@ -460,33 +513,53 @@ void Renderer::initVulkan()
 
     m_swapchain->createAllImageViews(m_device.getLogicalDevice());
 
-    createRenderPass();
 
     // Descriptor Pool
-    m_descriptorPool.createDescriptorPool(
+    m_descriptorPool = DescriptorPool(
         m_device.getLogicalDevice(),
         {
             // TODO: Make the size more precise.
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 30/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 30/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 800/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 800/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
         },
-        30
+        800
         /*m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT*/
     );
 
     createDescriptorSetLayouts();
 
-    createGraphicsPipelines();
+    // -----------------------------------Features------------------------------
 
-    m_depthBuffer.createDepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain->getExtent());
+    m_msaa = RenderTarget::MSAA(
+        m_device.getPhysicalDevice(),
+        m_device.getLogicalDevice(),
+        m_swapchain->getExtent(),
+        m_swapchain->getImageFormat()
+    );
 
-    m_swapchain->createFramebuffers(m_device.getLogicalDevice(), m_renderPass.get(), m_depthBuffer);
+    m_depthBuffer = RenderTarget::DepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain->getExtent(), m_msaa.getSamplesCount());
+
+    //m_shadowMap = ShadowMap(
+    //      m_device.getPhysicalDevice(),
+    //      m_device.getLogicalDevice(),
+    //      m_swapchain->getExtent().width,
+    //      m_swapchain->getExtent().height,
+    //      m_depthBuffer.getFormat(),
+    //      m_msaa.getSamplesCount(),
+    //      m_descriptorSetLayoutShadowMap
+    //);
+
+    createRenderPass();
+
+    m_swapchain->createFramebuffers(m_device.getLogicalDevice(), m_renderPass.get(), m_depthBuffer, m_msaa);
 
     m_commandPool = CommandPool(
         m_device.getLogicalDevice(),
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         m_qfIndices.graphicsFamily.value()
     );
+
+    createGraphicsPipelines();
 
     // Allocates all the neccessary cmd buffers in the cmd pool.
     m_commandPool.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
@@ -562,12 +635,20 @@ void Renderer::recordCommandBuffer(
             if (model->getType() == ModelType::NORMAL_PBR)
             {
                 if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+                {
+                    if (pModel.get()->isHided())
+                        continue;
                     bindAllMeshesData<NormalPBR>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                }
             }
-            if (model->getType() == ModelType::DIRECTIONAL_LIGHT)
+            if (model->getType() == ModelType::LIGHT)
             {
-                if (auto pModel = std::dynamic_pointer_cast<DirectionalLight>(model))
-                    bindAllMeshesData<DirectionalLight>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                if (auto pModel = std::dynamic_pointer_cast<Light>(model))
+                {
+                    if (pModel.get()->isHided())
+                        continue;
+                    bindAllMeshesData<Light>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                }
             }
         }
     }
@@ -599,11 +680,14 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         if (model->getType() == ModelType::NORMAL_PBR)
         {
             if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
-                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(),m_camera->getProjectionM(),m_allModels,m_directionalLightIndices,currentFrame);
+            {
+                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), m_lightModelIndices.size(), m_allModels, currentFrame);
+                pModel->updateUBOlightsInfo(m_device.getLogicalDevice(), m_lightModelIndices, m_allModels, currentFrame);
+            }
         }
-        if (model->getType() == ModelType::DIRECTIONAL_LIGHT)
+        if (model->getType() == ModelType::LIGHT)
         {
-            if (auto pModel = std::dynamic_pointer_cast<DirectionalLight>(model))
+            if (auto pModel = std::dynamic_pointer_cast<Light>(model))
                 pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), currentFrame);
 
         }
@@ -620,7 +704,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         m_swapchain->getFramebuffer(imageIndex),
         m_renderPass,
         m_swapchain->getExtent(),
-        { m_graphicsPipelineDirectionalLight,m_graphicsPipelinePBR, m_graphicsPipelineSkybox },
+        { m_graphicsPipelineLight,m_graphicsPipelinePBR, m_graphicsPipelineSkybox },
         currentFrame,
         m_commandPool.getCommandBuffer(currentFrame),
         m_commandPool
@@ -645,9 +729,9 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     // ImGUI added
-    std::array<VkCommandBuffer, 2> submitCommandBuffers = { m_commandPool.getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
+    std::vector<VkCommandBuffer> submitCommandBuffers = { m_commandPool.getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
 
-    submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size());
+    submitInfo.commandBufferCount = submitCommandBuffers.size();
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
     // Specifies which semaphores to signal once the command buffer/s have finished execution.
 
@@ -730,7 +814,7 @@ void Renderer::mainLoop()
     while (m_window.isWindowClosed() == false)
     {
         handleInput();
-        m_GUI->draw(m_allModels, m_camera->getPos(), m_normalModelIndices, m_directionalLightIndices);
+        m_GUI->draw(m_allModels, m_camera->getPos(), m_objectModelIndices, m_lightModelIndices);
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -748,8 +832,11 @@ void Renderer::destroySyncObjects()
 
 void Renderer::cleanup()
 {
+    // MSAA
+    m_msaa.destroy(m_device.getLogicalDevice());
+
     // DepthBuffer
-    m_depthBuffer.destroyDepthBuffer(m_device.getLogicalDevice());
+    m_depthBuffer.destroy(m_device.getLogicalDevice());
 
     // ImGui
     m_GUI->destroy(m_device.getLogicalDevice());
@@ -766,7 +853,7 @@ void Renderer::cleanup()
     // Graphics Pipelines
     m_graphicsPipelinePBR.destroy(m_device.getLogicalDevice());
     m_graphicsPipelineSkybox.destroy(m_device.getLogicalDevice());
-    m_graphicsPipelineDirectionalLight.destroy(m_device.getLogicalDevice());
+    m_graphicsPipelineLight.destroy(m_device.getLogicalDevice());
 
     // Render pass
     m_renderPass.destroy(m_device.getLogicalDevice());
@@ -781,7 +868,7 @@ void Renderer::cleanup()
     // Descriptor Set Layouts
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR);
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox);
-    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(),m_descriptorSetLayoutDirectionalLight);
+    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutLight);
 
     // Sync objects
     destroySyncObjects();
@@ -825,7 +912,7 @@ void Renderer::addObjectPBR(const std::string& name, const std::string& modelFil
 {
     m_allModels.push_back(std::make_shared<NormalPBR>(name, modelFileName, glm::fvec4(pos, 1.0f), rot, size));
 
-    m_normalModelIndices.push_back(m_allModels.size() - 1);
+    m_objectModelIndices.push_back(m_allModels.size() - 1);
 }
 
 void Renderer::addDirectionalLight(
@@ -833,18 +920,72 @@ void Renderer::addDirectionalLight(
     const std::string& modelFileName,
     const glm::fvec3& color,
     const glm::fvec3& pos,
-    const glm::fvec3& rot,
     const glm::fvec3& size
 ) {
     m_allModels.push_back(
-        std::make_shared<DirectionalLight>(
+        std::make_shared<Light>(
             name,
             modelFileName,
+            LightType::DIRECTIONAL_LIGHT,
+            glm::fvec4(color, 1.0f),
+            glm::fvec4(pos, 1.0f),
+            glm::fvec3(0.0f),
+            size,
+            0.0f,
+            0.0f
+            )
+    );
+
+    m_lightModelIndices.push_back(m_allModels.size() - 1);
+}
+
+void Renderer::addPointLight(
+    const std::string& name,
+    const std::string& modelFileName,
+    const glm::fvec3& color,
+    const glm::fvec3& pos,
+    const glm::fvec3& size,
+    const float attenuation,
+    const float radius
+) {
+    m_allModels.push_back(
+        std::make_shared<Light>(
+            name,
+            modelFileName,
+            LightType::POINT_LIGHT,
+            glm::fvec4(color, 1.0f),
+            glm::fvec4(pos, 1.0f),
+            glm::fvec3(0.0f),
+            size,
+            attenuation,
+            radius
+            )
+    );
+    m_lightModelIndices.push_back(m_allModels.size() - 1);
+}
+
+void Renderer::addSpotLight(
+    const std::string& name,
+    const std::string& modelFileName,
+    const glm::fvec3& color,
+    const glm::fvec3& pos,
+    const glm::fvec3& rot,
+    const glm::fvec3& size,
+    const float attenuation,
+    const float radius
+) {
+    m_allModels.push_back(
+        std::make_shared<Light>(
+            name,
+            modelFileName,
+            LightType::SPOT_LIGHT,
             glm::fvec4(color, 1.0f),
             glm::fvec4(pos, 1.0f),
             rot,
-            size
+            size,
+            attenuation,
+            radius
             )
     );
-    m_directionalLightIndices.push_back(m_allModels.size() - 1);
+    m_lightModelIndices.push_back(m_allModels.size() - 1);
 }

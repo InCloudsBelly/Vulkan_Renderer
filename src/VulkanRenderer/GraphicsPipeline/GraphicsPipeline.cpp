@@ -9,7 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
-#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthUtils.h"
+#include "VulkanRenderer/GraphicsPipeline/RenderTargetUtils.h"
 
 GraphicsPipeline::GraphicsPipeline() {}
 
@@ -25,6 +25,7 @@ GraphicsPipeline::GraphicsPipeline(
     const VkDescriptorSetLayout& descriptorSetLayout,
     const std::string& vertexShaderFileName,
     const std::string& fragmentShaderFileName,
+    const VkSampleCountFlagBits& samplesCount,
     VkVertexInputBindingDescription vertexBindingDescriptions,
     std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
     std::vector<size_t>* modelIndices )
@@ -76,7 +77,7 @@ GraphicsPipeline::GraphicsPipeline(
 
     // Multisampling (disabled for now..)
     VkPipelineMultisampleStateCreateInfo multisamplingInfo{};
-    createMultisamplingInfo(multisamplingInfo);
+    createMultisamplingInfo(samplesCount, multisamplingInfo);
 
     // Color blending(attachment)
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
@@ -91,7 +92,7 @@ GraphicsPipeline::GraphicsPipeline(
 
     // Depth and stencil
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
-    DepthUtils::createDepthStencilStateInfo(m_type, depthStencil);
+    RenderTargetUtils::DepthBufferUtils::createDepthStencilStateInfo(m_type, depthStencil);
 
     // --------------Graphics pipeline creation------------
     VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -285,13 +286,13 @@ void GraphicsPipeline::createRasterizerInfo(VkPipelineRasterizationStateCreateIn
     rasterizerInfo.depthBiasSlopeFactor = 0.0f;
 }
 
-void GraphicsPipeline::createMultisamplingInfo(VkPipelineMultisampleStateCreateInfo& multisamplingInfo) 
+void GraphicsPipeline::createMultisamplingInfo(const VkSampleCountFlagBits& samplesCount, VkPipelineMultisampleStateCreateInfo& multisamplingInfo)
 {
     multisamplingInfo.sType = (
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
         );
-    multisamplingInfo.sampleShadingEnable = VK_FALSE;
-    multisamplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisamplingInfo.sampleShadingEnable = VK_TRUE;
+    multisamplingInfo.rasterizationSamples = samplesCount;
     // Optional
     multisamplingInfo.minSampleShading = 1.0f;
     // Optional

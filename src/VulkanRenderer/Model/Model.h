@@ -22,7 +22,7 @@ enum class ModelType
 {
 	NONE = 0,
 	NORMAL_PBR = 1,
-	DIRECTIONAL_LIGHT = 2,
+	LIGHT = 2,
 	SKYBOX = 3
 };
 
@@ -46,10 +46,11 @@ public:
 	) = 0;
 
 	virtual void createTextures(
-		const VkPhysicalDevice& physicalDevice,
-		const VkDevice&			logicalDevice,
-		CommandPool&			commandPool,
-		VkQueue&				graphicsQueue
+		const VkPhysicalDevice&			physicalDevice,
+		const VkDevice&					logicalDevice,
+		const VkSampleCountFlagBits&	samplesCount,
+		CommandPool&					commandPool,
+		VkQueue&						graphicsQueue
 	) = 0;
 
 	virtual void createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorPool& descriptorPool) = 0;
@@ -60,9 +61,11 @@ public:
 	const glm::fvec4& getPos() const;
 	const glm::fvec3& getRot() const;
 	const glm::fvec3& getSize() const;
+	const bool isHided() const;
 	void setPos(const glm::fvec4& newPos);
 	void setRot(const glm::fvec3& newRot);
 	void setSize(const glm::fvec3& newSize);
+	void setHideStatus(const bool status);
 
 	// Info to update UBO.
 	float			extremeX[2];
@@ -81,6 +84,7 @@ protected:
 	glm::fvec3			m_rot;
 	glm::fvec3			m_size;
 
+	bool				m_hideStatus;
 private:
 	void processNode(aiNode* node, const aiScene* scene);
 };

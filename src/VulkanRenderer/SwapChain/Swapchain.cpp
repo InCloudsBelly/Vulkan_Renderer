@@ -9,7 +9,7 @@
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Window/Window.h"
-#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthBuffer.h"
+#include "VulkanRenderer/GraphicsPipeline/RenderTarget.h"
 
 Swapchain::Swapchain() {}
 Swapchain::~Swapchain() {}
@@ -137,15 +137,16 @@ void Swapchain::createAllImageViews(const VkDevice& logicalDevice)
 	}
 }
 
-void Swapchain::createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass, const DepthBuffer& depthBuffer)
+void Swapchain::createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass, const RenderTarget::DepthBuffer& depthBuffer,const RenderTarget::MSAA& msaa)
 {
 	m_framebuffers.resize(m_imageViews.size());
 
 	for (size_t i = 0; i < m_imageViews.size(); i++)
 	{
 		std::vector<VkImageView> attachments = {
-			m_imageViews[i],
-			depthBuffer.getDepthImageView()
+			msaa.getImageView(),
+			depthBuffer.getImageView(),
+			m_imageViews[i]
 		};
 
 		VkFramebufferCreateInfo framebufferInfo{};

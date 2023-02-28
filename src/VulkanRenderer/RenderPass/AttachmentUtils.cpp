@@ -29,7 +29,6 @@ void AttachmentUtils::createAttachmentDescription(
     VkAttachmentDescription& attachmentDescription
 ) {
     attachmentDescription.format = imageFormat;
-    // We won't configure the multisample yet.
     attachmentDescription.samples = samplesCount;
     // Determines what to do with the data in the attachment before rendering.
     //    - VK_ATTACHMENT_LOAD_OP_CLEAR: Specifies that the contents within the
@@ -41,15 +40,14 @@ void AttachmentUtils::createAttachmentDescription(
     //    memory and can be read later.
     attachmentDescription.storeOp = colorDepthStoreOp;
 
-    // Image Layouts configuration
- // (anotar mejor su funcionamiento y para que estan)
- //
- // Specifies which layout the image will have before the render pass begins.
- //    - VK_IMAGE_LAYOUT_UNDEFINED: It means that we don't care what previous
- //    layout the image was in. The contents of the image aren't guaranteed
- //    to be preserved.
- //    (in this case we're going to clear the image anyway, so we don't
- //    care to preserve the image).
+    // -Image Layouts configuration
+    //
+    // Specifies which layout the image will have before the render pass begins.
+    //    - VK_IMAGE_LAYOUT_UNDEFINED: It means that we don't care what previous
+    //    layout the image was in. The contents of the image aren't guaranteed
+    //    to be preserved.
+    //    (in this case we're going to clear the image anyway, so we don't
+    //    care to preserve the image).
     attachmentDescription.initialLayout = initialLayout;
     // Specifies the layout to automatically transition to when the render
     // pass finishes.

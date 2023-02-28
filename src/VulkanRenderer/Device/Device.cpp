@@ -44,6 +44,7 @@ void Device::createLogicalDevice(
     // For now, this will be empty.
     VkPhysicalDeviceFeatures deviceFeatures{};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.sampleRateShading = VK_TRUE;
 
     // Now we can create the logical device.
     VkDeviceCreateInfo createInfo{};

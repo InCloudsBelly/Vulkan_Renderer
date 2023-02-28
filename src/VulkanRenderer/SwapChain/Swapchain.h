@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Window/Window.h"
-#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthBuffer.h"
+#include "VulkanRenderer/GraphicsPipeline/RenderTarget.h"
 
 
 struct SwapchainSupportedProperties
@@ -37,7 +37,7 @@ public:
 	~Swapchain();
 
 	void createAllImageViews(const VkDevice& logicalDevice);
-	void createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass, const DepthBuffer& depthBuffer);
+	void createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass, const RenderTarget::DepthBuffer& depthBuffer, const RenderTarget::MSAA& msaa);
 
 	void destroyFramebuffers(const VkDevice& logicalDevice);
 	void destroySwapchain(const VkDevice& logicalDevice);

@@ -4,18 +4,27 @@
 
 #include <GLFW/glfw3.h>
 
-class DirectionalLight : public Model
+enum class LightType
+{
+    DIRECTIONAL_LIGHT = 0,
+    POINT_LIGHT = 1,
+    SPOT_LIGHT = 2
+};
+
+class Light : public Model
 {
 public:
 
-    DirectionalLight(const std::string& name, const std::string& modelFilename,
+    Light(const std::string& name, const std::string& modelFilename, const LightType& lightType,
         const glm::fvec4& lightColor,
         const glm::fvec4& pos = glm::fvec4(0.0f),
         const glm::fvec3& rot = glm::fvec3(0.0f),
-        const glm::fvec3& size = glm::fvec3(1.0f)
+        const glm::fvec3& size = glm::fvec3(1.0f),
+        const float attenuation = 1.0f,
+        const float radius = 1.0f
     );
 
-    ~DirectionalLight() override;
+    ~Light() override;
 
     void destroy(const VkDevice& logicalDevice) override;
 
@@ -25,7 +34,7 @@ public:
 
     void uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue,CommandPool& commandPool) override;
 
-    void createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,CommandPool& commandPool,VkQueue& graphicsQueue
+    void createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, CommandPool& commandPool,VkQueue& graphicsQueue
     ) override;
 
     void updateUBO(
@@ -37,7 +46,13 @@ public:
     );
 
     const glm::fvec4& getColor() const;
+    const float& getAttenuation() const;
+    const float& getRadius() const;
+    const LightType& getLightType() const;
+
     void setColor(const glm::fvec4& newColor);
+    void setAttenuation(const float& attenuation);
+    void setRadius(const float& radius);
 
     // Info to update UBO.
     float extremeX[2];
@@ -50,5 +65,8 @@ private:
 
     void processMesh(aiMesh* mesh, const aiScene* scene) override;
 
-    glm::fvec4  m_color;
+    float m_attenuation;
+    float m_radius;
+    glm::fvec4 m_color;
+    LightType m_lightType;
 };

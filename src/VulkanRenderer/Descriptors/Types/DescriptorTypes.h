@@ -7,14 +7,20 @@ namespace DescriptorTypes
 {
     namespace UniformBufferObject
     {
+        struct alignas(16) LightInfo
+        {
+            glm::vec4 pos;
+            glm::vec4 color;
+            float attenuation;
+            float radius;
+            int type;
+        };
 
         struct alignas(16) NormalPBR
         {
             glm::mat4 model;
             glm::mat4 view;
             glm::mat4 proj;
-            glm::vec4 lightPositions[10];
-            glm::vec4 lightColors[10];
             glm::vec4 cameraPos;
             int lightsCount;
         };
@@ -28,6 +34,14 @@ namespace DescriptorTypes
 
         struct alignas(16) Skybox
         {
+            glm::mat4 model;
+            glm::mat4 view;
+            glm::mat4 proj;
+        };
+
+        struct alignas(16) ShadowMap
+        {
+            glm::mat4 shadowModel;
             glm::mat4 model;
             glm::mat4 view;
             glm::mat4 proj;

@@ -12,6 +12,7 @@
 #include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
+#include "VulkanRenderer/GraphicsPipeline/RenderTarget.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Device/Device.h"
@@ -22,7 +23,7 @@
 #include "VulkanRenderer/Model/Types/Skybox.h"
 #include "VulkanRenderer/Camera/Camera.h"
 #include "VulkanRenderer/Camera/Types/Arcball.h"
-
+#include "VulkanRenderer/Features/ShadowMap.h"
 
 class Renderer
 {
@@ -40,8 +41,27 @@ public:
 	void addDirectionalLight(const std::string& name, const std::string& modelFileName,
 		const glm::fvec3& color,
 		const glm::fvec3& pos = glm::fvec4(0.0f),
-		const glm::fvec3& rot = glm::fvec3(0.0f),
 		const glm::fvec3& size = glm::fvec3(1.0f)
+	);
+	void addSpotLight(
+		const std::string& name,
+		const std::string& modelFileName,
+		const glm::fvec3& color,
+		const glm::fvec3& pos,
+		const glm::fvec3& rot,
+		const glm::fvec3& size,
+		const float attenuation,
+		const float radius
+	);
+
+	void addPointLight(
+		const std::string& name,
+		const std::string& modelFileName,
+		const glm::fvec3& color,
+		const glm::fvec3& pos,
+		const glm::fvec3& size,
+		const float attenuation,
+		const float radius
 	);
 
 private:
@@ -97,7 +117,6 @@ private:
 	// Command buffer for main drawing commands.
 	CommandPool					m_commandPool;
 
-	DepthBuffer					m_depthBuffer;
 
 	// Sync objects(for each frame)
 	std::vector<VkSemaphore>	m_imageAvailableSemaphores;
@@ -107,19 +126,25 @@ private:
 
 	std::vector<std::shared_ptr<Model>> m_allModels;
 	// Models that interact with the light.
-	std::vector<size_t>			m_normalModelIndices;
+	std::vector<size_t>			m_objectModelIndices;
 	std::vector<size_t>			m_skyboxModelIndices;
-	std::vector<size_t>			m_directionalLightIndices;
+	std::vector<size_t>			m_lightModelIndices;
 
 	DescriptorPool				m_descriptorPool;
 	GraphicsPipeline            m_graphicsPipelinePBR;
 	GraphicsPipeline            m_graphicsPipelineSkybox;
-	GraphicsPipeline            m_graphicsPipelineDirectionalLight;
+	GraphicsPipeline            m_graphicsPipelineLight;
 	VkDescriptorSetLayout       m_descriptorSetLayoutNormalPBR;
-	VkDescriptorSetLayout       m_descriptorSetLayoutDirectionalLight;
+	VkDescriptorSetLayout       m_descriptorSetLayoutLight;
 	VkDescriptorSetLayout       m_descriptorSetLayoutSkybox;
+	VkDescriptorSetLayout      m_descriptorSetLayoutShadowMap;
 
 	std::vector<VkClearValue>	m_clearValues;
 	std::shared_ptr<Camera>		m_camera;
 	bool						m_isMouseInMotion;
+
+	//---------------------------Features--------------------------------------
+	RenderTarget::DepthBuffer  m_depthBuffer;
+	RenderTarget::MSAA         m_msaa;
+	ShadowMap                  m_shadowMap;
 };

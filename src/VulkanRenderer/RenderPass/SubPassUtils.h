@@ -8,8 +8,9 @@ namespace SubPassUtils
 {
     void createSubPassDescription(
         const VkPipelineBindPoint& pipelineBindPoint,
-        const std::vector<VkAttachmentReference>& colorAttachRefs,
+        const VkAttachmentReference* colorAttachRef,
         const VkAttachmentReference* depthStencilAttachRef,
+        const VkAttachmentReference* colorResolveAttachmentRef,
         VkSubpassDescription& subPassDescription
     );
 

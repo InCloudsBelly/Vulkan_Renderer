@@ -8,13 +8,12 @@ class DescriptorPool
 {
 public:
 	DescriptorPool();
-	~DescriptorPool();
-
-	void createDescriptorPool(
+	DescriptorPool(
 		const VkDevice&							logicalDevice, 
 		const std::vector<VkDescriptorPoolSize> poolSizes,
 		const uint32_t							descriptorSetsCount
 	);
+	~DescriptorPool();
 
 	const VkDescriptorPool& getDescriptorPool() const;
 

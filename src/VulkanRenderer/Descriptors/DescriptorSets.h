@@ -6,20 +6,35 @@
 
 #include "VulkanRenderer/Descriptors/DescriptorInfo.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
+#include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
 #include "VulkanRenderer/Textures/Texture.h"
 
 class DescriptorSets
 {
 public:
-	void createDescriptorSets(
+	DescriptorSets();
+	DescriptorSets(
 		const VkDevice						logicalDevice,
 		const std::vector<DescriptorInfo>&	uboInfo,
 		const std::vector<DescriptorInfo>&	samplersInfo,
 		const std::vector<Texture>&			textures,
-		std::vector<VkBuffer>&				uniformBuffers,
+		std::vector<UBO*>&					UBOs,	
 		const VkDescriptorSetLayout&		descriptorSetLayout,
 		DescriptorPool&						descriptorPool
 	);
+
+	DescriptorSets(
+		const VkDevice logicalDevice,
+		const std::vector<DescriptorInfo>& uboInfo,
+		const std::vector<DescriptorInfo>& samplerInfo,
+		const std::vector<VkImageView>& imageViews,
+		const std::vector<Sampler>& imageSamplers,
+		std::vector<UBO*>& UBOs,
+		const VkDescriptorSetLayout& descriptorSetLayout,
+		DescriptorPool& descriptorPool
+	);
+
+	~DescriptorSets();
 
 	const VkDescriptorSet& get(const uint32_t index) const;
 

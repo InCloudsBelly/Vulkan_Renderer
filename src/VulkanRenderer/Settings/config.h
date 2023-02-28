@@ -19,7 +19,7 @@ namespace Config
 	//Camera settings
 	inline const float FOV = 45.0f;
 	inline const float Z_NEAR = 0.01f;
-	inline const float Z_FAR = 10.0f;
+	inline const float Z_FAR = 100.0f;
 
 
 	// Textures - Naming Convention For Cubemaps

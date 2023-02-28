@@ -79,14 +79,16 @@ Skybox::~Skybox() {}
 
 void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorPool& descriptorPool)
 {
+    std::vector<UBO*> opUBOs = { &m_ubo };
+
     for (auto& mesh : m_meshes)
     {
-        mesh.m_descriptorSets.createDescriptorSets(
+        mesh.m_descriptorSets = DescriptorSets(
             logicalDevice,
             GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
             GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
             mesh.m_textures,
-            m_ubo.getUniformBuffers(),
+            opUBOs,
             descriptorSetLayout,
             descriptorPool
         );
@@ -135,7 +137,7 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDev
     }
 }
 
-void Skybox::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,CommandPool& commandPool, VkQueue& graphicsQueue)
+void Skybox::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, CommandPool& commandPool, VkQueue& graphicsQueue)
 {
     for (auto& mesh : m_meshes)
     {
@@ -147,6 +149,7 @@ void Skybox::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevic
                 mesh.m_texturesToLoadInfo[i],
                 // isSkybox
                 true,
+                samplesCount,
                 commandPool,
                 graphicsQueue
             );
@@ -167,6 +170,7 @@ void Skybox::updateUBO(
     newUBO.view = view;
     newUBO.proj = UBOutils::getUpdatedProjMatrix(glm::radians(75.0f),extent.width / (float)extent.height,0.01f,40.0f);
 
-    UBOutils::updateUBO(m_ubo, logicalDevice, newUBO, currentFrame);
+    const size_t size = sizeof(newUBO);
+    UBOutils::updateUBO(logicalDevice, m_ubo, size, &newUBO, currentFrame);
 }
 

@@ -40,6 +40,8 @@ private:
 
     void createLightsWindow(std::vector<std::shared_ptr<Model>> models, const std::vector<size_t> indices);
     void createModelsWindow(std::vector<std::shared_ptr<Model>> models, const std::vector<size_t> indices);
+    
+    void createSlider(const std::string& subMenuName, const std::string& sliceName, const float& maxV, const float& minV, float& value);
     void createCameraWindow(const std::string& name, glm::fvec4& cameraPos);
     void createTransformationsInfo(glm::vec4& pos,glm::vec3& rot, glm::vec3& size, const std::string& modelName);
     void createTranslationSliders(const std::string& name, glm::fvec4& pos, const float minR, const float maxR);

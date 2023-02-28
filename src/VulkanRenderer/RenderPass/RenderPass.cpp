@@ -4,7 +4,7 @@
 #include <array>
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/GraphicsPipeline/DepthBuffer/DepthUtils.h"
+#include "VulkanRenderer/GraphicsPipeline/RenderTargetUtils.h"
 
 
 RenderPass::RenderPass() {}
@@ -22,9 +22,9 @@ RenderPass::RenderPass(
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	info.attachmentCount = attachments.size();
 	info.pAttachments = attachments.data();
-	info.subpassCount = subpasses.size();
+	info.subpassCount = 1;
 	info.pSubpasses = subpasses.data();
-	info.dependencyCount = dependencies.size();
+	info.dependencyCount = 1;
 	info.pDependencies = dependencies.data();
 
 	auto status = vkCreateRenderPass(logicalDevice, &info, nullptr, &m_renderPass);

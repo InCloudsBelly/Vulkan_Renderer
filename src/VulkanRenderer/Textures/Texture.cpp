@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan.h>
 #include <stdexcept>
+#include <iostream>
 
 #include "VulkanRenderer/Textures/MipmapUtils.h"
 #include "VulkanRenderer/Settings/Config.h"
@@ -21,9 +22,10 @@ Texture::Texture(
     const VkDevice& logicalDevice,
     const TextureToLoadInfo& textureInfo,
     const bool isCubemap,
+    const VkSampleCountFlagBits& samplesCount,
     CommandPool& commandPool,
     VkQueue& graphicsQueue
-): m_isCubemap(isCubemap) 
+): m_isCubemap(isCubemap) , m_samplesCount(samplesCount)
 {
     if (m_isCubemap)
     {
@@ -144,7 +146,7 @@ void Texture::transitionImageLayout(
 
 void Texture::createTextureSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice) 
 {
-    m_textureSampler = Sampler(physicalDevice, logicalDevice, m_mipLevels);
+    m_textureSampler = Sampler(physicalDevice, logicalDevice, m_mipLevels, VK_SAMPLER_ADDRESS_MODE_REPEAT);
 }
 
 void Texture::createTextureImageView(const VkDevice& logicalDevice, const VkFormat& format)  
@@ -201,6 +203,7 @@ void Texture::createTextureImage(
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         false,
         m_mipLevels,
+        m_samplesCount,
         m_textureImage,
         m_textureImageMemory
     );
@@ -307,6 +310,7 @@ void Texture::createTextureImageCubemap(
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         true,
         m_mipLevels,
+        m_samplesCount,
         m_textureImage,
         m_textureImageMemory
     );
@@ -354,7 +358,7 @@ const VkImageView& Texture::getTextureImageView() const
 
 const VkSampler& Texture::getTextureSampler() const
 {
-    return m_textureSampler.getSampler();
+    return m_textureSampler.get();
 }
 
 void Texture::destroyTexture(const VkDevice& logicalDevice)

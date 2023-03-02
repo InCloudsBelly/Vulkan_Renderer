@@ -10,7 +10,21 @@ enum class GraphicsPipelineType
 {
 	PBR = 0,
 	LIGHT = 1,
-	SKYBOX = 2
+	SKYBOX = 2,
+	SHADOWMAP = 3
+};
+
+enum shaderType
+{
+	NONE = 0,
+	VERTEX = 1,
+	FRAGMENT = 2
+};
+
+struct ShaderInfo
+{
+	shaderType type;
+	std::string fileName;
 };
 
 class GraphicsPipeline
@@ -25,8 +39,7 @@ public:
 		const VkExtent2D& extent,
 		const VkRenderPass& renderPass,
 		const VkDescriptorSetLayout& descriptorSetLayout,
-		const std::string& vertexShaderFileName,
-		const std::string& fragmentShaderFileName,
+		const std::vector<ShaderInfo>& shaderInfos,
 		const VkSampleCountFlagBits& samplesCount,
 		VkVertexInputBindingDescription vertexBindingDescriptions,
 		std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
@@ -40,18 +53,17 @@ public:
 	void destroy(const VkDevice& logicalDevice);
 
 private:
-	void createShaderModules(
+	void createShaderModule(
 		const VkDevice& logicalDevice,
-		const std::string& vertexShaderFileName,
-		VkShaderModule& vertexShaderModule,
-		const std::string& fragmentShaderFileName,
-		VkShaderModule& fragmentShaderModule
+		const ShaderInfo& shaderInfos,
+		VkShaderModule& shaderModule
 	);
-	void createShaderStagesInfos(
-		const VkShaderModule& vertexShaderModule,
-		const VkShaderModule& fragmentShaderModule,
-		VkPipelineShaderStageCreateInfo(&shaderStagesInfos)[2]
+	void createShaderStageInfo(
+		const VkShaderModule& shaderModule,
+		const shaderType& type,
+		VkPipelineShaderStageCreateInfo& shaderStageInfo
 	);
+
 	void createDynamicStatesInfo(const std::vector<VkDynamicState>& dynamicStates, VkPipelineDynamicStateCreateInfo& dynamicStatesInfo);
 	
 	void createVertexShaderInputInfo(const VkVertexInputBindingDescription& bindingDescription,

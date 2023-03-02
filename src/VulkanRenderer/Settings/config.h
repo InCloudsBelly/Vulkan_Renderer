@@ -19,7 +19,7 @@ namespace Config
 	//Camera settings
 	inline const float FOV = 45.0f;
 	inline const float Z_NEAR = 0.01f;
-	inline const float Z_FAR = 100.0f;
+	inline const float Z_FAR = 200.0f;
 
 
 	// Textures - Naming Convention For Cubemaps
@@ -27,4 +27,7 @@ namespace Config
 	{"pz","nz","py","ny","nx","px"};
 
 	inline const std::string TEXTURE_CUBEMAP_FORMAT = "png";
+
+	// Scene
+	inline const uint32_t LIGHTS_COUNT = 10;
 }

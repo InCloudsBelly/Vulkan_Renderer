@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <optional>
+#include <memory>
 
 #include <vulkan/vulkan.h>
 
@@ -31,7 +32,7 @@ public:
 	Swapchain(
 		const VkPhysicalDevice& physicalDevice,
 		const VkDevice& logicalDevice,
-		const Window& window,
+		const std::shared_ptr<Window>& window,
 		const SwapchainSupportedProperties& supportedProperties
 	);
 	~Swapchain();
@@ -52,14 +53,14 @@ public:
 	const VkImageView& getImageView(const uint32_t index) const;
 
 private:
-	void chooseBestSettings(const Window& window,const SwapchainSupportedProperties& supportedProperties,
+	void chooseBestSettings(const std::shared_ptr<Window>& window,const SwapchainSupportedProperties& supportedProperties,
 			VkSurfaceFormatKHR& surfaceFormat,VkPresentModeKHR& presentMode,VkExtent2D& extent);
 
 	VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
 
 	VkPresentModeKHR chooseBestPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
 
-	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const Window& window);
+	VkExtent2D chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilities, const std::shared_ptr<Window>& window);
 
 	const bool existsMaxNumberOfSupportedImages(const VkSurfaceCapabilitiesKHR& capabilities)const;
 

@@ -14,24 +14,15 @@ class DescriptorSets
 public:
 	DescriptorSets();
 	DescriptorSets(
-		const VkDevice						logicalDevice,
-		const std::vector<DescriptorInfo>&	uboInfo,
-		const std::vector<DescriptorInfo>&	samplersInfo,
-		const std::vector<Texture>&			textures,
-		std::vector<UBO*>&					UBOs,	
-		const VkDescriptorSetLayout&		descriptorSetLayout,
-		DescriptorPool&						descriptorPool
-	);
-
-	DescriptorSets(
-		const VkDevice logicalDevice,
-		const std::vector<DescriptorInfo>& uboInfo,
-		const std::vector<DescriptorInfo>& samplerInfo,
-		const std::vector<VkImageView>& imageViews,
-		const std::vector<Sampler>& imageSamplers,
-		std::vector<UBO*>& UBOs,
-		const VkDescriptorSetLayout& descriptorSetLayout,
-		DescriptorPool& descriptorPool
+		const VkDevice								logicalDevice,
+		const std::vector<DescriptorInfo>&			uboInfo,
+		const std::vector<DescriptorInfo>&			samplersInfo,
+		const std::vector<std::shared_ptr<Texture>>& textures,
+		const VkImageView*							shadowMapImageView,
+		const VkSampler*							shadowMapSampler,
+		std::vector<UBO*>&							UBOs,
+		const VkDescriptorSetLayout&				descriptorSetLayout,
+		DescriptorPool&								descriptorPool
 	);
 
 	~DescriptorSets();

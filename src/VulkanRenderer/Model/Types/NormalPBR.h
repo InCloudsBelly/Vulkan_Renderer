@@ -1,7 +1,10 @@
 #pragma once
 
+#include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Features/ShadowMap.h"
+
 
 class NormalPBR : public Model
 {
@@ -20,6 +23,7 @@ public:
     void createDescriptorSets(
         const VkDevice& logicalDevice,
         const VkDescriptorSetLayout& descriptorSetLayout,
+        const ShadowMap* shadowMap,
         DescriptorPool& descriptorPool
     ) override;
 
@@ -49,6 +53,7 @@ public:
         const glm::vec4& cameraPos,
         const glm::mat4& view,
         const glm::mat4& proj, 
+        const glm::mat4& lightSpace,
         const int& lightsCount,
         const std::vector<std::shared_ptr<Model>>& models,
         const uint32_t& currentFrame
@@ -60,13 +65,15 @@ public:
         const uint32_t& currentFrame
     );
 
+    const glm::mat4& getModelM() const;
+
     // Info to update UBO.
    float extremeX[2];
    float extremeY[2];
    float extremeZ[2];
 
+   // TODO: make it private
    std::vector<Mesh<Attributes::PBR::Vertex>> m_meshes;
-
 private:
 
    void processMesh(aiMesh* mesh, const aiScene* scene) override;
@@ -79,6 +86,6 @@ private:
 
    UBO m_uboLights;
 
-   DescriptorTypes::UniformBufferObject::NormalPBR m_basicInfo;
-   DescriptorTypes::UniformBufferObject::LightInfo m_lightsInfo[10];
+   DescriptorTypes::UniformBufferObject::NormalPBR m_dataInShader;
+   DescriptorTypes::UniformBufferObject::LightInfo m_lightsInfo[Config::LIGHTS_COUNT];
 };

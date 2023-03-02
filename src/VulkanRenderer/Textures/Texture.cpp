@@ -15,8 +15,6 @@
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Descriptors/Types/Sampler/Sampler.h"
 
-Texture::Texture() {}
-
 Texture::Texture(
     const VkPhysicalDevice& physicalDevice,
     const VkDevice& logicalDevice,
@@ -49,8 +47,6 @@ Texture::Texture(
             graphicsQueue
         );
     }
-    createTextureImageView(logicalDevice, textureInfo.format);
-    createTextureSampler(physicalDevice, logicalDevice);
 }
 
 Texture::~Texture() {}
@@ -78,7 +74,7 @@ void Texture::transitionImageLayout(
         // we'll ignore these two.
         imgMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         imgMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        imgMemoryBarrier.image = m_textureImage;
+        imgMemoryBarrier.image = m_image.get();
         imgMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         imgMemoryBarrier.subresourceRange.baseMipLevel = 0;
         // In this case, our image is not an array(it has 2D coords -> texel).
@@ -144,16 +140,6 @@ void Texture::transitionImageLayout(
     commandPool.submitCommandBuffer(graphicsQueue,commandBuffer);
 }
 
-void Texture::createTextureSampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice) 
-{
-    m_textureSampler = Sampler(physicalDevice, logicalDevice, m_mipLevels, VK_SAMPLER_ADDRESS_MODE_REPEAT);
-}
-
-void Texture::createTextureImageView(const VkDevice& logicalDevice, const VkFormat& format)  
-{
-    ImageManager::createImageView(logicalDevice, format, m_textureImage, VK_IMAGE_ASPECT_COLOR_BIT, m_isCubemap, m_mipLevels, m_textureImageView);
-}
-
 void Texture::createTextureImage(
     const char*             pathToTexture,
     const VkFormat&         format,
@@ -192,7 +178,7 @@ void Texture::createTextureImage(
     stbi_image_free(pixels);
 
     // Creates an empty Image object of determined properties.
-    ImageManager::createImage(
+    m_image = Image(
         physicalDevice,
         logicalDevice,
         texWidth,
@@ -204,8 +190,13 @@ void Texture::createTextureImage(
         false,
         m_mipLevels,
         m_samplesCount,
-        m_textureImage,
-        m_textureImageMemory
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        VK_FILTER_LINEAR
     );
 
     // We will transfer the pixels to the image object with a cmd buffer.
@@ -224,9 +215,9 @@ void Texture::createTextureImage(
         static_cast<uint32_t>(texHeight),
         false,
         graphicsQueue,
-        commandPool,
         stagingBuffer,
-        m_textureImage
+        commandPool,
+        m_image.get()
     );
 
     vkDestroyBuffer(logicalDevice,stagingBuffer,nullptr);
@@ -236,7 +227,7 @@ void Texture::createTextureImage(
         physicalDevice,
         commandPool,
         graphicsQueue,
-        m_textureImage,
+        m_image.get(),
         texWidth,
         texHeight,
         format,
@@ -299,7 +290,7 @@ void Texture::createTextureImageCubemap(
     }
 
     // Creates an empty Image object of determined properties.
-    ImageManager::createImage(
+    m_image = Image(
         physicalDevice,
         logicalDevice,
         texWidth,
@@ -311,8 +302,13 @@ void Texture::createTextureImageCubemap(
         true,
         m_mipLevels,
         m_samplesCount,
-        m_textureImage,
-        m_textureImageMemory
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        VK_FILTER_LINEAR
     );
 
     // We will transfer the pixels to the image object with a cmd buffer.
@@ -331,9 +327,9 @@ void Texture::createTextureImageCubemap(
         static_cast<uint32_t>(texHeight),
         true,
         graphicsQueue,
-        commandPool,
         stagingBuffer,
-        m_textureImage
+        commandPool,
+        m_image.get()
     );
 
     // Another transition to sample from the shader.
@@ -352,19 +348,16 @@ void Texture::createTextureImageCubemap(
 
 const VkImageView& Texture::getTextureImageView() const
 {
-    return m_textureImageView;
+    return m_image.getImageView();
 }
 
 
 const VkSampler& Texture::getTextureSampler() const
 {
-    return m_textureSampler.get();
+    return m_image.getSampler();
 }
 
 void Texture::destroyTexture(const VkDevice& logicalDevice)
 {
-    m_textureSampler.destroySampler(logicalDevice);
-    vkDestroyImageView(logicalDevice, m_textureImageView, nullptr);
-    vkDestroyImage(logicalDevice, m_textureImage, nullptr);
-    vkFreeMemory(logicalDevice, m_textureImageMemory, nullptr);
+    m_image.destroy(logicalDevice);
 }

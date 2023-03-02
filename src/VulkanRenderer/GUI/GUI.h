@@ -8,6 +8,7 @@
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/SwapChain/Swapchain.h"
+#include "VulkanRenderer/Camera/Camera.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Model/Model.h"
 
@@ -21,14 +22,14 @@ public:
         const Swapchain& swapchain,
         const uint32_t& graphicsFamilyIndex,
         const VkQueue& graphicsQueue,
-        Window& window
+        const std::shared_ptr<Window>& window
     );
 
     ~GUI();
 
     void recordCommandBuffer(const uint8_t currentFrame, const uint8_t imageIndex, const std::vector<VkClearValue>& clearValues);
 
-    void draw(const std::vector<std::shared_ptr<Model>>& models,glm::fvec4& cameraPos, const std::vector<size_t>& normalModelIndices,const std::vector<size_t>& lightModelIndices);
+    void draw(const std::vector<std::shared_ptr<Model>>& models, const std::shared_ptr<Camera>& camera, const std::vector<size_t>& normalModelIndices,const std::vector<size_t>& lightModelIndices);
 
     const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
 
@@ -42,9 +43,9 @@ private:
     void createModelsWindow(std::vector<std::shared_ptr<Model>> models, const std::vector<size_t> indices);
     
     void createSlider(const std::string& subMenuName, const std::string& sliceName, const float& maxV, const float& minV, float& value);
-    void createCameraWindow(const std::string& name, glm::fvec4& cameraPos);
+    void createCameraWindow(const std::shared_ptr<Camera>& camera);
     void createTransformationsInfo(glm::vec4& pos,glm::vec3& rot, glm::vec3& size, const std::string& modelName);
-    void createTranslationSliders(const std::string& name, glm::fvec4& pos, const float minR, const float maxR);
+    void createTranslationSliders(const std::string& name, const std::string& treeNodeName, glm::fvec4& pos, const float minR, const float maxR);
     void createRotationSliders(const std::string& name,glm::fvec3& pos,const float minR,const float maxR);
     void createSizeSliders(const std::string& name, glm::fvec3& pos, const float minR, const float maxR);
 

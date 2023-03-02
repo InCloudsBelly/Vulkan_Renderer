@@ -2,7 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Images/imageManager.h"
+#include "VulkanRenderer/Images/ImageManager.h"
+#include "VulkanRenderer/Images/Image.h"
 #include "VulkanRenderer/GraphicsPipeline/RenderTargetUtils.h"
 
 
@@ -18,7 +19,7 @@ RenderTarget::MSAA::MSAA(
 ) {
     m_samplesCount = RenderTargetUtils::MSAAUtils::getMaxUsableSampleCount(physicalDevice);
 
-    ImageManager::createImage(
+    m_image = Image(
         physicalDevice,
         logicalDevice,
         swapchainExtent.width,
@@ -30,20 +31,13 @@ RenderTarget::MSAA::MSAA(
         false,
         1,
         m_samplesCount,
-        m_image,
-        m_imageMemory
-    );
-
-
-    ImageManager::createImageView(
-        logicalDevice,
-        swapchainFormat,
-        m_image,
         VK_IMAGE_ASPECT_COLOR_BIT,
-        false,
-        1,
-        m_imageView
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY
     );
+
 }
 
 RenderTarget::MSAA::~MSAA() {}
@@ -56,14 +50,12 @@ const VkSampleCountFlagBits& RenderTarget::MSAA::getSamplesCount() const
 
 void RenderTarget::MSAA::destroy(const VkDevice& logicalDevice) 
 {
-    vkDestroyImageView(logicalDevice, m_imageView, nullptr);
-    vkDestroyImage(logicalDevice, m_image, nullptr);
-    vkFreeMemory(logicalDevice, m_imageMemory, nullptr);
+    m_image.destroy(logicalDevice);
 }
 
 const VkImageView& RenderTarget::MSAA::getImageView() const
 {
-    return m_imageView;
+    return  m_image.getImageView();
 }
 
 /////////////////////////////////Depth buffer//////////////////////////////////
@@ -87,7 +79,7 @@ RenderTarget::DepthBuffer::DepthBuffer(
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
     );
 
-    ImageManager::createImage(
+    m_image = Image(
         physicalDevice,
         logicalDevice,
         swapchainExtent.width,
@@ -99,18 +91,11 @@ RenderTarget::DepthBuffer::DepthBuffer(
         false,
         1,
         samplesCount,
-        m_image,
-        m_imageMemory
-    );
-
-    ImageManager::createImageView(
-        logicalDevice,
-        m_format,
-        m_image,
         VK_IMAGE_ASPECT_DEPTH_BIT,
-        false,
-        1,
-        m_imageView
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY,
+        VK_COMPONENT_SWIZZLE_IDENTITY
     );
 }
 
@@ -118,7 +103,7 @@ RenderTarget::DepthBuffer::~DepthBuffer() {}
 
 const VkImageView& RenderTarget::DepthBuffer::getImageView() const
 {
-    return m_imageView;
+    return m_image.getImageView();
 }
 
 const VkFormat& RenderTarget::DepthBuffer::getFormat() const
@@ -128,7 +113,5 @@ const VkFormat& RenderTarget::DepthBuffer::getFormat() const
 
 void RenderTarget::DepthBuffer::destroy(const VkDevice& logicalDevice) 
 {
-    vkDestroyImageView(logicalDevice, m_imageView, nullptr);
-    vkDestroyImage(logicalDevice, m_image, nullptr);
-    vkFreeMemory(logicalDevice, m_imageMemory, nullptr);
+    m_image.destroy(logicalDevice);
 }

@@ -6,7 +6,7 @@ class Sampler
 {
 public:
     Sampler();
-    Sampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t mipLevels, const VkSamplerAddressMode& addressMode);
+    Sampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t mipLevels, const VkSamplerAddressMode& addressMode, const VkFilter& filter);
     
     ~Sampler();
 

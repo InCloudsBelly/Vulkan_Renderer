@@ -21,6 +21,7 @@ namespace SubPassUtils
         const uint32_t& dstSubPass,
         const VkPipelineStageFlags& dstStageFlags,
         const VkAccessFlags& dstAccessMask,
+        const VkDependencyFlagBits& dependencyFlags,
         VkSubpassDependency& dependency
     );
 

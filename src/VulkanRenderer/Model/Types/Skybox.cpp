@@ -25,26 +25,21 @@
 #include "VulkanRenderer/Buffers/BufferManager.h"
 
 Skybox::Skybox(const std::string& name, const std::string& textureFolderName)
-	:Model(name, ModelType::SKYBOX)
+	:Model(name, ModelType::SKYBOX), m_textureFolderName(textureFolderName)
 {
 	loadModel((std::string(MODEL_DIR) + "Cube.gltf").c_str());
 
-	for (auto& mesh : m_meshes)
-	{
-		mesh.m_textures.resize(GRAPHICS_PIPELINE::SKYBOX::TEXTURES_PER_MESH_COUNT);
-        mesh.m_texturesToLoadInfo.push_back({ textureFolderName,VK_FORMAT_R8G8B8A8_SRGB });
-	}
 }
 
 void Skybox::destroy(const VkDevice& logicalDevice)
 {
 	m_ubo.destroyUniformBuffersAndMemories(logicalDevice);
 
+    for (auto& texture : m_texturesLoaded)
+        texture->destroyTexture(logicalDevice);
+
     for (auto& mesh : m_meshes)
     {
-        for (auto& texture : mesh.m_textures)
-            texture.destroyTexture(logicalDevice);
-
         BufferManager::destroyBuffer(logicalDevice,mesh.m_vertexBuffer);
         BufferManager::destroyBuffer(logicalDevice,mesh.m_indexBuffer);
 
@@ -77,7 +72,7 @@ void Skybox::processMesh(aiMesh* mesh, const aiScene* scene)
 
 Skybox::~Skybox() {}
 
-void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorPool& descriptorPool)
+void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, const ShadowMap* shadowMap, DescriptorPool& descriptorPool)
 {
     std::vector<UBO*> opUBOs = { &m_ubo };
 
@@ -88,6 +83,8 @@ void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescrip
             GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
             GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
             mesh.m_textures,
+            nullptr,
+            nullptr,
             opUBOs,
             descriptorSetLayout,
             descriptorPool
@@ -139,20 +136,23 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDev
 
 void Skybox::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, CommandPool& commandPool, VkQueue& graphicsQueue)
 {
+    const size_t nTextures = GRAPHICS_PIPELINE::SKYBOX::TEXTURES_PER_MESH_COUNT;
+    const TextureToLoadInfo info = {m_textureFolderName,VK_FORMAT_R8G8B8A8_SRGB};
+
     for (auto& mesh : m_meshes)
     {
-        for (size_t i = 0; i < mesh.m_textures.size(); i++)
+        for (size_t i = 0; i < nTextures; i++)
         {
-            mesh.m_textures[i] = Texture(
-                physicalDevice,
-                logicalDevice,
-                mesh.m_texturesToLoadInfo[i],
-                // isSkybox
-                true,
-                samplesCount,
-                commandPool,
-                graphicsQueue
-            );
+            auto it = (m_texturesID.find(info.name));
+
+            if (it == m_texturesID.end())
+            {
+                mesh.m_textures.push_back(std::make_shared<Texture>(physicalDevice,logicalDevice,info,true,samplesCount,commandPool,graphicsQueue));
+                m_texturesLoaded.push_back(mesh.m_textures[i]);
+                m_texturesID[info.name] = (m_texturesLoaded.size() - 1);
+            }
+            else
+                mesh.m_textures.push_back(m_texturesLoaded[it->second]);
         }
     }
 }

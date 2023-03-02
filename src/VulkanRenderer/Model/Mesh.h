@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 
+#include "VulkanRenderer/Images/Image.h"
 #include "VulkanRenderer/Textures/Texture.h"
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
 #include "VulkanRenderer/Model/Attributes.h"
@@ -20,9 +21,8 @@ struct Mesh
 	VkDeviceMemory m_vertexMemory;
 	VkDeviceMemory m_indexMemory;
 
-	// Textures
-	std::vector<Texture> m_textures;
-	std::vector<TextureToLoadInfo> m_texturesToLoadInfo;
+	std::vector<std::shared_ptr<Texture>> m_textures;
+	std::vector<TextureToLoadInfo>        m_texturesToLoadInfo;
 
 	// Descritors
 	// (one descriptor set for all the ubo and samplers of a mesh)

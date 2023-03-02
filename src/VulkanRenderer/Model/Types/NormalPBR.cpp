@@ -18,12 +18,6 @@ NormalPBR::NormalPBR(const std::string& name, const std::string& modelFileName,
 ) : Model(name, ModelType::NORMAL_PBR, pos, rot, size) 
 {
 	loadModel((std::string(MODEL_DIR) + modelFileName).c_str());
-
-	for (auto& mesh : m_meshes)
-	{
-		mesh.m_textures.resize(GRAPHICS_PIPELINE::PBR::TEXTURES_PER_MESH_COUNT);
-	}
-
 }
 
 NormalPBR::~NormalPBR() {}
@@ -33,11 +27,11 @@ void NormalPBR::destroy(const VkDevice& logicalDevice)
 	m_ubo.destroyUniformBuffersAndMemories(logicalDevice);
 	m_uboLights.destroyUniformBuffersAndMemories(logicalDevice);
 
+	for (auto& texture : m_texturesLoaded)
+		texture->destroyTexture(logicalDevice);
+
 	for (auto& mesh : m_meshes)
 	{
-		for(auto & texture : mesh.m_textures)
-			texture.destroyTexture(logicalDevice);
-
 		BufferManager::destroyBuffer(logicalDevice, mesh.m_vertexBuffer);
 		BufferManager::destroyBuffer(logicalDevice, mesh.m_indexBuffer);
 
@@ -109,6 +103,9 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 		else
 			vertex.tangent = glm::fvec3(1.0f);
 
+		//glm::vec3 bitangent = glm::cross(vertex.normal, tangent);
+
+		vertex.posInLightSpace = glm::fvec4(1.0f);
 
 		newMesh.m_vertices.push_back(vertex);
 	}
@@ -147,7 +144,7 @@ void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice,cons
 	m_uboLights.createUniformBuffers(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10);
 }
 
-void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout,DescriptorPool& descriptorPool) 
+void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout, const ShadowMap* shadowMap, DescriptorPool& descriptorPool)
 {
 	std::vector<UBO*> opUBOs = { &m_ubo, &m_uboLights };
 
@@ -158,6 +155,8 @@ void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescr
 			GRAPHICS_PIPELINE::PBR::UBOS_INFO,
 			GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO,
 			mesh.m_textures,
+			&shadowMap->getShadowMapView(),
+			&shadowMap->getSampler(),
 			opUBOs,
 			descriptorSetLayout,
 			descriptorPool
@@ -198,27 +197,35 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const Vk
 	}
 }
 
+/*
+ * Creates and loads all the samplers used in the shader of each mesh.
+ */
 void NormalPBR::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, CommandPool& commandPool, VkQueue& graphicsQueue)
 {
+	const size_t nTextures = GRAPHICS_PIPELINE::PBR::TEXTURES_PER_MESH_COUNT;
+
 	for (auto& mesh : m_meshes)
 	{
-		if (!mesh.m_hasTextureCoords)
-			continue;
-
-		for (size_t i = 0; i < mesh.m_textures.size(); i++)
+		// Samplers of textures.
+		for (size_t i = 0; i < nTextures; i++)
 		{
-			mesh.m_textures[i] = Texture(
-				physicalDevice,
-				logicalDevice,
-				mesh.m_texturesToLoadInfo[i],
-				// isSkybox
-				false,
-				samplesCount,
-				commandPool,
-				graphicsQueue
-			);
+			auto it = (m_texturesID.find(mesh.m_texturesToLoadInfo[i].name));
+
+			if (it == m_texturesID.end())
+			{
+				mesh.m_textures.push_back(std::make_shared<Texture>(physicalDevice,logicalDevice,mesh.m_texturesToLoadInfo[i],false,samplesCount,commandPool,graphicsQueue));
+				m_texturesLoaded.push_back(mesh.m_textures[i]);
+				m_texturesID[mesh.m_texturesToLoadInfo[i].name] = (m_texturesLoaded.size() - 1);
+			}
+			else
+				mesh.m_textures.push_back(m_texturesLoaded[it->second]);
 		}
 	}
+}
+
+const glm::mat4& NormalPBR::getModelM() const
+{
+	return m_dataInShader.model;
 }
 
 void NormalPBR::updateUBO(
@@ -226,20 +233,22 @@ void NormalPBR::updateUBO(
 	const glm::vec4&			cameraPos,
 	const glm::mat4&			view,
 	const glm::mat4&			proj,
+	const glm::mat4&			lightSpace,
 	const int&					lightsCount,
 	const std::vector<std::shared_ptr<Model>>& models,
 	const uint32_t&				currentFrame
 ) {
 
-	m_basicInfo.model = UBOutils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
-	m_basicInfo.view = view;
-	m_basicInfo.proj = proj;
+	m_dataInShader.model = UBOutils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
+	m_dataInShader.view = view;
+	m_dataInShader.proj = proj;
+	m_dataInShader.lightSpace = lightSpace;
 
-	m_basicInfo.cameraPos = cameraPos;
-	m_basicInfo.lightsCount = lightsCount;
+	m_dataInShader.cameraPos = cameraPos;
+	m_dataInShader.lightsCount = lightsCount;
 
-	size_t size = sizeof(m_basicInfo);
-	UBOutils::updateUBO(logicalDevice, m_ubo, size, &m_basicInfo, currentFrame);
+	size_t size = sizeof(m_dataInShader);
+	UBOutils::updateUBO(logicalDevice, m_ubo, size, &m_dataInShader, currentFrame);
 }
 
 void NormalPBR::updateUBOlightsInfo(
@@ -256,8 +265,10 @@ void NormalPBR::updateUBOlightsInfo(
 		{
 			m_lightsInfo[i].pos = pModel->getPos();
 			m_lightsInfo[i].color = pModel->getColor();
+			m_lightsInfo[i].dir = pModel->getTargetPos() - pModel->getPos();
 			m_lightsInfo[i].attenuation = pModel->getAttenuation();
 			m_lightsInfo[i].radius = pModel->getRadius();
+			m_lightsInfo[i].intensity = pModel->getIntensity();
 			m_lightsInfo[i].type = (int)pModel->getLightType();
 		}
 	}

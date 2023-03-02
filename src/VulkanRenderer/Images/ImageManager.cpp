@@ -88,6 +88,10 @@ void ImageManager::createImageView(
     const VkImageAspectFlags& aspectFlags,
     const bool isCubemap,
     const uint32_t mipLevels,
+    const VkComponentSwizzle& componentMapR,
+    const VkComponentSwizzle& componentMapG,
+    const VkComponentSwizzle& componentMapB,
+    const VkComponentSwizzle& componentMapA,
     VkImageView& imageView
 ) {
     VkImageViewCreateInfo createInfo{};
@@ -105,10 +109,10 @@ void ImageManager::createImageView(
     // Specifies how we want to map all the color channels of the images
     // (E.g: map all of the channels to the red channel for a monochrome
     // texture)
-    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    createInfo.components.r = componentMapR;
+    createInfo.components.g = componentMapG;
+    createInfo.components.b = componentMapB;
+    createInfo.components.a = componentMapA;
     // Specifies what the image's purpose is and which part of the image
     // should be accessed.
     // (E.g: with mipmapping leves or multiple layers)
@@ -132,10 +136,10 @@ void ImageManager::copyBufferToImage(
     const uint32_t width,
     const uint32_t height,
     const bool isCubemap,
-    VkQueue& graphicsQueue,
+    const VkQueue& graphicsQueue,
+    const VkBuffer& buffer,
     CommandPool& commandPool,
-    VkBuffer& buffer,
-    VkImage& image
+    const VkImage& image
 ) {
 
     VkCommandBuffer commandBuffer;

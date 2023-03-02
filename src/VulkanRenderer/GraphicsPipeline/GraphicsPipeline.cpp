@@ -23,8 +23,7 @@ GraphicsPipeline::GraphicsPipeline(
     const VkExtent2D& extent,
     const VkRenderPass& renderPass,
     const VkDescriptorSetLayout& descriptorSetLayout,
-    const std::string& vertexShaderFileName,
-    const std::string& fragmentShaderFileName,
+    const std::vector<ShaderInfo>& shaderInfos,
     const VkSampleCountFlagBits& samplesCount,
     VkVertexInputBindingDescription vertexBindingDescriptions,
     std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
@@ -32,17 +31,24 @@ GraphicsPipeline::GraphicsPipeline(
     : m_type(type), m_opModelIndices(modelIndices)
 {
     // -------------------Shader Modules--------------------
-    VkShaderModule vertexShaderModule;
-    VkShaderModule fragmentShaderModule;
-    createShaderModules(logicalDevice, vertexShaderFileName, vertexShaderModule, fragmentShaderFileName, fragmentShaderModule);
-
-    // -------------------Shader Stages--------------------
-    VkPipelineShaderStageCreateInfo shaderStagesInfos[2];
-    createShaderStagesInfos(vertexShaderModule, fragmentShaderModule, shaderStagesInfos);
+    std::vector<VkShaderModule> shaderModules(shaderInfos.size());
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
+    for (size_t i = 0; i < shaderInfos.size(); i++)
+    {
+        createShaderModule(logicalDevice,shaderInfos[i],shaderModules[i]);
+        createShaderStageInfo(shaderModules[i],shaderInfos[i].type,shaderStagesInfos[i]);
+    }
 
     // -------------------Fixed Functions------------------
     // Here we define which states we want to modify dynamically during runtime.
     std::vector<VkDynamicState> dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+
+    // Enabling depth bias allows us to modify the fragment's calculated depth
+    // value. We can provide parameters for biasing a fragment's depth during
+    // the pipeline creation. But when depth bias is specified as one of the
+    // dynamic states, we do it through a function call.
+    //if (m_type == GraphicsPipelineType::SHADOWMAP)
+    //   dynamicStates.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
 
     // Dynamic states
     VkPipelineDynamicStateCreateInfo dynamicStatesInfo{};
@@ -75,7 +81,7 @@ GraphicsPipeline::GraphicsPipeline(
     VkPipelineRasterizationStateCreateInfo rasterizerInfo{};
     createRasterizerInfo(rasterizerInfo);
 
-    // Multisampling (disabled for now..)
+    // Multisampling 
     VkPipelineMultisampleStateCreateInfo multisamplingInfo{};
     createMultisamplingInfo(samplesCount, multisamplingInfo);
 
@@ -97,8 +103,9 @@ GraphicsPipeline::GraphicsPipeline(
     // --------------Graphics pipeline creation------------
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStagesInfos;
+    pipelineInfo.stageCount = shaderInfos.size();
+    pipelineInfo.pStages = shaderStagesInfos.data();
+
     // Reference to all the structures describing the fixed-function stage
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
@@ -130,50 +137,48 @@ GraphicsPipeline::GraphicsPipeline(
 
     // Since after the creation of the Graphics Pipeline the shaders are
     // already linked, we won't need the shader modules anymore.
-    ShaderManager::destroyShaderModule(vertexShaderModule, logicalDevice);
-    ShaderManager::destroyShaderModule(fragmentShaderModule, logicalDevice);
+    for (auto& shaderModule : shaderModules)
+    {
+        ShaderManager::destroyShaderModule(shaderModule,logicalDevice);
+    }
 }
 
-void GraphicsPipeline::createShaderModules(
+void GraphicsPipeline::createShaderModule(
     const VkDevice& logicalDevice,
-    const std::string& vertexShaderFileName,
-    VkShaderModule& vertexShaderModule,
-    const std::string& fragmentShaderFileName,
-    VkShaderModule& fragmentShaderModule)
+    const ShaderInfo& shaderInfo,
+    VkShaderModule& shaderModule ) 
 {
-    const std::vector<char> vertexShaderCode = (ShaderManager::getBinaryDataFromFile("vert-" + vertexShaderFileName));
-    const std::vector<char> fragmentShaderCode = (ShaderManager::getBinaryDataFromFile("frag-" + fragmentShaderFileName));
-   
-    vertexShaderModule = ShaderManager::createShaderModule(vertexShaderCode,logicalDevice);
-    fragmentShaderModule = ShaderManager::createShaderModule(fragmentShaderCode,logicalDevice);
+    std::vector<char> shaderCode;
+
+    if (shaderInfo.type == shaderType::VERTEX)
+        shaderCode = (ShaderManager::getBinaryDataFromFile("vert-" + shaderInfo.fileName));
+    else if (shaderInfo.type == shaderType::FRAGMENT)
+        shaderCode = (ShaderManager::getBinaryDataFromFile("frag-" + shaderInfo.fileName));
+    else
+        throw std::runtime_error("Shader type doesn't exist.");
+
+    shaderModule = ShaderManager::createShaderModule(shaderCode,logicalDevice);
 }
 
 //Creates the info strucutres to link the shaders to specific pipeline stages.
-void GraphicsPipeline::createShaderStagesInfos(const VkShaderModule& vertexShaderModule,const VkShaderModule& fragmentShaderModule,VkPipelineShaderStageCreateInfo(&shaderStagesInfos)[2])
+void GraphicsPipeline::createShaderStageInfo(const VkShaderModule& shaderModule, const shaderType& type, VkPipelineShaderStageCreateInfo& shaderStageInfo)
 {
-    // - Vertex Shader
-    VkPipelineShaderStageCreateInfo vertexShaderStageInfo{};
-    vertexShaderStageInfo.sType = (
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
-        );
-    vertexShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-    vertexShaderStageInfo.module = vertexShaderModule;
+    shaderStageInfo.sType = (VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO);
+    
+    if (type == shaderType::VERTEX)
+        shaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    else if (type == shaderType::FRAGMENT)
+        shaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    else
+        throw std::runtime_error("Shader type doesn't exist");
+
+    shaderStageInfo.module = shaderModule;
+
     // Entry point: Name of the function to invoke.
-    vertexShaderStageInfo.pName = "main";
+    shaderStageInfo.pName = "main";
     // pSpecializationInfo -> Specifies values for shader constants. This
     // optimizes the shaders avoiding the use of if-statements.
     // ..
-
-    // - Fragment Shader
-    VkPipelineShaderStageCreateInfo fragmentShaderStageInfo{};
-    fragmentShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-
-    fragmentShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    fragmentShaderStageInfo.module = fragmentShaderModule;
-    fragmentShaderStageInfo.pName = "main";
-
-    shaderStagesInfos[0] = vertexShaderStageInfo;
-    shaderStagesInfos[1] = fragmentShaderStageInfo;
 }
 
 void GraphicsPipeline::createDynamicStatesInfo(const std::vector<VkDynamicState>& dynamicStates,VkPipelineDynamicStateCreateInfo& dynamicStatesInfo) 
@@ -274,16 +279,18 @@ void GraphicsPipeline::createRasterizerInfo(VkPipelineRasterizationStateCreateIn
 
     rasterizerInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
-    // Alters the depth values by adding a constant value or biasing them based
-    // on a fragment's slope. Used sometimes for shadow mapping. We won't be
-    // using it yet.
-    rasterizerInfo.depthBiasEnable = VK_FALSE;
+    // on a fragment's slope. Used sometimes for shadow mapping.
+    if (m_type == GraphicsPipelineType::SHADOWMAP)
+    {
+        rasterizerInfo.depthBiasEnable = VK_TRUE;
+        rasterizerInfo.depthBiasConstantFactor = 4.0f;
+        rasterizerInfo.depthBiasSlopeFactor = 1.5f;
+    }
+    else
+        rasterizerInfo.depthBiasEnable = VK_FALSE;
+    
     // Optional
-    rasterizerInfo.depthBiasConstantFactor = 0.0f;
-    // Optional
-    rasterizerInfo.depthBiasClamp = 0.0f;
-    // Optional
-    rasterizerInfo.depthBiasSlopeFactor = 0.0f;
+    //rasterizerInfo.depthBiasClamp = 0.0f;
 }
 
 void GraphicsPipeline::createMultisamplingInfo(const VkSampleCountFlagBits& samplesCount, VkPipelineMultisampleStateCreateInfo& multisamplingInfo)
@@ -303,7 +310,7 @@ void GraphicsPipeline::createMultisamplingInfo(const VkSampleCountFlagBits& samp
     multisamplingInfo.alphaToOneEnable = VK_FALSE;
 }
 
-// Contains the the configuration per attached framebuffer.
+// Contains the configuration per attached framebuffer.
 // (For now, we won't use both Config.)
 void GraphicsPipeline::createColorBlendingAttachment(VkPipelineColorBlendAttachmentState& colorBlendAttachment)
 {

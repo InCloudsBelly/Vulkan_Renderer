@@ -77,6 +77,12 @@ void Renderer::run()
     m_clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
     m_clearValues[1].color = { 1.0f, 0.0f };
 
+    m_clearValuesShadowMap.resize(2);
+    m_clearValuesShadowMap[0].depthStencil.depth = 1.0f;
+    m_clearValuesShadowMap[1].depthStencil.depth = 1.0f;
+    m_clearValuesShadowMap[0].depthStencil.stencil = 0.0f;
+    m_clearValuesShadowMap[1].depthStencil.stencil = 0.0f;
+
     if (m_allModels.size() == 0)
     {
         std::cout << "Nothing to render..\n";
@@ -90,7 +96,7 @@ void Renderer::run()
     m_isMouseInMotion = false;
 
     m_camera = std::make_shared<Arcball>(
-            m_window.get(),
+            m_window->get(),
             glm::fvec4(0.0f, 0.0f, 5.0f, 1.0f),
             Config::FOV,
             (m_swapchain->getExtent().width / (float)m_swapchain->getExtent().height),
@@ -98,8 +104,8 @@ void Renderer::run()
             Config::Z_FAR
         );
 
-    glfwSetWindowUserPointer(m_window.get(), m_camera.get());
-    glfwSetScrollCallback(m_window.get(), scrollCallback);
+    glfwSetWindowUserPointer(m_window->get(), m_camera.get());
+    glfwSetScrollCallback(m_window->get(), scrollCallback);
 
     m_GUI = std::make_unique<GUI>(
         m_device.getPhysicalDevice(),
@@ -117,7 +123,7 @@ void Renderer::run()
 
 void Renderer::initWindow()
 {
-    m_window.createWindow(Config::RESOLUTION_W,Config::RESOLUTION_H,Config::TITLE);
+    m_window = std::make_shared<Window>(Config::RESOLUTION_W,Config::RESOLUTION_H,Config::TITLE);
 }
 
 void Renderer::createSyncObjects()
@@ -223,24 +229,81 @@ void Renderer::createVkInstance()
         throw std::runtime_error("Failed to create Vulkan's instance!");
 }
 
-void Renderer::createRenderPass()
+void Renderer::createShadowMapRenderPass()
+{
+    // - Attachments
+
+    VkAttachmentDescription shadowMapAttachment{};
+    AttachmentUtils::createAttachmentDescriptionWithStencil(
+        m_depthBuffer.getFormat(),
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_ATTACHMENT_LOAD_OP_CLEAR,
+        VK_ATTACHMENT_STORE_OP_STORE,
+        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        shadowMapAttachment
+    );
+
+    // Attachment references
+
+    VkAttachmentReference shadowMapAttachmentRef{};
+    AttachmentUtils::createAttachmentReference(0,VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,shadowMapAttachmentRef);
+
+    // Subpasses
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.flags = 0;
+    subpass.inputAttachmentCount = 0;
+    subpass.pInputAttachments = nullptr;
+    // No color attachments
+    subpass.colorAttachmentCount = 0;
+    subpass.pColorAttachments = nullptr;
+    subpass.pResolveAttachments = nullptr;
+    subpass.pDepthStencilAttachment = &shadowMapAttachmentRef;
+    subpass.preserveAttachmentCount = 0;
+    subpass.pPreserveAttachments = nullptr;
+
+
+    // Subpass dependencies
+    //std::vector<VkSubpassDependency> dependencies(2);
+
+    //subPassUtils::createSubPassDependency(
+    //      // -Source parameters.
+    //      VK_SUBPASS_EXTERNAL,
+    //      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+    //      VK_ACCESS_SHADER_READ_BIT,
+    //      // -Destination parameters.
+    //      0,
+    //      VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+    //      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    //      VK_DEPENDENCY_BY_REGION_BIT,
+    //      dependencies[0]
+    //);
+
+    //subPassUtils::createSubPassDependency(
+    //      // -Source parameters.
+    //      0,
+    //      // Operations that the subpass needs to wait on. 
+    //      VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+    //      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    //      // -Destination parameters.
+    //      VK_SUBPASS_EXTERNAL,
+    //      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+    //      VK_ACCESS_SHADER_READ_BIT,
+    //      VK_DEPENDENCY_BY_REGION_BIT,
+    //      dependencies[1]
+    //);
+    // 
+    
+    m_renderPassShadowMap = RenderPass(m_device.getLogicalDevice(),{ shadowMapAttachment },{ subpass },{});
+}
+
+void Renderer::createSceneRenderPass()
 {
     // -Attachments
     
-    // ShadowMap
-    //VkAttachmentDescription shadowMapAttachment{};
-    //attachmentUtils::createAttachmentDescriptionWithStencil(
-    //      m_depthBuffer.getFormat(),
-    //      VK_SAMPLE_COUNT_1_BIT,
-    //      VK_ATTACHMENT_LOAD_OP_CLEAR,
-    //      VK_ATTACHMENT_STORE_OP_STORE,
-    //      VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-    //      VK_ATTACHMENT_STORE_OP_DONT_CARE,
-    //      VK_IMAGE_LAYOUT_UNDEFINED,
-    //      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    //      shadowMapAttachment
-    //);
-
     // Color Attachment
     VkAttachmentDescription colorAttachment{};
     AttachmentUtils::createAttachmentDescription(
@@ -289,38 +352,20 @@ void Renderer::createRenderPass()
         colorResolveAttachment
     );
 
-    // Attachment references
-
-    //VkAttachmentReference shadowMapAttachmentRef{};
-    //attachmentUtils::createAttachmentReference
+    // Attachment references 
     
     VkAttachmentReference colorAttachmentRef{};
-    AttachmentUtils::createAttachmentReference(
-        0,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        colorAttachmentRef
-    );
+    AttachmentUtils::createAttachmentReference(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorAttachmentRef);
 
     VkAttachmentReference depthAttachmentRef{};
-    AttachmentUtils::createAttachmentReference(
-        1,
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        depthAttachmentRef
-    );
+    AttachmentUtils::createAttachmentReference(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depthAttachmentRef);
 
     VkAttachmentReference colorResolveAttachmentRef{};
-    AttachmentUtils::createAttachmentReference(
-        2,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        colorResolveAttachmentRef
-    );
+    AttachmentUtils::createAttachmentReference(2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorResolveAttachmentRef);
 
 
     // Subpasses
-
-    std::vector<VkAttachmentReference> allAttachments = {
-       colorAttachmentRef
-    };
+    std::vector<VkAttachmentReference> allAttachments = { colorAttachmentRef };
     VkSubpassDescription subPassDescript{};
     SubPassUtils::createSubPassDescription(
         VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -340,21 +385,13 @@ void Renderer::createRenderPass()
         //before the render pass. 
         VK_SUBPASS_EXTERNAL,
         // Operations that the subpass needs to wait on. 
-        (
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-            ),
+        (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT),
         0,
         // -Destination parameters.
         0,
-        (
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-            VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
-            ),
-        (
-            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-            VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-            ),
+        (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT),
+        (VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
+        (VkDependencyFlagBits)0,
         dependency
     );
 
@@ -377,7 +414,7 @@ void Renderer::uploadAllData()
         // (Position, color, texCoord, normal, etc)
         model->uploadVertexData(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_qfHandles.graphicsQueue, m_commandPool);
 
-        // Creates and uploads the Texture.
+        // Creates and uploads the Texture.(samplers).
         model->createTextures(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), VK_SAMPLE_COUNT_1_BIT, m_commandPool, m_qfHandles.graphicsQueue);
 
         // Uniform Buffers
@@ -389,17 +426,17 @@ void Renderer::uploadAllData()
         {
             case ModelType::SKYBOX:
             {
-                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox, m_descriptorPool);
+                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox, nullptr, m_descriptorPool);
                 break;
             }
             case ModelType::NORMAL_PBR:
             {
-                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR, m_descriptorPool);
+                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR, &m_shadowMap, m_descriptorPool);
                 break;
             }
             case ModelType::LIGHT:
             {
-                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutLight, m_descriptorPool);
+                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutLight, nullptr, m_descriptorPool);
                 break;
             }
             case ModelType::NONE:
@@ -412,14 +449,14 @@ void Renderer::uploadAllData()
 
 void Renderer::createGraphicsPipelines()
 {
+    ///////////////////////////////////MODELS///////////////////////////////////
     m_graphicsPipelineSkybox = GraphicsPipeline(
         m_device.getLogicalDevice(),
         GraphicsPipelineType::SKYBOX,
         m_swapchain->getExtent(),
         m_renderPass.get(),
         m_descriptorSetLayoutSkybox,
-        "skybox",
-        "skybox",
+        { { shaderType::VERTEX,"skybox"},{shaderType::FRAGMENT,"skybox"} },
         m_msaa.getSamplesCount(),
         Attributes::SKYBOX::getBindingDescription(),
         Attributes::SKYBOX::getAttributeDescriptions(),
@@ -432,8 +469,7 @@ void Renderer::createGraphicsPipelines()
         m_swapchain->getExtent(),
         m_renderPass.get(),
         m_descriptorSetLayoutNormalPBR,
-        "normal",
-        "normal",
+        { { shaderType::VERTEX,"scene"},{shaderType::FRAGMENT,"scene"} },
         m_msaa.getSamplesCount(),
         Attributes::PBR::getBindingDescription(),
         Attributes::PBR::getAttributeDescriptions(),
@@ -446,14 +482,31 @@ void Renderer::createGraphicsPipelines()
         m_swapchain->getExtent(),
         m_renderPass.get(),
         m_descriptorSetLayoutLight,
-        "light",
-        "light",
+        { { shaderType::VERTEX,"light"},{shaderType::FRAGMENT,"light"} },
         m_msaa.getSamplesCount(),
         Attributes::LIGHT::getBindingDescription(),
         Attributes::LIGHT::getAttributeDescriptions(),
         &m_lightModelIndices
     );
+
+
+    //////////////////////////////////FEATURES//////////////////////////////////
+
+    m_graphicsPipelineShadowMap = GraphicsPipeline(
+        m_device.getLogicalDevice(),
+        GraphicsPipelineType::SHADOWMAP,
+        m_swapchain->getExtent(),
+        m_renderPassShadowMap.get(),
+        m_descriptorSetLayoutShadowMap,
+        { {shaderType::VERTEX, "shadowMap"} },
+        VK_SAMPLE_COUNT_1_BIT,
+        Attributes::SHADOWMAP::getBindingDescription(),
+        Attributes::SHADOWMAP::getAttributeDescriptions(),
+        &m_objectModelIndices
+    );
 }
+
+
 
 /*
  * Specifies all the neccessary descriptors, their bindings and their
@@ -489,12 +542,12 @@ void Renderer::createDescriptorSetLayouts()
 
     // ---------------------------------Features--------------------------------
 
-    //descriptorSetLayoutUtils::createDescriptorSetLayout(
-    //      m_device.getLogicalDevice(),
-    //      GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
-    //      GRAPHICS_PIPELINE::SHADOWMAP::SAMPLERS_INFO,
-    //      m_descriptorSetLayoutShadowMap
-    //);
+    DescriptorSetLayoutUtils::createDescriptorSetLayout(
+        m_device.getLogicalDevice(),
+        GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
+        {},
+        m_descriptorSetLayoutShadowMap
+    );
 }
 
 void Renderer::initVulkan()
@@ -502,9 +555,9 @@ void Renderer::initVulkan()
     createVkInstance();
 
     vlManager::createDebugMessenger(m_vkInstance, m_debugMessenger);
-    m_window.createSurface(m_vkInstance);
+    m_window->createSurface(m_vkInstance);
 
-    m_device.pickPhysicalDevice(m_vkInstance,m_qfIndices,m_window.getSurface());
+    m_device.pickPhysicalDevice(m_vkInstance,m_qfIndices,m_window->getSurface());
     m_device.createLogicalDevice(m_qfIndices);
 
     m_qfHandles.setQueueHandles(m_device.getLogicalDevice(), m_qfIndices);
@@ -519,10 +572,10 @@ void Renderer::initVulkan()
         m_device.getLogicalDevice(),
         {
             // TODO: Make the size more precise.
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 800/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 800/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1500/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1500/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
         },
-        800
+        1500
         /*m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT*/
     );
 
@@ -530,28 +583,39 @@ void Renderer::initVulkan()
 
     // -----------------------------------Features------------------------------
 
-    m_msaa = RenderTarget::MSAA(
-        m_device.getPhysicalDevice(),
-        m_device.getLogicalDevice(),
-        m_swapchain->getExtent(),
-        m_swapchain->getImageFormat()
-    );
+    m_msaa = RenderTarget::MSAA(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_swapchain->getExtent(), m_swapchain->getImageFormat());
 
     m_depthBuffer = RenderTarget::DepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain->getExtent(), m_msaa.getSamplesCount());
 
-    //m_shadowMap = ShadowMap(
-    //      m_device.getPhysicalDevice(),
-    //      m_device.getLogicalDevice(),
-    //      m_swapchain->getExtent().width,
-    //      m_swapchain->getExtent().height,
-    //      m_depthBuffer.getFormat(),
-    //      m_msaa.getSamplesCount(),
-    //      m_descriptorSetLayoutShadowMap
-    //);
+    m_shadowMap = ShadowMap(
+        m_device.getPhysicalDevice(),
+        m_device.getLogicalDevice(),
+        m_swapchain->getExtent().width,
+        m_swapchain->getExtent().height,
+        m_depthBuffer.getFormat(),
+        m_descriptorSetLayoutShadowMap,
+        Config::MAX_FRAMES_IN_FLIGHT
+    );
 
-    createRenderPass();
+    //----------------------------------RenderPass------------------------------
+    createShadowMapRenderPass();
+    createSceneRenderPass();
+
+
+    //----------------------------------Framebuffers----------------------------
 
     m_swapchain->createFramebuffers(m_device.getLogicalDevice(), m_renderPass.get(), m_depthBuffer, m_msaa);
+    m_shadowMap.createFramebuffer(m_device.getLogicalDevice(), m_renderPassShadowMap.get(), m_swapchain->getImageCount());
+
+
+
+    //--------------------------------------------------------------------------
+
+    createGraphicsPipelines();
+
+
+
+    //----------------------------------Command Pools---------------------------
 
     m_commandPool = CommandPool(
         m_device.getLogicalDevice(),
@@ -559,10 +623,15 @@ void Renderer::initVulkan()
         m_qfIndices.graphicsFamily.value()
     );
 
-    createGraphicsPipelines();
-
     // Allocates all the neccessary cmd buffers in the cmd pool.
     m_commandPool.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+
+
+    m_shadowMap.createCommandPool(m_device.getLogicalDevice(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_qfIndices.graphicsFamily.value());
+
+    m_shadowMap.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+
+    //--------------------------------------------------------------------------
 
     uploadAllData();
 
@@ -581,7 +650,13 @@ void Renderer::bindAllMeshesData(
         CommandUtils::STATE::bindVertexBuffers({ mesh.m_vertexBuffer }, { 0 }, 0, 1, commandBuffer);
         CommandUtils::STATE::bindIndexBuffer(mesh.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
 
-        CommandUtils::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), 0, { mesh.m_descriptorSets.get(currentFrame) }, {}, commandBuffer);
+        VkDescriptorSet descriptorSet;
+        if (graphicsPipeline.getType() == GraphicsPipelineType::SHADOWMAP)
+            descriptorSet = m_shadowMap.getDescriptorSet(currentFrame);
+        else
+            descriptorSet = mesh.m_descriptorSets.get(currentFrame);
+
+        CommandUtils::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), 0, { descriptorSet }, {}, commandBuffer);
 
         CommandUtils::ACTION::drawIndexed(mesh.m_indices.size(), 1, 0, 0, 0, commandBuffer);
     }
@@ -594,6 +669,7 @@ void Renderer::recordCommandBuffer(
     const std::vector<GraphicsPipeline>& graphicsPipelines,
     const uint32_t currentFrame,
     const VkCommandBuffer& commandBuffer,
+    const std::vector<VkClearValue>& clearValues,
     CommandPool& commandPool
 ) {
     // Resets the command buffer to be able to be recorded.
@@ -611,7 +687,7 @@ void Renderer::recordCommandBuffer(
     //    command buffers will be executed.
     //    -VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS: The render pass
     //    commands will be executed from secondary command buffers.
-    renderPass.begin(framebuffer, extent, m_clearValues, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+    renderPass.begin(framebuffer, extent, clearValues, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
 
     //---------------------------------CMDs-------------------------------
@@ -632,7 +708,7 @@ void Renderer::recordCommandBuffer(
                 if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
                     bindAllMeshesData<Skybox>( pModel, graphicsPipeline, commandBuffer, currentFrame);
             }
-            if (model->getType() == ModelType::NORMAL_PBR)
+            else if (model->getType() == ModelType::NORMAL_PBR)
             {
                 if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
                 {
@@ -641,13 +717,17 @@ void Renderer::recordCommandBuffer(
                     bindAllMeshesData<NormalPBR>(pModel, graphicsPipeline, commandBuffer, currentFrame);
                 }
             }
-            if (model->getType() == ModelType::LIGHT)
+            else 
             {
-                if (auto pModel = std::dynamic_pointer_cast<Light>(model))
+                if (model->getType() == ModelType::LIGHT)
                 {
-                    if (pModel.get()->isHided())
-                        continue;
-                    bindAllMeshesData<Light>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                    if (auto pModel =std::dynamic_pointer_cast<Light>(model)) 
+                    {
+                        if (pModel.get()->isHided())
+                            continue;
+
+                        bindAllMeshesData<Light>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                    }
                 }
             }
         }
@@ -670,6 +750,29 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     //------------------------Updates uniform buffer----------------------------
+
+    // Shadow Map
+    if (m_directionalLightIndex.has_value())
+    {
+        auto pLight = std::dynamic_pointer_cast<Light>(m_allModels[m_directionalLightIndex.value()]);
+        // TODO: improve this
+        auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_allModels[m_mainModelIndex]);
+
+        m_shadowMap.updateUBO(
+            m_device.getLogicalDevice(),
+            // TODO: make it for more than 1 model
+            pMainModel->getModelM(),
+            pLight->getPos(),
+            pLight->getTargetPos(),
+            m_camera->getAspect(),
+            Config::Z_NEAR,
+            Config::Z_FAR,
+            currentFrame
+        );
+    }
+
+
+    // Scene
     for (auto& model : m_allModels)
     {
         if (model->getType() == ModelType::SKYBOX)
@@ -681,7 +784,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         {
             if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
             {
-                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), m_lightModelIndices.size(), m_allModels, currentFrame);
+                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), m_shadowMap.getLightSpace(), m_lightModelIndices.size(), m_allModels, currentFrame);
                 pModel->updateUBOlightsInfo(m_device.getLogicalDevice(), m_lightModelIndices, m_allModels, currentFrame);
             }
         }
@@ -700,6 +803,19 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
     //---------------------Records all the command buffer-----------------------    
 
+    // Shadow Mapping
+    recordCommandBuffer(
+        m_shadowMap.getFramebuffer(imageIndex),
+        m_renderPassShadowMap,
+        m_swapchain->getExtent(),
+        {m_graphicsPipelineShadowMap},
+        currentFrame,
+        m_shadowMap.getCommandBuffer(currentFrame),
+        m_clearValuesShadowMap,
+        m_shadowMap.getCommandPool()
+    );
+
+    // Scene
     recordCommandBuffer(
         m_swapchain->getFramebuffer(imageIndex),
         m_renderPass,
@@ -707,10 +823,11 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         { m_graphicsPipelineLight,m_graphicsPipelinePBR, m_graphicsPipelineSkybox },
         currentFrame,
         m_commandPool.getCommandBuffer(currentFrame),
+        m_clearValues,
         m_commandPool
     );
 
-    // Draws imgui
+    // GUI
     m_GUI->recordCommandBuffer(currentFrame, imageIndex, m_clearValues);
 
     //----------------------Submits the command buffer -------------------------
@@ -729,7 +846,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     // ImGUI added
-    std::vector<VkCommandBuffer> submitCommandBuffers = { m_commandPool.getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
+    std::vector<VkCommandBuffer> submitCommandBuffers = { m_shadowMap.getCommandBuffer(currentFrame), m_commandPool.getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
 
     submitInfo.commandBufferCount = submitCommandBuffers.size();
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
@@ -770,20 +887,21 @@ void Renderer::scrollCallback(GLFWwindow* window,double xoffset,double yoffset)
     float actualFOV = camera->getFOV();
     float newFOV = actualFOV + yoffset * -1.0f;
 
+    // TODO
     if (newFOV || newFOV)
         camera->setFOV(newFOV);
 }
 
 void Renderer::handleInput()
 {
-    m_window.pollEvents();
+    m_window->pollEvents();
     // Avoids any input when we're touching the IMGUI.
     if (m_GUI->isCursorPositionInGUI())
         return;
 
     if (m_camera->getType() == CameraType::ARCBALL)
     {
-        if (glfwGetMouseButton(m_window.get(), GLFW_MOUSE_BUTTON_LEFT) ==GLFW_PRESS) 
+        if (glfwGetMouseButton(m_window->get(), GLFW_MOUSE_BUTTON_LEFT) ==GLFW_PRESS) 
         {
             auto pCamera = std::dynamic_pointer_cast<Arcball>(m_camera);
             if (!m_isMouseInMotion)
@@ -811,10 +929,10 @@ void Renderer::mainLoop()
     // Tells us in which frame we are,
     // between 1 <= frame <= MAX_FRAMES_IN_FLIGHT
     uint8_t currentFrame = 0;
-    while (m_window.isWindowClosed() == false)
+    while (m_window->isWindowClosed() == false)
     {
         handleInput();
-        m_GUI->draw(m_allModels, m_camera->getPos(), m_objectModelIndices, m_lightModelIndices);
+        m_GUI->draw(m_allModels, m_camera, m_objectModelIndices, m_lightModelIndices);
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -854,11 +972,14 @@ void Renderer::cleanup()
     m_graphicsPipelinePBR.destroy(m_device.getLogicalDevice());
     m_graphicsPipelineSkybox.destroy(m_device.getLogicalDevice());
     m_graphicsPipelineLight.destroy(m_device.getLogicalDevice());
+    m_graphicsPipelineShadowMap.destroy(m_device.getLogicalDevice());
 
-    // Render pass
+    // Renderpass
     m_renderPass.destroy(m_device.getLogicalDevice());
+    m_renderPassShadowMap.destroy(m_device.getLogicalDevice());
 
     // Models -> Buffers, Memories and Textures.
+    m_shadowMap.destroy(m_device.getLogicalDevice());
     for (auto& model : m_allModels)
         model->destroy(m_device.getLogicalDevice());
    
@@ -869,11 +990,12 @@ void Renderer::cleanup()
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR);
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox);
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutLight);
+    DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutShadowMap);
 
     // Sync objects
     destroySyncObjects();
 
-    // Command Pools
+    // Command Pool
     m_commandPool.destroy();
 
     // Logical Device
@@ -890,13 +1012,13 @@ void Renderer::cleanup()
     }
 
     // Window Surface
-    m_window.destroySurface(m_vkInstance);
+    m_window->destroySurface(m_vkInstance);
 
     // Vulkan's instance
     vkDestroyInstance(m_vkInstance, nullptr);
 
     // GLFW
-    m_window.destroyWindow();
+    m_window->destroyWindow();
 }
 
 void Renderer::addSkybox(const std::string& name, const std::string& textureFolderName)
@@ -913,6 +1035,9 @@ void Renderer::addObjectPBR(const std::string& name, const std::string& modelFil
     m_allModels.push_back(std::make_shared<NormalPBR>(name, modelFileName, glm::fvec4(pos, 1.0f), rot, size));
 
     m_objectModelIndices.push_back(m_allModels.size() - 1);
+
+    // TODO: delete this
+    m_mainModelIndex = m_allModels.size() - 1;
 }
 
 void Renderer::addDirectionalLight(
@@ -920,23 +1045,34 @@ void Renderer::addDirectionalLight(
     const std::string& modelFileName,
     const glm::fvec3& color,
     const glm::fvec3& pos,
+    const glm::fvec3& endPos,
     const glm::fvec3& size
 ) {
-    m_allModels.push_back(
-        std::make_shared<Light>(
-            name,
-            modelFileName,
-            LightType::DIRECTIONAL_LIGHT,
-            glm::fvec4(color, 1.0f),
-            glm::fvec4(pos, 1.0f),
-            glm::fvec3(0.0f),
-            size,
-            0.0f,
-            0.0f
-            )
-    );
-
-    m_lightModelIndices.push_back(m_allModels.size() - 1);
+    if (!m_directionalLightIndex.has_value())
+    {
+        m_allModels.push_back(
+            std::make_shared<Light>(
+                name,
+                modelFileName,
+                LightType::DIRECTIONAL_LIGHT,
+                glm::fvec4(color, 1.0f),
+                glm::fvec4(pos, 1.0f),
+                glm::fvec4(endPos, 1.0f),
+                glm::fvec3(0.0f),
+                size,
+                0.0f,
+                0.0f
+                )
+        );
+        m_lightModelIndices.push_back(m_allModels.size() - 1);
+        m_directionalLightIndex = m_allModels.size() - 1;
+    }
+    else
+    {
+        throw std::runtime_error(
+            "Just one directional light per scene is allowed to be added."
+        );
+    }
 }
 
 void Renderer::addPointLight(
@@ -955,6 +1091,7 @@ void Renderer::addPointLight(
             LightType::POINT_LIGHT,
             glm::fvec4(color, 1.0f),
             glm::fvec4(pos, 1.0f),
+            glm::fvec4(0.0f),
             glm::fvec3(0.0f),
             size,
             attenuation,
@@ -969,6 +1106,7 @@ void Renderer::addSpotLight(
     const std::string& modelFileName,
     const glm::fvec3& color,
     const glm::fvec3& pos,
+    const glm::fvec3& endPos,
     const glm::fvec3& rot,
     const glm::fvec3& size,
     const float attenuation,
@@ -981,6 +1119,7 @@ void Renderer::addSpotLight(
             LightType::SPOT_LIGHT,
             glm::fvec4(color, 1.0f),
             glm::fvec4(pos, 1.0f),
+            glm::fvec4(endPos, 1.0f),
             rot,
             size,
             attenuation,

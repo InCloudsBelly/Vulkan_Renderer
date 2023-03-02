@@ -17,6 +17,7 @@ namespace Attributes
             glm::vec3 normal;
             glm::vec3 tangent;
             glm::vec3 bitangent;
+            glm::vec4 posInLightSpace;
         };
 
         VkVertexInputBindingDescription getBindingDescription();
@@ -41,6 +42,17 @@ namespace Attributes
             glm::vec3 pos;
             glm::vec2 texCoord;
             glm::vec3 normal;
+        };
+        VkVertexInputBindingDescription getBindingDescription();
+        std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+    };
+
+
+    namespace SHADOWMAP
+    {
+        struct Vertex
+        {
+            glm::vec3 pos;
         };
         VkVertexInputBindingDescription getBindingDescription();
         std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();

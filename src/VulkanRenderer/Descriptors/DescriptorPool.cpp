@@ -37,7 +37,7 @@ const VkDescriptorPool& DescriptorPool::getDescriptorPool() const
 
 // Allocates all the descriptor set from all the objs.
 
-void DescriptorPool::allocDescriptorSets(const VkDevice& logicalDevice, std::vector<VkDescriptorSet>& descriptorSets, std::vector<VkDescriptorSetLayout>& descriptorSetLayouts) 
+void DescriptorPool::allocDescriptorSets(const VkDevice& logicalDevice, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts, std::vector<VkDescriptorSet>& descriptorSets)
 {
 	VkDescriptorSetAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

@@ -40,14 +40,16 @@ public:
 
 	void addDirectionalLight(const std::string& name, const std::string& modelFileName,
 		const glm::fvec3& color,
-		const glm::fvec3& pos = glm::fvec4(0.0f),
-		const glm::fvec3& size = glm::fvec3(1.0f)
+		const glm::fvec3& pos,
+		const glm::fvec3& endPos,
+		const glm::fvec3& size
 	);
 	void addSpotLight(
 		const std::string& name,
 		const std::string& modelFileName,
 		const glm::fvec3& color,
 		const glm::fvec3& pos,
+		const glm::fvec3& endPos,
 		const glm::fvec3& rot,
 		const glm::fvec3& size,
 		const float attenuation,
@@ -77,8 +79,11 @@ private:
 	void mainLoop();
 	void cleanup();
 
-	void createRenderPass();
+	void createShadowMapRenderPass();
+	void createSceneRenderPass();
+
 	void createDescriptorSetLayouts();
+
 	void recordCommandBuffer(
 		const VkFramebuffer& framebuffer,
 		const RenderPass& renderPass,
@@ -86,6 +91,7 @@ private:
 		const std::vector<GraphicsPipeline>& graphicsPipelines,
 		const uint32_t currentFrame,
 		const VkCommandBuffer& commandBuffer,
+		const std::vector<VkClearValue>& clearValues,
 		CommandPool& commandPool
 	);
 
@@ -104,7 +110,7 @@ private:
 	void createSyncObjects();
 	void destroySyncObjects();
 
-	Window						m_window;
+	std::shared_ptr<Window>     m_window;
 	std::unique_ptr<GUI>		m_GUI;
 	VkInstance					m_vkInstance;
 	Device						m_device;
@@ -112,6 +118,8 @@ private:
 	QueueFamilyHandles			m_qfHandles;
 	std::unique_ptr<Swapchain>	m_swapchain;
 	RenderPass					m_renderPass;
+	RenderPass                  m_renderPassShadowMap;
+
 	VkDebugUtilsMessengerEXT	m_debugMessenger;
 
 	// Command buffer for main drawing commands.
@@ -129,17 +137,23 @@ private:
 	std::vector<size_t>			m_objectModelIndices;
 	std::vector<size_t>			m_skyboxModelIndices;
 	std::vector<size_t>			m_lightModelIndices;
+	std::optional<size_t>		m_directionalLightIndex;
+	// TODO: delete this
+	size_t						m_mainModelIndex;
 
 	DescriptorPool				m_descriptorPool;
 	GraphicsPipeline            m_graphicsPipelinePBR;
 	GraphicsPipeline            m_graphicsPipelineSkybox;
 	GraphicsPipeline            m_graphicsPipelineLight;
+	GraphicsPipeline            m_graphicsPipelineShadowMap;
+
 	VkDescriptorSetLayout       m_descriptorSetLayoutNormalPBR;
 	VkDescriptorSetLayout       m_descriptorSetLayoutLight;
 	VkDescriptorSetLayout       m_descriptorSetLayoutSkybox;
-	VkDescriptorSetLayout      m_descriptorSetLayoutShadowMap;
+	VkDescriptorSetLayout		m_descriptorSetLayoutShadowMap;
 
 	std::vector<VkClearValue>	m_clearValues;
+	std::vector<VkClearValue>	m_clearValuesShadowMap;
 	std::shared_ptr<Camera>		m_camera;
 	bool						m_isMouseInMotion;
 

@@ -17,6 +17,7 @@
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
 #include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
+#include "VulkanRenderer/Features/ShadowMap.h"
 
 class Skybox : public Model
 {
@@ -39,6 +40,7 @@ public:
     void createDescriptorSets(
         const VkDevice& logicalDevice,
         const VkDescriptorSetLayout& descriptorSetLayout,
+        const ShadowMap* shadowMap,
         DescriptorPool& descriptorPool
     ) override;
 
@@ -73,4 +75,6 @@ public:
 private:
 
     void processMesh(aiMesh* mesh, const aiScene* scene) override;
+
+    std::string m_textureFolderName;
 };

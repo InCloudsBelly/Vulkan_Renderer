@@ -57,8 +57,10 @@ void RenderTargetUtils::DepthBufferUtils::createDepthStencilStateInfo(const Grap
     // Specifies the comparasion that is performed to keep or discard
     // fragments. We're sticking to the convention of lower depth = closer,
     // so the depth of new fragments should be less.
-    if (type == GraphicsPipelineType::SKYBOX)
+    if (type == GraphicsPipelineType::SKYBOX || type == GraphicsPipelineType::SHADOWMAP)
+    {       
         depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    }
     else
         depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
     // These 3 param. are used for the optional depth bound test(allows to

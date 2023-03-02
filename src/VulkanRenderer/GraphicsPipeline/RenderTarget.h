@@ -2,6 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "VulkanRenderer/Images/Image.h"
+
 namespace RenderTarget
 {
 
@@ -24,12 +26,11 @@ namespace RenderTarget
 
     private:
 
-        VkImage m_image;
-        VkDeviceMemory m_imageMemory;
-        VkImageView m_imageView;
-        VkFormat m_format;
+        Image       m_image;
+        VkFormat    m_format;
 
     };
+
 
     class MSAA
     {
@@ -54,9 +55,7 @@ namespace RenderTarget
 
     private:
 
-        VkImage        m_image;
-        VkDeviceMemory m_imageMemory;
-        VkImageView    m_imageView;
+        Image   m_image;
         VkSampleCountFlagBits m_samplesCount;
 
     };

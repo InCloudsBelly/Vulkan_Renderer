@@ -29,13 +29,6 @@ glm::mat4 UBOutils::getUpdatedModelMatrix(
     return model;
 }
 
-glm::mat4 UBOutils::getUpdatedViewMatrix(
-    const glm::fvec3& cameraPos,
-    const glm::fvec3& centerPos,
-    const glm::fvec3& upAxis
-) {
-    return glm::lookAt(cameraPos, centerPos, upAxis);
-}
 
 glm::mat4 UBOutils::getUpdatedProjMatrix(
     const float vfov,
@@ -51,6 +44,11 @@ glm::mat4 UBOutils::getUpdatedProjMatrix(
     proj[1][1] *= -1;
     return proj;
 }
+
+//glm::mat4 UBOutils::getUpdatedOrthoProjMatrix(
+//      const float left, float
+//) {
+//}
 
 
 void UBOutils::updateUBO(const VkDevice& logicalDevice, UBO& ubo,const size_t size, void* dataToSend, const uint32_t& currentFrame)

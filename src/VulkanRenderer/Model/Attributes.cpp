@@ -165,7 +165,7 @@ VkVertexInputBindingDescription Attributes::LIGHT::getBindingDescription()
 std::vector<VkVertexInputAttributeDescription>
 Attributes::LIGHT::getAttributeDescriptions()
 {
-	std::vector<VkVertexInputAttributeDescription> attributeDescriptions(3);
+	std::vector<VkVertexInputAttributeDescription> attributeDescriptions(2);
 
 	// -Vertex Attribute: Position
 
@@ -183,13 +183,6 @@ Attributes::LIGHT::getAttributeDescriptions()
 	attributeDescriptions[1].location = 1;
 	attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
 	attributeDescriptions[1].offset = offsetof(LIGHT::Vertex, texCoord);
-
-	// - Vertex Attribute: Normal
-
-	attributeDescriptions[2].binding = 0;
-	attributeDescriptions[2].location = 2;
-	attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[2].offset = offsetof(LIGHT::Vertex, normal);
 
 	return attributeDescriptions;
 }

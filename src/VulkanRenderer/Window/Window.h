@@ -15,7 +15,7 @@ public:
 	const VkSurfaceKHR getSurface() const;
 	void getResolutionInPixels(int& width, int& height) const;
 
-	void destroyWindow();
+	void destroy();
 	void destroySurface(const VkInstance& instance);
 
 	bool isWindowClosed() const;

@@ -41,7 +41,6 @@ namespace Attributes
         {
             glm::vec3 pos;
             glm::vec2 texCoord;
-            glm::vec3 normal;
         };
         VkVertexInputBindingDescription getBindingDescription();
         std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();

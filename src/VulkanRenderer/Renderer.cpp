@@ -7,6 +7,7 @@
 #include <limits>
 #include <algorithm>
 #include <chrono>
+#include <thread>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -14,6 +15,10 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+#ifdef RELEASE_MODE_ON
+#include <tracy/Tracy.hpp>
+#endif
 
 #include "VulkanRenderer/Settings/config.h"
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
@@ -52,8 +57,6 @@
 #include "VulkanRenderer/Textures/Texture.h"
 
 #include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
-#include "VulkanRenderer/GraphicsPipeline/RenderTarget.h"
-#include "VulkanRenderer/GraphicsPipeline/RenderTargetUtils.h"
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
@@ -71,6 +74,12 @@ glm::fvec3 cameraPos = glm::fvec3(2.0f, 2.0f, 2.0f);
 
 void Renderer::run()
 {
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
+    loadModels();
+
     // TODO: Improve this!
     // NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
     m_clearValues.resize(2);
@@ -83,7 +92,7 @@ void Renderer::run()
     m_clearValuesShadowMap[0].depthStencil.stencil = 0.0f;
     m_clearValuesShadowMap[1].depthStencil.stencil = 0.0f;
 
-    if (m_allModels.size() == 0)
+    if (m_models.size() == 0)
     {
         std::cout << "Nothing to render..\n";
         return;
@@ -98,6 +107,7 @@ void Renderer::run()
     m_camera = std::make_shared<Arcball>(
             m_window->get(),
             glm::fvec4(0.0f, 0.0f, 5.0f, 1.0f),
+            glm::fvec4(0.0f),
             Config::FOV,
             (m_swapchain->getExtent().width / (float)m_swapchain->getExtent().height),
             Config::Z_NEAR,
@@ -121,6 +131,93 @@ void Renderer::run()
     cleanup();
 }
 
+void Renderer::loadModel(const size_t startI, const size_t chunckSize)
+{
+   const size_t endI = startI + chunckSize;
+
+   for (size_t i = startI; i < endI; i++)
+   {
+      ModelToLoadInfo& modelInfo = m_modelsToLoadInfo[i];
+      switch (modelInfo.type)
+      {
+         case ModelType::SKYBOX:
+         {
+            m_models.push_back(std::make_shared<Skybox>(modelInfo.name,modelInfo.modelFileName));
+            m_skyboxModelIndex.push_back(m_models.size() - 1);
+            m_skybox = std::dynamic_pointer_cast<Skybox>(m_models[m_skyboxModelIndex[0]]);
+            break;
+         }
+         case ModelType::NORMAL_PBR:
+         {
+            m_models.push_back(std::make_shared<NormalPBR>(modelInfo.name,modelInfo.modelFileName,glm::fvec4(modelInfo.pos, 1.0f),modelInfo.rot,modelInfo.size));
+            m_objectModelIndices.push_back(m_models.size() - 1);
+
+            // TODO: delete this
+            m_mainModelIndex = m_models.size() - 1;
+            break;
+         }
+         case ModelType::LIGHT:
+         {
+            switch (modelInfo.lType)
+            {
+               case LightType::DIRECTIONAL_LIGHT:
+               {
+                   m_models.push_back(std::make_shared<Light>(modelInfo.name, modelInfo.modelFileName, LightType::DIRECTIONAL_LIGHT, glm::fvec4(modelInfo.color, 1.0f), glm::fvec4(modelInfo.pos, 1.0f),
+                       glm::fvec4(modelInfo.endPos, 1.0f), glm::fvec3(0.0f), modelInfo.size, 0.0f, 0.0f));
+                    m_lightModelIndices.push_back(m_models.size() - 1);
+                    // TODO: Improve this.
+                    m_directionalLightIndex = m_models.size() - 1;
+                    break;
+               }
+               case LightType::POINT_LIGHT:
+               {
+                   m_models.push_back(std::make_shared<Light>(modelInfo.name, modelInfo.modelFileName, LightType::POINT_LIGHT, glm::fvec4(modelInfo.color, 1.0f), glm::fvec4(modelInfo.pos, 1.0f),
+                           glm::fvec4(0.0f), glm::fvec3(0.0f), modelInfo.size, modelInfo.attenuation, modelInfo.radius));
+                  m_lightModelIndices.push_back(m_models.size() - 1);
+                  break;
+               }
+               case LightType::SPOT_LIGHT:
+               {
+                   m_models.push_back(std::make_shared<Light>(modelInfo.name, modelInfo.modelFileName, LightType::SPOT_LIGHT, glm::fvec4(modelInfo.color, 1.0f), glm::fvec4(modelInfo.pos, 1.0f), glm::fvec4(modelInfo.endPos, 1.0f),
+                       modelInfo.rot, modelInfo.size, modelInfo.attenuation, modelInfo.radius));
+                    m_lightModelIndices.push_back(m_models.size() - 1);
+                    break;
+               }
+            }
+            break;
+         }
+      }
+   }
+}
+
+void Renderer::loadModels()
+{
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
+    std::vector<std::thread> threads;
+
+    const size_t maxThreadsCount = std::thread::hardware_concurrency() - 1;
+
+    size_t chunckSize = ((m_modelsToLoadInfo.size() < maxThreadsCount) ? 1 : m_modelsToLoadInfo.size() / maxThreadsCount);
+
+    const size_t threadsCount = ((m_modelsToLoadInfo.size() < maxThreadsCount) ? m_modelsToLoadInfo.size() : maxThreadsCount);
+
+    for (size_t i = 0; i < threadsCount; i++)
+    {
+        if (i == threadsCount - 1 && maxThreadsCount < m_modelsToLoadInfo.size())
+        {
+            chunckSize = (m_modelsToLoadInfo.size() - (threadsCount * chunckSize));
+        }
+        threads.push_back(std::thread(&Renderer::loadModel, this, i, chunckSize));
+    }
+    for (auto& thread : threads)
+        thread.join();
+}
+
+
 void Renderer::initWindow()
 {
     m_window = std::make_shared<Window>(Config::RESOLUTION_W,Config::RESOLUTION_H,Config::TITLE);
@@ -128,6 +225,10 @@ void Renderer::initWindow()
 
 void Renderer::createSyncObjects()
 {
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     m_imageAvailableSemaphores.resize(Config::MAX_FRAMES_IN_FLIGHT);
     m_renderFinishedSemaphores.resize(Config::MAX_FRAMES_IN_FLIGHT);
     m_inFlightFences.resize(Config::MAX_FRAMES_IN_FLIGHT);
@@ -162,6 +263,11 @@ void Renderer::createSyncObjects()
 
 void Renderer::createVkInstance()
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     if (VkLayersConfig::VALIDATION_LAYERS_ENABLED &&!vlManager::AllRequestedLayersAvailable()) {
         throw std::runtime_error("Validation layers requested, but not available!"
         );
@@ -231,6 +337,11 @@ void Renderer::createVkInstance()
 
 void Renderer::createShadowMapRenderPass()
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     // - Attachments
 
     VkAttachmentDescription shadowMapAttachment{};
@@ -265,43 +376,16 @@ void Renderer::createShadowMapRenderPass()
     subpass.preserveAttachmentCount = 0;
     subpass.pPreserveAttachments = nullptr;
 
-
-    // Subpass dependencies
-    //std::vector<VkSubpassDependency> dependencies(2);
-
-    //subPassUtils::createSubPassDependency(
-    //      // -Source parameters.
-    //      VK_SUBPASS_EXTERNAL,
-    //      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-    //      VK_ACCESS_SHADER_READ_BIT,
-    //      // -Destination parameters.
-    //      0,
-    //      VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-    //      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-    //      VK_DEPENDENCY_BY_REGION_BIT,
-    //      dependencies[0]
-    //);
-
-    //subPassUtils::createSubPassDependency(
-    //      // -Source parameters.
-    //      0,
-    //      // Operations that the subpass needs to wait on. 
-    //      VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-    //      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-    //      // -Destination parameters.
-    //      VK_SUBPASS_EXTERNAL,
-    //      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-    //      VK_ACCESS_SHADER_READ_BIT,
-    //      VK_DEPENDENCY_BY_REGION_BIT,
-    //      dependencies[1]
-    //);
-    // 
-    
     m_renderPassShadowMap = RenderPass(m_device.getLogicalDevice(),{ shadowMapAttachment },{ subpass },{});
 }
 
 void Renderer::createSceneRenderPass()
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     // -Attachments
     
     // Color Attachment
@@ -406,37 +490,52 @@ void Renderer::createSceneRenderPass()
 /*
  * Uploads the data of each model to the gpu.
  */
-void Renderer::uploadAllData()
+void Renderer::uploadModels()
 {
-    for (auto& model : m_allModels)
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
+    for (auto& model : m_models)
     {
         // Vertex buffer and index buffer(with staging buffer)
         // (Position, color, texCoord, normal, etc)
         model->uploadVertexData(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_qfHandles.graphicsQueue, m_commandPool);
 
-        // Creates and uploads the Texture.(samplers).
-        model->createTextures(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), VK_SAMPLE_COUNT_1_BIT, m_commandPool, m_qfHandles.graphicsQueue);
+        // Creates and uploads the Textures(images and samplers).
+        model->loadTextures(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), VK_SAMPLE_COUNT_1_BIT, m_commandPool, m_qfHandles.graphicsQueue);
 
         // Uniform Buffers
         model->createUniformBuffers(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), Config::MAX_FRAMES_IN_FLIGHT);
 
-        // TODO: Improve this
         // Descriptor Sets
         switch (model->getType())
         {
             case ModelType::SKYBOX:
             {
-                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox, nullptr, m_descriptorPool);
+                if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
+                {
+                    pModel->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutSkybox, m_descriptorPool);
+                }
+
                 break;
             }
             case ModelType::NORMAL_PBR:
             {
-                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR, &m_shadowMap, m_descriptorPool);
+                if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+                {
+                    pModel->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR, m_skybox->getIrradianceMap(), m_shadowMap, m_descriptorPool);
+                }
+
                 break;
             }
             case ModelType::LIGHT:
             {
-                model->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutLight, nullptr, m_descriptorPool);
+                if (auto pModel = std::dynamic_pointer_cast<Light>(model))
+                {
+                    pModel->createDescriptorSets(m_device.getLogicalDevice(), m_descriptorSetLayoutLight, m_descriptorPool);
+                }
                 break;
             }
             case ModelType::NONE:
@@ -449,6 +548,11 @@ void Renderer::uploadAllData()
 
 void Renderer::createGraphicsPipelines()
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     ///////////////////////////////////MODELS///////////////////////////////////
     m_graphicsPipelineSkybox = GraphicsPipeline(
         m_device.getLogicalDevice(),
@@ -460,7 +564,7 @@ void Renderer::createGraphicsPipelines()
         m_msaa.getSamplesCount(),
         Attributes::SKYBOX::getBindingDescription(),
         Attributes::SKYBOX::getAttributeDescriptions(),
-        &m_skyboxModelIndices
+        & m_skyboxModelIndex
     );
 
     m_graphicsPipelinePBR = GraphicsPipeline(
@@ -515,6 +619,10 @@ void Renderer::createGraphicsPipelines()
 void Renderer::createDescriptorSetLayouts()
 {
 
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
 // ---------------------------------Models----------------------------------
 
     DescriptorSetLayoutUtils::createDescriptorSetLayout(
@@ -552,6 +660,11 @@ void Renderer::createDescriptorSetLayouts()
 
 void Renderer::initVulkan()
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     createVkInstance();
 
     vlManager::createDebugMessenger(m_vkInstance, m_debugMessenger);
@@ -564,7 +677,7 @@ void Renderer::initVulkan()
 
     m_swapchain = std::make_unique<Swapchain>(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_window, m_device.getSupportedProperties());
 
-    m_swapchain->createAllImageViews(m_device.getLogicalDevice());
+    m_swapchain->createAllImageViews();
 
 
     // Descriptor Pool
@@ -572,22 +685,22 @@ void Renderer::initVulkan()
         m_device.getLogicalDevice(),
         {
             // TODO: Make the size more precise.
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1500/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1500/*,static_cast<uint32_t> (m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1500/*,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1500/*,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
         },
         1500
-        /*m_allModels.size() * Config::MAX_FRAMES_IN_FLIGHT*/
+        /*m_models.size() * Config::MAX_FRAMES_IN_FLIGHT*/
     );
 
     createDescriptorSetLayouts();
 
     // -----------------------------------Features------------------------------
 
-    m_msaa = RenderTarget::MSAA(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_swapchain->getExtent(), m_swapchain->getImageFormat());
+    m_msaa = MSAA(m_device.getPhysicalDevice(), m_device.getLogicalDevice(), m_swapchain->getExtent(), m_swapchain->getImageFormat());
 
-    m_depthBuffer = RenderTarget::DepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain->getExtent(), m_msaa.getSamplesCount());
+    m_depthBuffer = DepthBuffer(m_device.getPhysicalDevice(),m_device.getLogicalDevice(),m_swapchain->getExtent(), m_msaa.getSamplesCount());
 
-    m_shadowMap = ShadowMap(
+    m_shadowMap = std::make_shared<ShadowMap>(
         m_device.getPhysicalDevice(),
         m_device.getLogicalDevice(),
         m_swapchain->getExtent().width,
@@ -604,8 +717,8 @@ void Renderer::initVulkan()
 
     //----------------------------------Framebuffers----------------------------
 
-    m_swapchain->createFramebuffers(m_device.getLogicalDevice(), m_renderPass.get(), m_depthBuffer, m_msaa);
-    m_shadowMap.createFramebuffer(m_device.getLogicalDevice(), m_renderPassShadowMap.get(), m_swapchain->getImageCount());
+    m_swapchain->createFramebuffers(m_renderPass.get(), m_depthBuffer, m_msaa);
+    m_shadowMap->createFramebuffer(m_renderPassShadowMap.get(), m_swapchain->getImageCount());
 
 
 
@@ -617,23 +730,23 @@ void Renderer::initVulkan()
 
     //----------------------------------Command Pools---------------------------
 
-    m_commandPool = CommandPool(
+    m_commandPool = std::make_shared<CommandPool>(
         m_device.getLogicalDevice(),
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         m_qfIndices.graphicsFamily.value()
     );
 
     // Allocates all the neccessary cmd buffers in the cmd pool.
-    m_commandPool.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+    m_commandPool->allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
 
 
-    m_shadowMap.createCommandPool(m_device.getLogicalDevice(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_qfIndices.graphicsFamily.value());
+    m_shadowMap->createCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_qfIndices.graphicsFamily.value());
 
-    m_shadowMap.allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+    m_shadowMap->allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
 
     //--------------------------------------------------------------------------
 
-    uploadAllData();
+    uploadModels();
 
     createSyncObjects();
 }
@@ -645,20 +758,25 @@ void Renderer::bindAllMeshesData(
     const VkCommandBuffer& commandBuffer,
     const uint32_t currentFrame) 
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     for (auto& mesh : model->m_meshes)
     {
-        CommandUtils::STATE::bindVertexBuffers({ mesh.m_vertexBuffer }, { 0 }, 0, 1, commandBuffer);
-        CommandUtils::STATE::bindIndexBuffer(mesh.m_indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
+        CommandUtils::STATE::bindVertexBuffers({ mesh.vertexBuffer }, { 0 }, 0, 1, commandBuffer);
+        CommandUtils::STATE::bindIndexBuffer(mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
 
         VkDescriptorSet descriptorSet;
         if (graphicsPipeline.getType() == GraphicsPipelineType::SHADOWMAP)
-            descriptorSet = m_shadowMap.getDescriptorSet(currentFrame);
+            descriptorSet = m_shadowMap->getDescriptorSet(currentFrame);
         else
-            descriptorSet = mesh.m_descriptorSets.get(currentFrame);
+            descriptorSet = mesh.descriptorSets.get(currentFrame);
 
         CommandUtils::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), 0, { descriptorSet }, {}, commandBuffer);
 
-        CommandUtils::ACTION::drawIndexed(mesh.m_indices.size(), 1, 0, 0, 0, commandBuffer);
+        CommandUtils::ACTION::drawIndexed(mesh.indices.size(), 1, 0, 0, 0, commandBuffer);
     }
 }
 
@@ -670,13 +788,13 @@ void Renderer::recordCommandBuffer(
     const uint32_t currentFrame,
     const VkCommandBuffer& commandBuffer,
     const std::vector<VkClearValue>& clearValues,
-    CommandPool& commandPool
+    const std::shared_ptr<CommandPool>& commandPool
 ) {
     // Resets the command buffer to be able to be recorded.
-    commandPool.resetCommandBuffer(currentFrame);
+    commandPool->resetCommandBuffer(currentFrame);
 
     // Specifies some details about the usage of this specific command buffer.
-    commandPool.beginCommandBuffer(0, commandBuffer);
+    commandPool->beginCommandBuffer(0, commandBuffer);
 
     //--------------------------------RenderPass-----------------------------
 
@@ -690,55 +808,68 @@ void Renderer::recordCommandBuffer(
     renderPass.begin(framebuffer, extent, clearValues, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
 
-    //---------------------------------CMDs-------------------------------
-    for (const auto& graphicsPipeline : graphicsPipelines)
-    {
-        CommandUtils::STATE::bindPipeline(graphicsPipeline.get(),commandBuffer);
-        // Set Dynamic States
-        CommandUtils::STATE::setViewport(0.0f, 0.0f, extent, 0.0f, 1.0f, 0, 1, commandBuffer);
-        CommandUtils::STATE::setScissor({ 0, 0 }, extent, 0, 1, commandBuffer);
-
-        for (const size_t& i : graphicsPipeline.getModelIndices())
+        //---------------------------------CMDs-------------------------------
+        for (const auto& graphicsPipeline : graphicsPipelines)
         {
+            CommandUtils::STATE::bindPipeline(graphicsPipeline.get(),commandBuffer);
+            // Set Dynamic States
+            CommandUtils::STATE::setViewport(0.0f, 0.0f, extent, 0.0f, 1.0f, 0, 1, commandBuffer);
+            CommandUtils::STATE::setScissor({ 0, 0 }, extent, 0, 1, commandBuffer);
 
-            const auto& model = m_allModels[i];
-
-            if (model->getType() == ModelType::SKYBOX)
+            for (const size_t& i : graphicsPipeline.getModelIndices())
             {
-                if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
-                    bindAllMeshesData<Skybox>( pModel, graphicsPipeline, commandBuffer, currentFrame);
-            }
-            else if (model->getType() == ModelType::NORMAL_PBR)
-            {
-                if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
-                {
-                    if (pModel.get()->isHided())
-                        continue;
-                    bindAllMeshesData<NormalPBR>(pModel, graphicsPipeline, commandBuffer, currentFrame);
-                }
-            }
-            else 
-            {
-                if (model->getType() == ModelType::LIGHT)
-                {
-                    if (auto pModel =std::dynamic_pointer_cast<Light>(model)) 
+                const auto& model = m_models[i];
+                switch (model->getType())
+                { 
+                    case ModelType::SKYBOX:
                     {
-                        if (pModel.get()->isHided())
-                            continue;
+                        if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
+                            bindAllMeshesData<Skybox>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                        break;
+                    }
+                    case ModelType::NORMAL_PBR:
+                    {
+                        if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+                        {
+                            if (pModel.get()->isHided())
+                                continue;
 
-                        bindAllMeshesData<Light>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                            bindAllMeshesData<NormalPBR>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                        }
+                        break;
+                    }
+                    case ModelType::LIGHT:
+                    {
+                        if (auto pModel = std::dynamic_pointer_cast<Light>(model))
+                        {
+                            if (pModel.get()->isHided())
+                                continue;
+
+                            bindAllMeshesData<Light>(pModel, graphicsPipeline, commandBuffer, currentFrame);
+                        }
+
+                        break;
+                    }
+                    case ModelType::NONE:
+                    {
+                        break;
                     }
                 }
             }
         }
-    }
-    renderPass.end(commandBuffer);
-    commandPool.endCommandBuffer(commandBuffer);
+        renderPass.end(commandBuffer);
+
+    commandPool->endCommandBuffer(commandBuffer);
 }
 
 
 void Renderer::drawFrame(uint8_t& currentFrame)
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     // Waits until the previous frame has finished.
    //    - 2 param. -> FenceCount.
    //    - 4 param. -> waitAll.
@@ -754,17 +885,16 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     // Shadow Map
     if (m_directionalLightIndex.has_value())
     {
-        auto pLight = std::dynamic_pointer_cast<Light>(m_allModels[m_directionalLightIndex.value()]);
+        auto pLight = std::dynamic_pointer_cast<Light>(m_models[m_directionalLightIndex.value()]);
         // TODO: improve this
-        auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_allModels[m_mainModelIndex]);
+        auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_models[m_mainModelIndex]);
 
-        m_shadowMap.updateUBO(
-            m_device.getLogicalDevice(),
+        m_shadowMap->updateUBO(
             // TODO: make it for more than 1 model
             pMainModel->getModelM(),
             pLight->getPos(),
             pLight->getTargetPos(),
-            m_camera->getAspect(),
+            1.0,
             Config::Z_NEAR,
             Config::Z_FAR,
             currentFrame
@@ -773,26 +903,38 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     // Scene
-    for (auto& model : m_allModels)
+    for (auto& model : m_models)
     {
-        if (model->getType() == ModelType::SKYBOX)
+        switch (model->getType())
         {
-            if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
-                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(),m_camera->getViewM(), m_swapchain->getExtent(), currentFrame);
-        }
-        if (model->getType() == ModelType::NORMAL_PBR)
-        {
-            if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+            case ModelType::SKYBOX:
             {
-                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), m_shadowMap.getLightSpace(), m_lightModelIndices.size(), m_allModels, currentFrame);
-                pModel->updateUBOlightsInfo(m_device.getLogicalDevice(), m_lightModelIndices, m_allModels, currentFrame);
-            }
-        }
-        if (model->getType() == ModelType::LIGHT)
-        {
-            if (auto pModel = std::dynamic_pointer_cast<Light>(model))
-                pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), currentFrame);
+                if (auto pModel = std::dynamic_pointer_cast<Skybox>(model))
+                    pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_swapchain->getExtent(), currentFrame);
 
+                break;
+            }
+            case ModelType::NORMAL_PBR:
+            {
+                if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+                {
+                    pModel->updateUBO(m_device.getLogicalDevice(), m_camera->getPos(), m_camera->getViewM(), m_camera->getProjectionM(), m_shadowMap->getLightSpace(), m_lightModelIndices.size(), m_models, currentFrame);
+                    pModel->updateUBOlightsInfo(m_device.getLogicalDevice(), m_lightModelIndices, m_models, currentFrame);
+                }
+                break;
+            } 
+            case ModelType::LIGHT:
+            {
+                if (auto pModel = std::dynamic_pointer_cast<Light>(model))
+                {
+                    pModel->updateUBO(m_device.getLogicalDevice(),m_camera->getPos(),m_camera->getViewM(),m_camera->getProjectionM(),currentFrame);
+                }
+                break;
+            } 
+            case ModelType::NONE:
+            {
+                break;
+            }
         }
     }
 
@@ -805,14 +947,14 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
     // Shadow Mapping
     recordCommandBuffer(
-        m_shadowMap.getFramebuffer(imageIndex),
+        m_shadowMap->getFramebuffer(imageIndex),
         m_renderPassShadowMap,
         m_swapchain->getExtent(),
         {m_graphicsPipelineShadowMap},
         currentFrame,
-        m_shadowMap.getCommandBuffer(currentFrame),
+        m_shadowMap->getCommandBuffer(currentFrame),
         m_clearValuesShadowMap,
-        m_shadowMap.getCommandPool()
+        m_shadowMap->getCommandPool()
     );
 
     // Scene
@@ -822,7 +964,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         m_swapchain->getExtent(),
         { m_graphicsPipelineLight,m_graphicsPipelinePBR, m_graphicsPipelineSkybox },
         currentFrame,
-        m_commandPool.getCommandBuffer(currentFrame),
+        m_commandPool->getCommandBuffer(currentFrame),
         m_clearValues,
         m_commandPool
     );
@@ -846,7 +988,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 
     // ImGUI added
-    std::vector<VkCommandBuffer> submitCommandBuffers = { m_shadowMap.getCommandBuffer(currentFrame), m_commandPool.getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
+    std::vector<VkCommandBuffer> submitCommandBuffers = { m_shadowMap->getCommandBuffer(currentFrame), m_commandPool->getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
 
     submitInfo.commandBufferCount = submitCommandBuffers.size();
     submitInfo.pCommandBuffers = submitCommandBuffers.data();
@@ -882,6 +1024,10 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
 void Renderer::scrollCallback(GLFWwindow* window,double xoffset,double yoffset) 
 {
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     Camera* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window));
 
     float actualFOV = camera->getFOV();
@@ -894,6 +1040,10 @@ void Renderer::scrollCallback(GLFWwindow* window,double xoffset,double yoffset)
 
 void Renderer::handleInput()
 {
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     m_window->pollEvents();
     // Avoids any input when we're touching the IMGUI.
     if (m_GUI->isCursorPositionInGUI())
@@ -926,13 +1076,17 @@ void Renderer::handleInput()
 
 void Renderer::mainLoop()
 {
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     // Tells us in which frame we are,
     // between 1 <= frame <= MAX_FRAMES_IN_FLIGHT
     uint8_t currentFrame = 0;
     while (m_window->isWindowClosed() == false)
     {
         handleInput();
-        m_GUI->draw(m_allModels, m_camera, m_objectModelIndices, m_lightModelIndices);
+        m_GUI->draw(m_models, m_camera, m_objectModelIndices, m_lightModelIndices);
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device.getLogicalDevice());
@@ -940,6 +1094,11 @@ void Renderer::mainLoop()
 
 void Renderer::destroySyncObjects()
 {
+
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     for (size_t i = 0; i < Config::MAX_FRAMES_IN_FLIGHT; i++)
     {
         vkDestroySemaphore(m_device.getLogicalDevice(), m_imageAvailableSemaphores[i], nullptr);
@@ -950,41 +1109,39 @@ void Renderer::destroySyncObjects()
 
 void Renderer::cleanup()
 {
+#ifdef RELEASE_MODE_ON
+    ZoneScoped;
+#endif
+
     // MSAA
-    m_msaa.destroy(m_device.getLogicalDevice());
+    m_msaa.destroy();
 
     // DepthBuffer
-    m_depthBuffer.destroy(m_device.getLogicalDevice());
+    m_depthBuffer.destroy();
 
     // ImGui
-    m_GUI->destroy(m_device.getLogicalDevice());
-
-    // Framebuffers
-    m_swapchain->destroyFramebuffers(m_device.getLogicalDevice());
-
-    // ViewImages of the images from the Swapchain
-    m_swapchain->destroyImageViews(m_device.getLogicalDevice());
+    m_GUI->destroy();
 
     // Swapchain
-    m_swapchain->destroySwapchain(m_device.getLogicalDevice());
+    m_swapchain->destroy();
 
     // Graphics Pipelines
-    m_graphicsPipelinePBR.destroy(m_device.getLogicalDevice());
-    m_graphicsPipelineSkybox.destroy(m_device.getLogicalDevice());
-    m_graphicsPipelineLight.destroy(m_device.getLogicalDevice());
-    m_graphicsPipelineShadowMap.destroy(m_device.getLogicalDevice());
+    m_graphicsPipelinePBR.destroy();
+    m_graphicsPipelineSkybox.destroy();
+    m_graphicsPipelineLight.destroy();
+    m_graphicsPipelineShadowMap.destroy();
 
     // Renderpass
-    m_renderPass.destroy(m_device.getLogicalDevice());
-    m_renderPassShadowMap.destroy(m_device.getLogicalDevice());
+    m_renderPass.destroy();
+    m_renderPassShadowMap.destroy();
 
     // Models -> Buffers, Memories and Textures.
-    m_shadowMap.destroy(m_device.getLogicalDevice());
-    for (auto& model : m_allModels)
+    m_shadowMap->destroy();
+    for (auto& model : m_models)
         model->destroy(m_device.getLogicalDevice());
    
     // Descriptor Pool
-    m_descriptorPool.destroyDescriptorPool(m_device.getLogicalDevice());
+    m_descriptorPool.destroy();
 
     // Descriptor Set Layouts
     DescriptorSetLayoutUtils::destroyDescriptorSetLayout(m_device.getLogicalDevice(), m_descriptorSetLayoutNormalPBR);
@@ -996,7 +1153,7 @@ void Renderer::cleanup()
     destroySyncObjects();
 
     // Command Pool
-    m_commandPool.destroy();
+    m_commandPool->destroy();
 
     // Logical Device
     vkDestroyDevice(m_device.getLogicalDevice(), nullptr);
@@ -1018,13 +1175,22 @@ void Renderer::cleanup()
     vkDestroyInstance(m_vkInstance, nullptr);
 
     // GLFW
-    m_window->destroyWindow();
+    m_window->destroy();
 }
 
 void Renderer::addSkybox(const std::string& name, const std::string& textureFolderName)
 {
-    m_allModels.push_back(std::make_shared<Skybox>(name,textureFolderName));
-    m_skyboxModelIndices.push_back(m_allModels.size() - 1);
+    m_modelsToLoadInfo.push_back({
+         ModelType::SKYBOX,name, textureFolderName,
+         glm::fvec3(0.0f),
+         glm::fvec3(0.0f),
+         glm::fvec3(0.0f),
+         glm::fvec3(0.0f),
+         LightType::NONE,
+         glm::fvec3(0.0f),
+         0.0f,
+         0.0f
+        });
 }
 
 void Renderer::addObjectPBR(const std::string& name, const std::string& modelFileName,
@@ -1032,12 +1198,19 @@ void Renderer::addObjectPBR(const std::string& name, const std::string& modelFil
     const glm::fvec3& rot,
     const glm::fvec3& size ) 
 {
-    m_allModels.push_back(std::make_shared<NormalPBR>(name, modelFileName, glm::fvec4(pos, 1.0f), rot, size));
-
-    m_objectModelIndices.push_back(m_allModels.size() - 1);
-
-    // TODO: delete this
-    m_mainModelIndex = m_allModels.size() - 1;
+    m_modelsToLoadInfo.push_back({
+         ModelType::NORMAL_PBR,
+         name,
+         modelFileName,
+         glm::fvec3(0.0f),
+         pos,
+         rot,
+         size,
+         LightType::NONE,
+         glm::fvec3(0.0f),
+         0.0f,
+         0.0f
+        });
 }
 
 void Renderer::addDirectionalLight(
@@ -1050,22 +1223,19 @@ void Renderer::addDirectionalLight(
 ) {
     if (!m_directionalLightIndex.has_value())
     {
-        m_allModels.push_back(
-            std::make_shared<Light>(
-                name,
-                modelFileName,
-                LightType::DIRECTIONAL_LIGHT,
-                glm::fvec4(color, 1.0f),
-                glm::fvec4(pos, 1.0f),
-                glm::fvec4(endPos, 1.0f),
-                glm::fvec3(0.0f),
-                size,
-                0.0f,
-                0.0f
-                )
-        );
-        m_lightModelIndices.push_back(m_allModels.size() - 1);
-        m_directionalLightIndex = m_allModels.size() - 1;
+        m_modelsToLoadInfo.push_back({
+            ModelType::LIGHT,
+            name,
+            modelFileName,
+            color,
+            pos,
+            glm::fvec3(0.0f),
+            size,
+            LightType::DIRECTIONAL_LIGHT,
+            endPos,
+            0.0f,
+            0.0f
+            });
     }
     else
     {
@@ -1084,21 +1254,19 @@ void Renderer::addPointLight(
     const float attenuation,
     const float radius
 ) {
-    m_allModels.push_back(
-        std::make_shared<Light>(
-            name,
-            modelFileName,
-            LightType::POINT_LIGHT,
-            glm::fvec4(color, 1.0f),
-            glm::fvec4(pos, 1.0f),
-            glm::fvec4(0.0f),
-            glm::fvec3(0.0f),
-            size,
-            attenuation,
-            radius
-            )
-    );
-    m_lightModelIndices.push_back(m_allModels.size() - 1);
+    m_modelsToLoadInfo.push_back({
+          ModelType::LIGHT,
+          name,
+          modelFileName,
+          color,
+          pos,
+          glm::fvec3(0.0f),
+          size,
+          LightType::POINT_LIGHT,
+          glm::fvec3(0.0f),
+          attenuation,
+          radius
+        });
 }
 
 void Renderer::addSpotLight(
@@ -1112,19 +1280,17 @@ void Renderer::addSpotLight(
     const float attenuation,
     const float radius
 ) {
-    m_allModels.push_back(
-        std::make_shared<Light>(
-            name,
-            modelFileName,
-            LightType::SPOT_LIGHT,
-            glm::fvec4(color, 1.0f),
-            glm::fvec4(pos, 1.0f),
-            glm::fvec4(endPos, 1.0f),
-            rot,
-            size,
-            attenuation,
-            radius
-            )
-    );
-    m_lightModelIndices.push_back(m_allModels.size() - 1);
+    m_modelsToLoadInfo.push_back({
+          ModelType::LIGHT,
+          name,
+          modelFileName,
+          color,
+          pos,
+          rot,
+          size,
+          LightType::SPOT_LIGHT,
+          endPos,
+          attenuation,
+          radius
+        });
 }

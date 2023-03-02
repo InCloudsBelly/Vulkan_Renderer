@@ -18,21 +18,21 @@ namespace BufferManager
 
     template<typename T>
     void createBufferAndTransferToDevice(
-        CommandPool&                commandPool,
-        const VkPhysicalDevice&     physicalDevice,
-        const VkDevice&             logicalDevice,
-        T*                          data,
-        size_t                      size,
-        VkQueue&                    graphicsQueue,
-        const VkBufferUsageFlags    usageDstBuffer,
-        VkDeviceMemory&             memory,
-        VkBuffer&                   buffer
+        const std::shared_ptr<CommandPool>&     commandPool,
+        const VkPhysicalDevice&                 physicalDevice,
+        const VkDevice&                         logicalDevice,
+        T*                                      data,
+        size_t                                  size,
+        VkQueue&                                graphicsQueue,
+        const VkBufferUsageFlags                usageDstBuffer,
+        VkDeviceMemory&                         memory,
+        VkBuffer&                               buffer
     );
 
     void freeMemory(const VkDevice& logicalDevice, VkDeviceMemory& memory);
     void destroyBuffer(const VkDevice& logicalDevice, VkBuffer& buffer);
 
-    void copyBuffer(CommandPool& commandPool, const VkDeviceSize size, 
+    void copyBuffer(const std::shared_ptr<CommandPool>& commandPool, const VkDeviceSize size,
         VkBuffer& srcBuffer, VkBuffer& dstBuffer, VkQueue& graphicsQueue);
 
     template<typename T>

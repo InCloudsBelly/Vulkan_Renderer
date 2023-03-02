@@ -11,6 +11,7 @@
 DescriptorPool::DescriptorPool() {}
 
 DescriptorPool::DescriptorPool(const VkDevice& logicalDevice, const std::vector<VkDescriptorPoolSize> poolSizes, const uint32_t descriptorSetsCount)
+	: m_logicalDevice(logicalDevice)
 {
 	if (poolSizes.size() == 0)
 		throw std::runtime_error("Failed to create descriptor pool!");
@@ -30,14 +31,14 @@ DescriptorPool::DescriptorPool(const VkDevice& logicalDevice, const std::vector<
 
 DescriptorPool::~DescriptorPool() {}
 
-const VkDescriptorPool& DescriptorPool::getDescriptorPool() const
+const VkDescriptorPool& DescriptorPool::get() const
 {
 	return m_descriptorPool;
 }
 
 // Allocates all the descriptor set from all the objs.
 
-void DescriptorPool::allocDescriptorSets(const VkDevice& logicalDevice, const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts, std::vector<VkDescriptorSet>& descriptorSets)
+void DescriptorPool::allocDescriptorSets(const std::vector<VkDescriptorSetLayout>& descriptorSetLayouts, std::vector<VkDescriptorSet>& descriptorSets)
 {
 	VkDescriptorSetAllocateInfo allocInfo{};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -45,11 +46,11 @@ void DescriptorPool::allocDescriptorSets(const VkDevice& logicalDevice, const st
 	allocInfo.descriptorSetCount = static_cast<uint32_t>(descriptorSets.size());
 	allocInfo.pSetLayouts = descriptorSetLayouts.data();
 
-	if (vkAllocateDescriptorSets(logicalDevice, &allocInfo, descriptorSets.data()) != VK_SUCCESS)
+	if (vkAllocateDescriptorSets(m_logicalDevice, &allocInfo, descriptorSets.data()) != VK_SUCCESS)
 		throw std::runtime_error("Failed to allocate descriptr sets!");
 }
 
-void DescriptorPool::destroyDescriptorPool(const VkDevice& logicalDevice)
+void DescriptorPool::destroy()
 {
-	vkDestroyDescriptorPool(logicalDevice, m_descriptorPool, nullptr);
+	vkDestroyDescriptorPool(m_logicalDevice, m_descriptorPool, nullptr);
 }

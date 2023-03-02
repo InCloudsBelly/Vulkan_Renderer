@@ -18,12 +18,16 @@ public:
 		const std::vector<DescriptorInfo>&			uboInfo,
 		const std::vector<DescriptorInfo>&			samplersInfo,
 		const std::vector<std::shared_ptr<Texture>>& textures,
-		const VkImageView*							shadowMapImageView,
-		const VkSampler*							shadowMapSampler,
 		std::vector<UBO*>&							UBOs,
 		const VkDescriptorSetLayout&				descriptorSetLayout,
-		DescriptorPool&								descriptorPool
+		DescriptorPool& descriptorPool,
+		const std::optional<Texture>				irradianceMap = std::nullopt,
+		const std::optional<VkImageView>			shadowMapView = std::nullopt,
+		const std::optional<VkSampler>				shadowMapSampler = std::nullopt
 	);
+
+	DescriptorSets(const DescriptorSets& other);
+	DescriptorSets& operator=(const DescriptorSets& other);
 
 	~DescriptorSets();
 
@@ -41,6 +45,6 @@ private:
 		VkWriteDescriptorSet&	descriptorWrite
 	);
 
-	std::vector<VkDescriptorSet> m_descriptorSets;
-	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+	std::vector<VkDescriptorSet>		m_descriptorSets;
+	std::vector<VkDescriptorSetLayout>	m_descriptorSetLayouts;
 };

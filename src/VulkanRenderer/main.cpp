@@ -13,7 +13,8 @@ int main()
     {
         // SCENE 1
         {
-            app.addSkybox("Town", "SmallTown");
+       /*     app.addSkybox("Town", "SmallTown");*/
+
             //app.addObjectPBR(
             //      "Gun",
             //      "gun.gltf",
@@ -46,6 +47,7 @@ int main()
                 0.5f,
                 3.0f
             );*/
+            app.addSkybox("Apartment.hdr", "Apartment");
 
             app.addObjectPBR(
                 "Sponza",
@@ -59,9 +61,19 @@ int main()
                 "Sun",
                 "lightSphere.obj",
                 glm::fvec3(1.0f),
-                glm::fvec3(1.0f, 87.0f, -49.0f),
-                glm::fvec3(0.f, 0.f, 0.f),
+                glm::fvec3(-1.5 * 10.9f, 1.5 * 87.0f, -1.5 * 10.6f),
+                glm::fvec3(30.6f, -61.0f, 0.66f),
                 glm::fvec3(0.125f)
+            );
+
+            app.addPointLight(
+                "PointLight1",
+                "lightSphere.obj",
+                glm::fvec3(1.0f),
+                glm::fvec3(0.0f, 0.1, 2.881f),
+                glm::fvec3(0.125f),
+                0.5f,
+                3.0f
             );
 
         }

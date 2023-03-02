@@ -4,8 +4,6 @@
 #include <array>
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/GraphicsPipeline/RenderTargetUtils.h"
-
 
 RenderPass::RenderPass() {}
 
@@ -17,6 +15,7 @@ RenderPass::RenderPass(
 	const std::vector<VkAttachmentDescription>& attachments,
 	const std::vector<VkSubpassDescription>& subpasses,
 	const std::vector<VkSubpassDependency>& dependencies ) 
+	: m_logicalDevice(logicalDevice)
 {
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -71,7 +70,7 @@ void RenderPass::end(const VkCommandBuffer& commandBuffer) const
 	vkCmdEndRenderPass(commandBuffer);
 }
 
-void RenderPass::destroy(const VkDevice& logicalDevice)
+void RenderPass::destroy()
 {
-	vkDestroyRenderPass(logicalDevice, m_renderPass, nullptr);
+	vkDestroyRenderPass(m_logicalDevice, m_renderPass, nullptr);
 }

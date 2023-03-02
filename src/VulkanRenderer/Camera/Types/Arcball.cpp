@@ -11,11 +11,12 @@
 Arcball::Arcball(
     GLFWwindow*         window,
     const glm::fvec4&   pos,
+    const glm::fvec4&   target,
     const float         FOV,
     const float         ratio,
     const float         zNear,
     const float         zFar
-) : Camera(window,pos,CameraType::ARCBALL,FOV,ratio,zNear,zFar) {
+) : Camera(window,pos, target,CameraType::ARCBALL,FOV,ratio,zNear,zFar) {
     m_lastCursorPos = glm::fvec2(0.0f);
     m_currentCursorPos = glm::fvec2(0.0f);
     m_targetPos = glm::fvec4(0.0f);

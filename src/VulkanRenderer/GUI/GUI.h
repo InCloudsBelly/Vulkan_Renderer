@@ -35,7 +35,7 @@ public:
 
     const bool isCursorPositionInGUI() const;
 
-    void destroy(const VkDevice& logicalDevice);
+    void destroy();
 
 private:
 
@@ -54,12 +54,13 @@ private:
     void uploadFonts(const VkQueue& graphicsQueue);
     void applyStyle();
 
-    std::vector<VkFramebuffer>  m_framebuffers;
-    CommandPool                 m_commandPool;
-    DescriptorPool              m_descriptorPool;
-    RenderPass                  m_renderPass;
+    VkDevice                        m_logicalDevice;
+
+    std::vector<VkFramebuffer>      m_framebuffers;
+    std::shared_ptr<CommandPool>    m_commandPool;
+    DescriptorPool                  m_descriptorPool;
+    RenderPass                      m_renderPass;
 
     // Observer pointers
-    const Swapchain*            m_opSwapchain;
-    const VkDevice*             m_opLogicalDevice;
+    const Swapchain*                m_opSwapchain;
 };

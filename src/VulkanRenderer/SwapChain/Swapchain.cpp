@@ -9,7 +9,8 @@
 #include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
 #include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Window/Window.h"
-#include "VulkanRenderer/GraphicsPipeline/RenderTarget.h"
+#include "VulkanRenderer/Features/MSAA.h"
+#include "VulkanRenderer/Features/DepthBuffer.h"
 #include "VulkanRenderer/Framebuffer/FramebufferUtils.h"
 
 Swapchain::Swapchain() {}
@@ -20,6 +21,7 @@ Swapchain::Swapchain(
 	const VkDevice& logicalDevice,
 	const std::shared_ptr<Window>& window,
 	const SwapchainSupportedProperties& supportedProperties )
+	: m_logicalDevice(logicalDevice)
 {
 	VkSurfaceFormatKHR surfaceFormat;
 	VkPresentModeKHR presentMode;
@@ -103,31 +105,26 @@ Swapchain::Swapchain(
 	vkGetSwapchainImagesKHR(logicalDevice, m_swapchain, &imageCount, m_images.data());
 }
 
-void Swapchain::destroyFramebuffers(const VkDevice& logicalDevice)
+void Swapchain::destroy()
 {
 	for (auto& framebuffer : m_framebuffers)
-		vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
-}
+		vkDestroyFramebuffer(m_logicalDevice, framebuffer, nullptr);
 
-void Swapchain::destroySwapchain(const VkDevice& logicalDevice)
-{
-	vkDestroySwapchainKHR(logicalDevice, m_swapchain, nullptr);
-}
+	vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
 
-void Swapchain::destroyImageViews(const VkDevice& logicalDevice)
-{
 	for (auto& imageView : m_imageViews)
-		vkDestroyImageView(logicalDevice, imageView, nullptr);
+		vkDestroyImageView(m_logicalDevice, imageView, nullptr);
 }
 
-void Swapchain::createAllImageViews(const VkDevice& logicalDevice)
+
+void Swapchain::createAllImageViews()
 {
 	m_imageViews.resize(m_images.size());
 
 	for (size_t i = 0; i < m_images.size(); i++)
 	{
 		ImageManager::createImageView(
-			logicalDevice,
+			m_logicalDevice,
 			m_imageFormat,
 			m_images[i],
 			VK_IMAGE_ASPECT_COLOR_BIT,
@@ -142,7 +139,7 @@ void Swapchain::createAllImageViews(const VkDevice& logicalDevice)
 	}
 }
 
-void Swapchain::createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass, const RenderTarget::DepthBuffer& depthBuffer,const RenderTarget::MSAA& msaa)
+void Swapchain::createFramebuffers(const VkRenderPass& renderPass,const DepthBuffer& depthBuffer,const MSAA& msaa)
 {
 	m_framebuffers.resize(m_imageViews.size());
 
@@ -156,7 +153,7 @@ void Swapchain::createFramebuffers(const VkDevice& logicalDevice, const VkRender
 		};
 
 		FramebufferUtils::createFramebuffer(
-			logicalDevice, 
+			m_logicalDevice, 
 			renderPass,
 			attachments,
 			m_extent.width,

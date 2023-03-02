@@ -45,12 +45,9 @@ private:
         const VkPhysicalDevice& possiblePhysicalDevice
     );
 
-    VkPhysicalDevice m_physicalDevice;
-    VkDevice m_logicalDevice;
+    VkPhysicalDevice               m_physicalDevice;
+    VkDevice                       m_logicalDevice;
+    SwapchainSupportedProperties   m_supportedProperties;
 
-    const std::vector<const char*> m_requiredExtensions = {
-          VK_KHR_SWAPCHAIN_EXTENSION_NAME
-    };
-
-    SwapchainSupportedProperties m_supportedProperties;
+    const std::vector<const char*> m_requiredExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 };

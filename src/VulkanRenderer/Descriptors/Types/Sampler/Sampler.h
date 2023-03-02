@@ -5,16 +5,14 @@
 class Sampler
 {
 public:
-    Sampler();
     Sampler(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t mipLevels, const VkSamplerAddressMode& addressMode, const VkFilter& filter);
     
     ~Sampler();
 
     const VkSampler& get() const;
-    void destroySampler(const VkDevice& logicalDevice);
+    void destroy();
 
 private:
-
+    VkDevice      m_logicalDevice;
     VkSampler     m_sampler;
-
 };

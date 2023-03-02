@@ -50,11 +50,10 @@ public:
 	const VkPipelineLayout& getPipelineLayout() const;
 	const GraphicsPipelineType getType() const;
 	const std::vector<size_t>& getModelIndices() const;
-	void destroy(const VkDevice& logicalDevice);
+	void destroy();
 
 private:
 	void createShaderModule(
-		const VkDevice& logicalDevice,
 		const ShaderInfo& shaderInfos,
 		VkShaderModule& shaderModule
 	);
@@ -79,13 +78,14 @@ private:
 	void createMultisamplingInfo(const VkSampleCountFlagBits& samplesCount, VkPipelineMultisampleStateCreateInfo& multisamplingInfo);
 	void createColorBlendingAttachment(VkPipelineColorBlendAttachmentState& colorBlendAttachment);
 	void createColorBlendingGlobalInfo(const VkPipelineColorBlendAttachmentState& colorBlendAttachment, VkPipelineColorBlendStateCreateInfo& colorBlendingInfo);
-	void createPipelineLayout(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout);
+	void createPipelineLayout(const VkDescriptorSetLayout& descriptorSetLayout);
 
-	VkPipeline m_graphicsPipeline;
-	VkPipelineLayout m_pipelineLayout;
+	VkDevice             m_logicalDevice;
+	GraphicsPipelineType m_type;
+
+	VkPipeline           m_graphicsPipeline;
+	VkPipelineLayout     m_pipelineLayout;
 
 	// Observer pointer
 	std::vector<size_t>* m_opModelIndices;
-
-	GraphicsPipelineType m_type;
 };

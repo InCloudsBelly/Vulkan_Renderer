@@ -34,8 +34,9 @@ private:
 
 	void createCommandBufferAllocateInfo(const uint32_t& commandBuffersCount,VkCommandBufferAllocateInfo& allocInfo);
 
-	VkCommandPool m_commandPool;
-	VkDevice m_logicalDevice;
+	VkDevice                     m_logicalDevice;
+
+	VkCommandPool                m_commandPool;
 
 	std::vector<VkCommandBuffer> m_commandBuffers;
 };

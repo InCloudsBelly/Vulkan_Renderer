@@ -9,7 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanRenderer/ShaderManager/ShaderManager.h"
-#include "VulkanRenderer/GraphicsPipeline/RenderTargetUtils.h"
+#include "VulkanRenderer/Features/FeaturesUtils.h"
 
 GraphicsPipeline::GraphicsPipeline() {}
 
@@ -28,14 +28,14 @@ GraphicsPipeline::GraphicsPipeline(
     VkVertexInputBindingDescription vertexBindingDescriptions,
     std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
     std::vector<size_t>* modelIndices )
-    : m_type(type), m_opModelIndices(modelIndices)
+    : m_logicalDevice(logicalDevice),m_type(type),m_opModelIndices(modelIndices)
 {
     // -------------------Shader Modules--------------------
     std::vector<VkShaderModule> shaderModules(shaderInfos.size());
     std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
     for (size_t i = 0; i < shaderInfos.size(); i++)
     {
-        createShaderModule(logicalDevice,shaderInfos[i],shaderModules[i]);
+        createShaderModule(shaderInfos[i],shaderModules[i]);
         createShaderStageInfo(shaderModules[i],shaderInfos[i].type,shaderStagesInfos[i]);
     }
 
@@ -94,11 +94,11 @@ GraphicsPipeline::GraphicsPipeline(
     createColorBlendingGlobalInfo(colorBlendAttachment, colorBlendingInfo);
 
     // Pipeline layout
-    createPipelineLayout(logicalDevice, descriptorSetLayout);
+    createPipelineLayout(descriptorSetLayout);
 
     // Depth and stencil
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
-    RenderTargetUtils::DepthBufferUtils::createDepthStencilStateInfo(m_type, depthStencil);
+    FeaturesUtils::createDepthStencilStateInfo(m_type, depthStencil);
 
     // --------------Graphics pipeline creation------------
     VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -144,7 +144,6 @@ GraphicsPipeline::GraphicsPipeline(
 }
 
 void GraphicsPipeline::createShaderModule(
-    const VkDevice& logicalDevice,
     const ShaderInfo& shaderInfo,
     VkShaderModule& shaderModule ) 
 {
@@ -157,7 +156,7 @@ void GraphicsPipeline::createShaderModule(
     else
         throw std::runtime_error("Shader type doesn't exist.");
 
-    shaderModule = ShaderManager::createShaderModule(shaderCode,logicalDevice);
+    shaderModule = ShaderManager::createShaderModule(shaderCode,m_logicalDevice);
 }
 
 //Creates the info strucutres to link the shaders to specific pipeline stages.
@@ -338,7 +337,7 @@ void GraphicsPipeline::createColorBlendingGlobalInfo(const VkPipelineColorBlendA
 
 // Interface that creates and allows us to communicate with the uniform
 // values and push constants in the shaders.
-void GraphicsPipeline::createPipelineLayout(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout) 
+void GraphicsPipeline::createPipelineLayout(const VkDescriptorSetLayout& descriptorSetLayout) 
 {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -350,7 +349,7 @@ void GraphicsPipeline::createPipelineLayout(const VkDevice& logicalDevice, const
     // Optional
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-    auto status = vkCreatePipelineLayout(logicalDevice, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+    auto status = vkCreatePipelineLayout(m_logicalDevice, &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create pipeline layout!");
@@ -373,10 +372,10 @@ const VkPipelineLayout& GraphicsPipeline::getPipelineLayout() const
 }
 
 
-void GraphicsPipeline::destroy(const VkDevice& logicalDevice)
+void GraphicsPipeline::destroy()
 {
-    vkDestroyPipeline(logicalDevice, m_graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(logicalDevice, m_pipelineLayout, nullptr);
+    vkDestroyPipeline(m_logicalDevice, m_graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
 }
 
 const GraphicsPipelineType GraphicsPipeline::getType() const

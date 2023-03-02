@@ -2,12 +2,16 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <stb_image_write.h>
 
 #include <vulkan/vulkan.h>
 #include <stdexcept>
 #include <iostream>
 
 #include "VulkanRenderer/Textures/MipmapUtils.h"
+#include "VulkanRenderer/Textures/Bitmap.h"
+#include "VulkanRenderer/Textures/cubemapUtils.h"
+
 #include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
@@ -19,34 +23,42 @@ Texture::Texture(
     const VkPhysicalDevice& physicalDevice,
     const VkDevice& logicalDevice,
     const TextureToLoadInfo& textureInfo,
-    const bool isCubemap,
     const VkSampleCountFlagBits& samplesCount,
-    CommandPool& commandPool,
+    const std::shared_ptr<CommandPool>& commandPool,
     VkQueue& graphicsQueue
-): m_isCubemap(isCubemap) , m_samplesCount(samplesCount)
+): m_logicalDevice(logicalDevice),m_isCubemap(false),m_isIrradianceMap(false),m_samplesCount(samplesCount)
 {
-    if (m_isCubemap)
-    {
-        createTextureImageCubemap(
-            (std::string(SKYBOX_DIR) + textureInfo.name).c_str(),
-            textureInfo.format,
-            physicalDevice,
-            logicalDevice,
-            commandPool,
-            graphicsQueue
-        );
-    }
-    else
-    {
-        createTextureImage(
-            (std::string(MODEL_DIR) + textureInfo.name).c_str(),
-            textureInfo.format,
-            physicalDevice,
-            logicalDevice,
-            commandPool,
-            graphicsQueue
-        );
-    }
+    
+    createTextureImage(
+        (std::string(MODEL_DIR) + textureInfo.name).c_str(),
+        textureInfo.format,
+        physicalDevice,
+        commandPool,
+        graphicsQueue
+    );
+}
+
+/*
+ * Creates all the texture resources for a skybox(cubemap).
+ */
+Texture::Texture(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    const bool isIrradianceMap,
+    const TextureToLoadInfo& textureInfo,
+    const std::string& textureFolderName,
+    const VkSampleCountFlagBits& samplesCount,
+    const std::shared_ptr<CommandPool>& commandPool,
+    VkQueue& graphicsQueue
+) : m_logicalDevice(logicalDevice),m_isCubemap(true),m_isIrradianceMap(isIrradianceMap),m_samplesCount(samplesCount)
+{
+    createTextureImageCubemap(
+        std::string(SKYBOX_DIR) + textureFolderName,
+        textureInfo,
+        physicalDevice,
+        commandPool,
+        graphicsQueue
+    );
 }
 
 Texture::~Texture() {}
@@ -55,14 +67,14 @@ void Texture::transitionImageLayout(
     const VkFormat& format,
     const VkImageLayout& oldLayout,
     const VkImageLayout& newLayout,
-    CommandPool& commandPool,
+    const std::shared_ptr<CommandPool>& commandPool,
     VkQueue& graphicsQueue )
 {
     VkCommandBuffer commandBuffer;
 
-    commandPool.allocCommandBuffer(commandBuffer,true);
+    commandPool->allocCommandBuffer(commandBuffer,true);
 
-    commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,commandBuffer);
+    commandPool->beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,commandBuffer);
 
         VkImageMemoryBarrier imgMemoryBarrier{};
         imgMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -135,17 +147,16 @@ void Texture::transitionImageLayout(
             commandBuffer
         );
 
-    commandPool.endCommandBuffer(commandBuffer);
+    commandPool->endCommandBuffer(commandBuffer);
 
-    commandPool.submitCommandBuffer(graphicsQueue,commandBuffer);
+    commandPool->submitCommandBuffer(graphicsQueue,commandBuffer);
 }
 
 void Texture::createTextureImage(
     const char*             pathToTexture,
     const VkFormat&         format,
     const VkPhysicalDevice& physicalDevice,
-    const VkDevice&         logicalDevice,
-    CommandPool&            commandPool,
+    const std::shared_ptr<CommandPool>& commandPool,
     VkQueue&                graphicsQueue
 ) {
     int texWidth, texHeight, texChannels;
@@ -164,7 +175,7 @@ void Texture::createTextureImage(
 
     BufferManager::createBuffer(
         physicalDevice,
-        logicalDevice,
+        m_logicalDevice,
         imageSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
@@ -173,14 +184,14 @@ void Texture::createTextureImage(
         stagingBuffer
     );
 
-    BufferManager::fillBuffer(logicalDevice, pixels, 0, imageSize, stagingBufferMemory);
+    BufferManager::fillBuffer(m_logicalDevice, pixels, 0, imageSize, stagingBufferMemory);
 
     stbi_image_free(pixels);
 
     // Creates an empty Image object of determined properties.
     m_image = Image(
         physicalDevice,
-        logicalDevice,
+        m_logicalDevice,
         texWidth,
         texHeight,
         format,
@@ -220,8 +231,8 @@ void Texture::createTextureImage(
         m_image.get()
     );
 
-    vkDestroyBuffer(logicalDevice,stagingBuffer,nullptr);
-    vkFreeMemory(logicalDevice,stagingBufferMemory,nullptr);
+    vkDestroyBuffer(m_logicalDevice,stagingBuffer,nullptr);
+    vkFreeMemory(m_logicalDevice,stagingBufferMemory,nullptr);
     
     MipmapUtils::generateMipmaps(
         physicalDevice,
@@ -236,44 +247,70 @@ void Texture::createTextureImage(
 }
 
 void Texture::createTextureImageCubemap(
-    const char* pathToTexture,
-    const VkFormat& format,
+    const std::string& pathToTexture,
+    const TextureToLoadInfo& textureInfo,
     const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
-    CommandPool& commandPool,
+    const std::shared_ptr<CommandPool>& commandPool,
     VkQueue& graphicsQueue ) 
 {
+    // Loads the texture
     int texWidth, texHeight, texChannels;
     VkDeviceSize imageSize;
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
 
-    stbi_uc* pixels[6];
-
-    for (size_t i = 0; i < 6; i++)
+    const float* img = stbi_loadf((m_isIrradianceMap) ?
+        (pathToTexture + "/IrradianceMap/" + textureInfo.name).c_str() :
+        (pathToTexture + "/" + textureInfo.name).c_str(),
+        &texWidth,
+        &texHeight,
+        &texChannels,
+        3
+    );
+    if (img == nullptr)
     {
-        pixels[i] = stbi_load(
-            (std::string(pathToTexture) + "/" + Config::TEXTURE_CUBEMAP_NAMING_CONV[i] + "." + Config::TEXTURE_CUBEMAP_FORMAT).c_str(),
-            &texWidth,
-            &texHeight,
-            &texChannels,
-            STBI_rgb_alpha
-        );
-
-        if (!pixels[i])
-        {
-            throw std::runtime_error("Failed to load texture image: " + std::string(pathToTexture) + "/" + Config::TEXTURE_CUBEMAP_NAMING_CONV[i] + "." + Config::TEXTURE_CUBEMAP_FORMAT);
-        }
+        throw std::runtime_error("Failed to load texture image: " + std::string(pathToTexture) + "/" + textureInfo.name);
     }
-    m_mipLevels = 1;
 
-    // 4 -> rgbA
-    // 6 -> since we've 6 layers because of the cubemap.
-    imageSize = texWidth * texHeight * 4 * 6;
+    // TODO: Verify if it's already created.
+    if (!m_isIrradianceMap)
+    {
+        cubemapUtils::createIrradianceHDR(img, texWidth, texHeight, pathToTexture + "/IrradianceMap/Irradiance.hdr");
+    }
+
+    // Converts RGB -> RGBA
+    // (Because Vulkan doesn't accept to use RGB format as sampler)
+    std::vector<float> img32(texWidth * texHeight * 4);
+    cubemapUtils::float24to32(texWidth, texHeight, img, img32.data());
+    stbi_image_free((void*)img);
+
+    // Creates a Vertical Cross texture from the square texture.
+
+    Bitmap in(texWidth, texHeight, 4, eBitmapFormat_Float, img32.data());
+    Bitmap out = cubemapUtils::convertEquirectangularMapToVerticalCross(in);
+
+
+    //stbi_write_hdr(
+    //      (pathToTexture + "/verticalCross.hdr").c_str(),
+    //      out.w_,
+    //      out.h_,
+    //      out.comp_,
+    //      (const float*)out.data_.data()
+    //);
+
+    // Divides the cross and creates the 6 faces.
+
+    Bitmap cubemap = cubemapUtils::convertVerticalCrossToCubeMapFaces(out);
+
+    uint8_t* data = cubemap.data_.data();
+    imageSize = (cubemap.w_ * cubemap.h_ * 4 * Bitmap::getBytesPerComponent(cubemap.fmt_) * 6);
+
+    // Creates the textures of the faces.
+    m_mipLevels = 1;
 
     BufferManager::createBuffer(
         physicalDevice,
-        logicalDevice,
+        m_logicalDevice,
         imageSize,
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -281,21 +318,15 @@ void Texture::createTextureImageCubemap(
         stagingBuffer
     );
 
-    VkDeviceSize layerSize = imageSize / 6;
-
-    for (size_t i = 0; i < 6; i++)
-    {
-        BufferManager::fillBuffer(logicalDevice, pixels[i], layerSize * i, layerSize, stagingBufferMemory);
-        stbi_image_free(pixels[i]);
-    }
+    BufferManager::fillBuffer(m_logicalDevice, data, 0, imageSize, stagingBufferMemory);
 
     // Creates an empty Image object of determined properties.
     m_image = Image(
         physicalDevice,
-        logicalDevice,
-        texWidth,
-        texHeight,
-        format,
+        m_logicalDevice,
+        cubemap.w_,
+        cubemap.h_,
+        textureInfo.format,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -314,7 +345,7 @@ void Texture::createTextureImageCubemap(
     // We will transfer the pixels to the image object with a cmd buffer.
     // (staging buffer to the image obj)
     transitionImageLayout(
-        format,
+        textureInfo.format,
         // Since the image was created with the VK_IMAGE_LAYOUT_UNDEFINED
         VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -323,8 +354,8 @@ void Texture::createTextureImageCubemap(
     );
 
     ImageManager::copyBufferToImage(
-        static_cast<uint32_t>(texWidth),
-        static_cast<uint32_t>(texHeight),
+        static_cast<uint32_t>(cubemap.w_),
+        static_cast<uint32_t>(cubemap.h_),
         true,
         graphicsQueue,
         stagingBuffer,
@@ -334,30 +365,30 @@ void Texture::createTextureImageCubemap(
 
     // Another transition to sample from the shader.
     transitionImageLayout(
-        format,
+        textureInfo.format,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         commandPool,
         graphicsQueue
     );
 
-    vkDestroyBuffer(logicalDevice, stagingBuffer, nullptr);
-    vkFreeMemory(logicalDevice, stagingBufferMemory, nullptr);
+    vkDestroyBuffer(m_logicalDevice, stagingBuffer, nullptr);
+    vkFreeMemory(m_logicalDevice, stagingBufferMemory, nullptr);
 }
 
 
-const VkImageView& Texture::getTextureImageView() const
+const VkImageView& Texture::getImageView() const
 {
     return m_image.getImageView();
 }
 
 
-const VkSampler& Texture::getTextureSampler() const
+const VkSampler& Texture::getSampler() const
 {
     return m_image.getSampler();
 }
 
-void Texture::destroyTexture(const VkDevice& logicalDevice)
+void Texture::destroy()
 {
-    m_image.destroy(logicalDevice);
+    m_image.destroy();
 }

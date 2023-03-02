@@ -9,7 +9,7 @@
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Buffers/BufferManager.h"
 #include "VulkanRenderer/Model/Types/Light.h"
-
+#include "VulkanRenderer/Math/MathUtils.h"
 
 NormalPBR::NormalPBR(const std::string& name, const std::string& modelFileName,
 	const glm::fvec4& pos,
@@ -24,19 +24,19 @@ NormalPBR::~NormalPBR() {}
 
 void NormalPBR::destroy(const VkDevice& logicalDevice)
 {
-	m_ubo.destroyUniformBuffersAndMemories(logicalDevice);
-	m_uboLights.destroyUniformBuffersAndMemories(logicalDevice);
+	m_ubo->destroy();
+	m_uboLights->destroy();
 
 	for (auto& texture : m_texturesLoaded)
-		texture->destroyTexture(logicalDevice);
+		texture->destroy();
 
 	for (auto& mesh : m_meshes)
 	{
-		BufferManager::destroyBuffer(logicalDevice, mesh.m_vertexBuffer);
-		BufferManager::destroyBuffer(logicalDevice, mesh.m_indexBuffer);
+		BufferManager::destroyBuffer(logicalDevice, mesh.vertexBuffer);
+		BufferManager::destroyBuffer(logicalDevice, mesh.indexBuffer);
 
-		BufferManager::freeMemory(logicalDevice, mesh.m_vertexMemory);
-		BufferManager::freeMemory(logicalDevice, mesh.m_indexMemory);
+		BufferManager::freeMemory(logicalDevice, mesh.vertexMemory);
+		BufferManager::freeMemory(logicalDevice, mesh.indexMemory);
 	}
 }
 
@@ -44,7 +44,7 @@ std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextu
 {
 	if (material->GetTextureCount(type) > 0)
 	{
-		// TODO: do something when there are many textures of the same type.
+		// TODO: manage  when there are several textures of the same type.
 
 		//for (size_t i = 0; i < material->GetTextureCount(type); i++)
 		//{
@@ -57,11 +57,9 @@ std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextu
 		return str.C_Str();
 
 	}
-	else {
-		if (typeName == "NORMALS")
-			std::cout << " NSADSADSADSA NO HAY NORMALS\n";
+	else
 		return defaultTextureFile;
-	}
+	
 }
 
 void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
@@ -78,21 +76,18 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 		{
 			vertex.normal = glm::normalize(glm::fvec3(mesh->mNormals[i].x,mesh->mNormals[i].y,mesh->mNormals[i].z));
 		}
-		else {
-			std::cout << " NO HAY NORMALS !\n";
-			vertex.normal = glm::fvec3(1.0f);
-		}
+		else
+			throw std::runtime_error("Mesh doesn't have normals!");
+
 
 		//TexCoords
 		if (mesh->mTextureCoords[0] != NULL)
 		{
 			vertex.texCoord = {mesh->mTextureCoords[0][i].x,mesh->mTextureCoords[0][i].y,};
-			newMesh.m_hasTextureCoords = true;
 		}
 		else
 		{
 			vertex.texCoord = glm::fvec3(1.0f);
-			newMesh.m_hasTextureCoords = false;
 		}
 
 		//Tangents
@@ -107,14 +102,14 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 
 		vertex.posInLightSpace = glm::fvec4(1.0f);
 
-		newMesh.m_vertices.push_back(vertex);
+		newMesh.vertices.push_back(vertex);
 	}
 
 	for (size_t i = 0; i < mesh->mNumFaces; i++)
 	{
 		auto face = mesh->mFaces[i];
 		for (size_t j = 0; j < face.mNumIndices; j++)
-			newMesh.m_indices.push_back(face.mIndices[j]);
+			newMesh.indices.push_back(face.mIndices[j]);
 	}
 
 
@@ -125,46 +120,52 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 		TextureToLoadInfo info;
 		info.name = getMaterialTextureName(material, aiTextureType_DIFFUSE, "DIFFUSE", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_SRGB;
-		newMesh.m_texturesToLoadInfo.push_back(info);
+		newMesh.texturesToLoadInfo.push_back(info);
 
 		info.name = getMaterialTextureName(material,aiTextureType_UNKNOWN,"METALIC_ROUGHNESS", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_SRGB;
-		newMesh.m_texturesToLoadInfo.push_back(info);
+		newMesh.texturesToLoadInfo.push_back(info);
 
 		info.name = getMaterialTextureName(material,aiTextureType_NORMALS,"NORMALS", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_UNORM;
-		newMesh.m_texturesToLoadInfo.push_back(info);
+		if (info.name == "textures/default.png")
+			m_hasNormalMap = false;
+		else
+			m_hasNormalMap = true;
+
+		newMesh.texturesToLoadInfo.push_back(info);
 	}
 	m_meshes.push_back(newMesh);
 }
 
 void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
 {
-	m_ubo.createUniformBuffers(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::NormalPBR));
-	m_uboLights.createUniformBuffers(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10);
+	m_ubo = std::make_shared<UBO>(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::NormalPBR));
+	m_uboLights = std::make_shared<UBO>(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10);
 }
 
-void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout, const ShadowMap* shadowMap, DescriptorPool& descriptorPool)
+void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout, const Texture& irradianceMap, const std::shared_ptr<ShadowMap>& shadowMap, DescriptorPool& descriptorPool)
 {
-	std::vector<UBO*> opUBOs = { &m_ubo, &m_uboLights };
+	std::vector<UBO*> opUBOs = { (m_ubo.get()),(m_uboLights.get()) };
 
 	for (auto& mesh : m_meshes)
 	{
-		mesh.m_descriptorSets = DescriptorSets(
+		mesh.descriptorSets = DescriptorSets(
 			logicalDevice,
 			GRAPHICS_PIPELINE::PBR::UBOS_INFO,
 			GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO,
-			mesh.m_textures,
-			&shadowMap->getShadowMapView(),
-			&shadowMap->getSampler(),
+			mesh.textures,
 			opUBOs,
 			descriptorSetLayout,
-			descriptorPool
+			descriptorPool,
+			std::make_optional(irradianceMap),
+			std::make_optional(shadowMap->getShadowMapView()),
+			std::make_optional(shadowMap->getSampler())
 		);
 	}
 }
 
-void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue,CommandPool& commandPool) 
+void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
 {
 
 	for (auto& mesh : m_meshes)
@@ -174,12 +175,12 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const Vk
 			commandPool,
 			physicalDevice,
 			logicalDevice,
-			mesh.m_vertices.data(),
-			sizeof(mesh.m_vertices[0]) * mesh.m_vertices.size(),
+			mesh.vertices.data(),
+			sizeof(mesh.vertices[0]) * mesh.vertices.size(),
 			graphicsQueue,
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-			mesh.m_vertexMemory,
-			mesh.m_vertexBuffer
+			mesh.vertexMemory,
+			mesh.vertexBuffer
 		);
 
 		// Index Buffer(with staging buffer)
@@ -187,12 +188,12 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const Vk
 			commandPool,
 			physicalDevice,
 			logicalDevice,
-			mesh.m_indices.data(),
-			sizeof(mesh.m_indices[0]) * mesh.m_indices.size(),
+			mesh.indices.data(),
+			sizeof(mesh.indices[0]) * mesh.indices.size(),
 			graphicsQueue,
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-			mesh.m_indexMemory,
-			mesh.m_indexBuffer
+			mesh.indexMemory,
+			mesh.indexBuffer
 		);
 	}
 }
@@ -200,7 +201,7 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const Vk
 /*
  * Creates and loads all the samplers used in the shader of each mesh.
  */
-void NormalPBR::createTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, CommandPool& commandPool, VkQueue& graphicsQueue)
+void NormalPBR::loadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, VkQueue& graphicsQueue)
 {
 	const size_t nTextures = GRAPHICS_PIPELINE::PBR::TEXTURES_PER_MESH_COUNT;
 
@@ -209,16 +210,16 @@ void NormalPBR::createTextures(const VkPhysicalDevice& physicalDevice,const VkDe
 		// Samplers of textures.
 		for (size_t i = 0; i < nTextures; i++)
 		{
-			auto it = (m_texturesID.find(mesh.m_texturesToLoadInfo[i].name));
+			auto it = (m_texturesID.find(mesh.texturesToLoadInfo[i].name));
 
 			if (it == m_texturesID.end())
 			{
-				mesh.m_textures.push_back(std::make_shared<Texture>(physicalDevice,logicalDevice,mesh.m_texturesToLoadInfo[i],false,samplesCount,commandPool,graphicsQueue));
-				m_texturesLoaded.push_back(mesh.m_textures[i]);
-				m_texturesID[mesh.m_texturesToLoadInfo[i].name] = (m_texturesLoaded.size() - 1);
+				mesh.textures.push_back(std::make_shared<Texture>(physicalDevice,logicalDevice, mesh.texturesToLoadInfo[i],samplesCount,commandPool,graphicsQueue));
+				m_texturesLoaded.push_back(mesh.textures[i]);
+				m_texturesID[mesh.texturesToLoadInfo[i].name] = (m_texturesLoaded.size() - 1);
 			}
 			else
-				mesh.m_textures.push_back(m_texturesLoaded[it->second]);
+				mesh.textures.push_back(m_texturesLoaded[it->second]);
 		}
 	}
 }
@@ -239,13 +240,14 @@ void NormalPBR::updateUBO(
 	const uint32_t&				currentFrame
 ) {
 
-	m_dataInShader.model = UBOutils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
+	m_dataInShader.model = MathUtils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
 	m_dataInShader.view = view;
 	m_dataInShader.proj = proj;
 	m_dataInShader.lightSpace = lightSpace;
 
 	m_dataInShader.cameraPos = cameraPos;
 	m_dataInShader.lightsCount = lightsCount;
+	m_dataInShader.hasNormalMap = m_hasNormalMap;
 
 	size_t size = sizeof(m_dataInShader);
 	UBOutils::updateUBO(logicalDevice, m_ubo, size, &m_dataInShader, currentFrame);

@@ -55,13 +55,13 @@ void BufferManager::bindBufferWithMemory(const VkDevice& logicalDevice, VkBuffer
     vkBindBufferMemory(logicalDevice, buffer, memory, 0);
 }
 
-void BufferManager::copyBuffer(CommandPool& commandPool, const VkDeviceSize size,
+void BufferManager::copyBuffer(const std::shared_ptr<CommandPool>& commandPool, const VkDeviceSize size,
     VkBuffer& srcBuffer, VkBuffer& dstBuffer, VkQueue& graphicsQueue) 
 {
     VkCommandBuffer commandBuffer;
-    commandPool.allocCommandBuffer(commandBuffer, true);
+    commandPool->allocCommandBuffer(commandBuffer, true);
 
-    commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, commandBuffer);
+    commandPool->beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, commandBuffer);
 
     VkBufferCopy copyRegion{};
     // optional
@@ -72,9 +72,9 @@ void BufferManager::copyBuffer(CommandPool& commandPool, const VkDeviceSize size
 
     CommandUtils::ACTION::copyBufferToBuffer(srcBuffer, dstBuffer, 1, copyRegion, commandBuffer);
 
-    commandPool.endCommandBuffer(commandBuffer);
+    commandPool->endCommandBuffer(commandBuffer);
 
-    commandPool.submitCommandBuffer(graphicsQueue, commandBuffer);
+    commandPool->submitCommandBuffer(graphicsQueue, commandBuffer);
 }
 
 void BufferManager::allocBuffer(const VkDevice& logicalDevice, const VkPhysicalDevice& physicalDevice,
@@ -109,7 +109,7 @@ void BufferManager::allocBuffer(const VkDevice& logicalDevice, const VkPhysicalD
 
 template<typename T>
 void BufferManager::createBufferAndTransferToDevice(
-    CommandPool&                commandPool,
+    const std::shared_ptr<CommandPool>& commandPool,
     const VkPhysicalDevice&     physicalDevice,
     const VkDevice&             logicalDevice,
     T*                          data,
@@ -143,7 +143,7 @@ void BufferManager::createBufferAndTransferToDevice(
 //////////////////////////////////Instances////////////////////////////////////
 
 template void BufferManager::createBufferAndTransferToDevice<uint32_t>(
-        CommandPool&                commandPool,
+        const std::shared_ptr<CommandPool>& commandPool,
         const VkPhysicalDevice&     physicalDevice,
         const VkDevice&             logicalDevice,
         uint32_t*                   data,
@@ -156,7 +156,7 @@ template void BufferManager::createBufferAndTransferToDevice<uint32_t>(
 
 template void BufferManager::createBufferAndTransferToDevice<Attributes::PBR::Vertex>
 (
-        CommandPool&                commandPool,
+        const std::shared_ptr<CommandPool>& commandPool,
         const VkPhysicalDevice&     physicalDevice,
         const VkDevice&             logicalDevice,
         Attributes::PBR::Vertex*    data,
@@ -168,7 +168,7 @@ template void BufferManager::createBufferAndTransferToDevice<Attributes::PBR::Ve
     );
 
 template void BufferManager::createBufferAndTransferToDevice< Attributes::SKYBOX::Vertex>(
-        CommandPool&                commandPool,
+        const std::shared_ptr<CommandPool>& commandPool,
         const VkPhysicalDevice&     physicalDevice,
         const VkDevice&             logicalDevice,
         Attributes::SKYBOX::Vertex* data,
@@ -180,7 +180,7 @@ template void BufferManager::createBufferAndTransferToDevice< Attributes::SKYBOX
     );
 
 template void BufferManager::createBufferAndTransferToDevice<Attributes::LIGHT::Vertex>(
-        CommandPool&                commandPool,
+        const std::shared_ptr<CommandPool>& commandPool,
         const VkPhysicalDevice&     physicalDevice,
         const VkDevice&             logicalDevice,
         Attributes::LIGHT::Vertex*  data,
@@ -232,9 +232,17 @@ template void BufferManager::fillBuffer<uint32_t>(
         VkDeviceMemory&             memory
     );
 
-template void BufferManager::fillBuffer<stbi_uc>(
+template void BufferManager::fillBuffer<uint8_t>(
         const VkDevice&             logicalDevice,
-        stbi_uc*                    data,
+        uint8_t*                    data,
+        const VkDeviceSize          offset,
+        const VkDeviceSize          size,
+        VkDeviceMemory&             memory
+    );
+
+template void BufferManager::fillBuffer<float>(
+        const VkDevice&             logicalDevice,
+        float*                      data,
         const VkDeviceSize          offset,
         const VkDeviceSize          size,
         VkDeviceMemory&             memory

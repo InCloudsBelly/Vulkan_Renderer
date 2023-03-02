@@ -21,16 +21,13 @@ DescriptorSets::DescriptorSets(
     const std::vector<DescriptorInfo>&          uboInfo,
     const std::vector<DescriptorInfo>&          samplersInfo,
     const std::vector<std::shared_ptr<Texture>>& textures,
-    const VkImageView*                          shadowMapImageView,
-    const VkSampler*                            shadowMapSampler,
     std::vector<UBO*>&                          UBOs,
     const VkDescriptorSetLayout&                descriptorSetLayout,
-    DescriptorPool&                             descriptorPool)
+    DescriptorPool&                             descriptorPool,
+    const std::optional<Texture>                irradianceMap,
+    const std::optional<VkImageView>            shadowMapView,
+    const std::optional<VkSampler>              shadowMapSampler)
 {
-    // TODO: Improve this, since all the descriptors sets
-    // are the same, just copy it instead of creating them
-    // many times.
-
     std::vector<VkDescriptorImageInfo> imageInfos;
     imageInfos.resize(samplersInfo.size());
 
@@ -39,7 +36,7 @@ DescriptorSets::DescriptorSets(
     // create descriptors sets with one same Descriptor Set Layout.
     m_descriptorSetLayouts.resize(Config::MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
 
-    descriptorPool.allocDescriptorSets(logicalDevice, m_descriptorSetLayouts,m_descriptorSets);
+    descriptorPool.allocDescriptorSets(m_descriptorSetLayouts,m_descriptorSets);
 
     // Configures the descriptor sets
     for (size_t i = 0; i < m_descriptorSets.size(); i++)
@@ -47,19 +44,25 @@ DescriptorSets::DescriptorSets(
         std::vector<VkDescriptorBufferInfo> bufferInfos(UBOs.size());
         for (size_t j = 0; j < UBOs.size(); ++j)
         {
-            DescriptorTypesUtils::createDescriptorBufferInfo(UBOs[j]->getUniformBuffer(i), bufferInfos[j]);
+            DescriptorTypesUtils::createDescriptorBufferInfo(UBOs[j]->get(i), bufferInfos[j]);
         }
 
         // Samplers of textures
         for (size_t j = 0; j < textures.size(); j++)
         {
-            DescriptorTypesUtils::createDescriptorImageInfo(textures[j]->getTextureImageView(),textures[j]->getTextureSampler(), imageInfos[j]);
+            DescriptorTypesUtils::createDescriptorImageInfo(textures[j]->getImageView(),textures[j]->getSampler(), imageInfos[j]);
         }
 
-        //Samplers of data(e.g shadowMapping)
-        if (shadowMapImageView != nullptr && shadowMapSampler != nullptr)
-            DescriptorTypesUtils::createDescriptorImageInfo(*shadowMapImageView, *shadowMapSampler, imageInfos[textures.size()]);
+        if (irradianceMap.has_value())
+        {
+            // Sampler of Irradiance map.
+            DescriptorTypesUtils::createDescriptorImageInfo(irradianceMap->getImageView(),irradianceMap->getSampler(),imageInfos[samplersInfo.size() - 2]);
+        }
 
+        if (shadowMapView.has_value() && shadowMapSampler.has_value())
+        {
+            DescriptorTypesUtils::createDescriptorImageInfo(shadowMapView.value(),shadowMapSampler.value(),imageInfos[samplersInfo.size() - 1]);
+        }
 
         std::vector<VkWriteDescriptorSet> descriptorWrites;
         descriptorWrites.resize(uboInfo.size() + samplersInfo.size());
@@ -78,6 +81,22 @@ DescriptorSets::DescriptorSets(
 
         vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
+}
+
+DescriptorSets::DescriptorSets(const DescriptorSets& other)
+    : m_descriptorSets(other.m_descriptorSets),
+    m_descriptorSetLayouts(other.m_descriptorSetLayouts)
+{}
+
+DescriptorSets& DescriptorSets::operator=(const DescriptorSets& other)
+{
+    if (this == &other)
+        return *this;
+
+    m_descriptorSets = other.m_descriptorSets;
+    m_descriptorSetLayouts = other.m_descriptorSetLayouts;
+
+    return *this;
 }
 
 

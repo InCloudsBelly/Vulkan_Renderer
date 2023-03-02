@@ -44,18 +44,17 @@ public:
 		const VkPhysicalDevice& physicalDevice,
 		const VkDevice&			logicalDevice,
 		VkQueue&				graphicsQueue,
-		CommandPool&			commandPool
+		const std::shared_ptr<CommandPool>& commandPool
 	) = 0;
 
-	virtual void createTextures(
+	virtual void loadTextures(
 		const VkPhysicalDevice&			physicalDevice,
 		const VkDevice&					logicalDevice,
 		const VkSampleCountFlagBits&	samplesCount,
-		CommandPool&					commandPool,
+		const std::shared_ptr<CommandPool>& commandPool,
 		VkQueue&						graphicsQueue
 	) = 0;
 
-	virtual void createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, const ShadowMap* shadowMap, DescriptorPool& descriptorPool) = 0;
 	virtual void createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount) = 0;
 
 	const std::string& getName() const;
@@ -69,24 +68,19 @@ public:
 	void setSize(const glm::fvec3& newSize);
 	void setHideStatus(const bool status);
 
-	// Info to update UBO.
-	float			extremeX[2];
-	float			extremeY[2];
-	float			extremeZ[2];
-
 protected:
 	virtual void processMesh(aiMesh* mesh, const aiScene* scene) = 0;
 	void loadModel(const char* pathToModel);
 
-	std::string			m_name;
-	ModelType			m_type;
-	UBO					m_ubo;
+	ModelType            m_type;
+	std::string          m_name;
+	std::shared_ptr<UBO> m_ubo;
 
-	glm::fvec4			m_pos;
-	glm::fvec3			m_rot;
-	glm::fvec3			m_size;
+	glm::fvec4           m_pos;
+	glm::fvec3           m_rot;
+	glm::fvec3           m_size;
 
-	bool				m_hideStatus;
+	bool                 m_hideStatus;
 
 	std::vector<std::shared_ptr<Texture>> m_texturesLoaded;
 	std::unordered_map<std::string, size_t> m_texturesID;

@@ -29,20 +29,19 @@ public:
 
 	void destroy(const VkDevice& logicalDevice) override;
 
-    void createTextures(
+    void loadTextures(
         const VkPhysicalDevice& physicalDevice,
         const VkDevice& logicalDevice,
         const VkSampleCountFlagBits& samplesCount,
-        CommandPool& commandPool,
+        const std::shared_ptr<CommandPool>& commandPool,
         VkQueue& graphicsQueue
     ) override;
 
     void createDescriptorSets(
         const VkDevice& logicalDevice,
         const VkDescriptorSetLayout& descriptorSetLayout,
-        const ShadowMap* shadowMap,
         DescriptorPool& descriptorPool
-    ) override;
+    );
 
     void createUniformBuffers(
         const VkPhysicalDevice& physicalDevice,
@@ -62,8 +61,10 @@ public:
         const VkPhysicalDevice& physicalDevice,
         const VkDevice& logicalDevice,
         VkQueue& graphicsQueue,
-        CommandPool& commandPool
+        const std::shared_ptr<CommandPool>& commandPool
     );
+
+    const Texture& getIrradianceMap() const;
 
     // Info to update UBO.
     float extremeX[2];
@@ -75,6 +76,15 @@ public:
 private:
 
     void processMesh(aiMesh* mesh, const aiScene* scene) override;
+    void loadIrradianceMap(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        const TextureToLoadInfo& textureInfo,
+        const VkSampleCountFlagBits& samplesCount,
+        const std::shared_ptr<CommandPool>& commandPool,
+        VkQueue& graphicsQueue
+    );
 
-    std::string m_textureFolderName;
+    std::string                m_textureFolderName;
+    std::shared_ptr<Texture>   m_irradianceMap;
 };

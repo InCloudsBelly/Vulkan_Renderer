@@ -23,9 +23,10 @@ public:
     void createDescriptorSets(
         const VkDevice& logicalDevice,
         const VkDescriptorSetLayout& descriptorSetLayout,
-        const ShadowMap* shadowMap,
+        const Texture& irradianceMap,
+        const std::shared_ptr<ShadowMap>& shadowMap,
         DescriptorPool& descriptorPool
-    ) override;
+    );
 
     void createUniformBuffers(
         const VkPhysicalDevice& physicalDevice,
@@ -37,14 +38,14 @@ public:
         const VkPhysicalDevice& physicalDevice,
         const VkDevice& logicalDevice,
         VkQueue& graphicsQueue,
-        CommandPool& commandPool
+        const std::shared_ptr<CommandPool>& commandPool
     ) override;
 
-    void createTextures(
+    void loadTextures(
         const VkPhysicalDevice& physicalDevice,
         const VkDevice& logicalDevice,
         const VkSampleCountFlagBits& samplesCount,
-        CommandPool& commandPool,
+        const std::shared_ptr<CommandPool>& commandPool,
         VkQueue& graphicsQueue
     ) override;
 
@@ -84,7 +85,8 @@ private:
         const std::string& defaultTextureFile
    );
 
-   UBO m_uboLights;
+   std::shared_ptr<UBO> m_uboLights;
+   bool                 m_hasNormalMap;
 
    DescriptorTypes::UniformBufferObject::NormalPBR m_dataInShader;
    DescriptorTypes::UniformBufferObject::LightInfo m_lightsInfo[Config::LIGHTS_COUNT];

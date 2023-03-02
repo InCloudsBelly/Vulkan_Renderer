@@ -10,7 +10,7 @@
 
 void MipmapUtils::generateMipmaps(
     const VkPhysicalDevice&     physicalDevice,
-    CommandPool&                commandPool,
+    const std::shared_ptr<CommandPool>& commandPool,
     const VkQueue&              graphicsQueue,
     const VkImage&              image,
     const int32_t               width,
@@ -23,9 +23,9 @@ void MipmapUtils::generateMipmaps(
 
     VkCommandBuffer commandBuffer;
 
-    commandPool.allocCommandBuffer(commandBuffer, true);
+    commandPool->allocCommandBuffer(commandBuffer, true);
 
-    commandPool.beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, commandBuffer);
+    commandPool->beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, commandBuffer);
 
     VkImageMemoryBarrier imgMemoryBarrier{};
     imgMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -40,7 +40,7 @@ void MipmapUtils::generateMipmaps(
     int32_t mipWidth = width;
     int32_t mipHeight = height;
 
-    for (uint32_t i = 1; i < mipLevels; i++)
+    for (int32_t i = 1; i < mipLevels; i++)
     {
         imgMemoryBarrier.subresourceRange.baseMipLevel = i - 1;
         imgMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -115,9 +115,9 @@ void MipmapUtils::generateMipmaps(
         commandBuffer
     );
 
-    commandPool.endCommandBuffer(commandBuffer);
+    commandPool->endCommandBuffer(commandBuffer);
 
-    commandPool.submitCommandBuffer(graphicsQueue, commandBuffer);
+    commandPool->submitCommandBuffer(graphicsQueue, commandBuffer);
 }
 
 bool MipmapUtils::isLinearBlittingSupported(const VkPhysicalDevice& physicalDevice,const VkFormat& format) 

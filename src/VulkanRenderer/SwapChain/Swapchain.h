@@ -7,8 +7,8 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Window/Window.h"
-#include "VulkanRenderer/GraphicsPipeline/RenderTarget.h"
-
+#include "VulkanRenderer/Features/MSAA.h"
+#include "VulkanRenderer/Features/DepthBuffer.h"
 
 struct SwapchainSupportedProperties
 {
@@ -37,12 +37,10 @@ public:
 	);
 	~Swapchain();
 
-	void createAllImageViews(const VkDevice& logicalDevice);
-	void createFramebuffers(const VkDevice& logicalDevice, const VkRenderPass& renderPass, const RenderTarget::DepthBuffer& depthBuffer, const RenderTarget::MSAA& msaa);
+	void createAllImageViews();
+	void createFramebuffers(const VkRenderPass& renderPass, const DepthBuffer& depthBuffer, const MSAA& msaa);
 
-	void destroyFramebuffers(const VkDevice& logicalDevice);
-	void destroySwapchain(const VkDevice& logicalDevice);
-	void destroyImageViews(const VkDevice& logicalDevice);
+	void destroy();
 
 	const VkExtent2D& getExtent() const;
 	const VkFormat& getImageFormat() const;
@@ -66,17 +64,15 @@ private:
 
 
 private:
-	VkSwapchainKHR					m_swapchain;
-	std::vector<VkImage>			m_images;
+	VkDevice                   m_logicalDevice;
+
+	VkSwapchainKHR             m_swapchain;
+	VkFormat                   m_imageFormat;
+	VkExtent2D                 m_extent;
+	std::vector<VkImage>       m_images;
+	std::vector<VkImageView>   m_imageViews;
+	std::vector<VkFramebuffer> m_framebuffers;
+
 	// Used for the creation of the Imgui instance.
-	uint32_t						m_minImageCount;
-
-	// Describes how to access the images and which part of the images to
-	// access.
-	std::vector<VkImageView>		m_imageViews;
-
-	VkFormat						m_imageFormat;
-	VkExtent2D						m_extent;
-
-	std::vector<VkFramebuffer>		m_framebuffers;
+	uint32_t                   m_minImageCount;
 };

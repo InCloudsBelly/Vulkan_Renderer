@@ -30,8 +30,9 @@ source_group(TREE ${PROJECT_SOURCE_DIR} FILES ${AllFile})
 
 if (CMAKE_BUILD_TYPE MATCHES Debug)
    set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Wall")
-   #else ()
-   #   set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
+else ()
+   set(CMAKE_CXX_FLAGS_RELEASE_INIT "-Wall")
+   add_definitions(-DRELEASE_MODE_ON=0)
 endif ()
 
 #####################################Libs######################################
@@ -77,12 +78,17 @@ PUBLIC
 
 # -Assimp
 set(ASSIMP_DIR "${PROJECT_LIBRARIES_DIR}/assimp")
+option(ASSIMP_BUILD_TESTS OFF)
 add_subdirectory(${ASSIMP_DIR})
-set(ASSIMP_BUILD_TESTS OFF)
 
 # - PThreads
 set(THREADS_PREFER_PTRHEAD_FLAG ON)
 find_package(Threads REQUIRED)
+
+# - Tracy
+option(TRACY_ENABLE "" ON)
+option(TRACY_ON_DEMAND "" ON)
+add_subdirectory("${PROJECT_LIBRARIES_DIR}/tracy")
 
 ##################################Shaders######################################
 
@@ -107,11 +113,13 @@ target_include_directories(
    PUBLIC
       "${Vulkan_INCLUDE_DIRS}"
       "${GLFW_INCLUDE_DIRS}"
+      "${TracyClient_INCLUDE_DIRS}"
    PRIVATE
       "${PROJECT_SOURCE_DIR}"
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC
+target_link_libraries(${PROJECT_NAME} 
+   PUBLIC
    glfw 
    ${Vulkan_LIBRARIES}
    Threads::Threads  # Needed by GLFW.
@@ -119,7 +127,10 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
    stb_image
    assimp
    imgui
-   PRIVATE ${CMAKE_DL_LIBS}
+   Tracy::TracyClient
+
+   PRIVATE
+   ${CMAKE_DL_LIBS}
 )
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})

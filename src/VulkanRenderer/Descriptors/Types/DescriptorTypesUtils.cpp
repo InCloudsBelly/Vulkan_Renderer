@@ -6,8 +6,7 @@ void DescriptorTypesUtils::createDescriptorBufferInfo(
     const VkBuffer& buffer,
     VkDescriptorBufferInfo& bufferInfo
 ) {
-    // Specifies the buffer and the region within it that contains the data
-    // for the descriptor set.
+    // Specifies the buffer and the region within it that contains the data used by the descriptor set.
     bufferInfo.buffer = buffer;
     bufferInfo.offset = 0;
     bufferInfo.range = VK_WHOLE_SIZE;

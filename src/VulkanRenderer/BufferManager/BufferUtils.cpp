@@ -1,4 +1,4 @@
-#include "VulkanRenderer/Buffers/bufferUtils.h"
+#include "VulkanRenderer/BufferManager/BufferUtils.h"
 
 #include <stdexcept>
 

@@ -13,7 +13,6 @@
 #include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Textures/Texture.h"
-#include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
 #include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"

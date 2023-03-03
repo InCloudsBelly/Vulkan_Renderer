@@ -7,7 +7,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
+#include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
 #include "VulkanRenderer/Settings/VkLayersConfig.h"
 
@@ -24,7 +24,8 @@ void Device::createLogicalDevice(
     // for the logical device.
     std::set<uint32_t> uniqueQueueFamilies = {
           requiredQueueFamiliesIndices.graphicsFamily.value(),
-          requiredQueueFamiliesIndices.presentFamily.value()
+          requiredQueueFamiliesIndices.presentFamily.value(),
+          requiredQueueFamiliesIndices.computeFamily.value(),
     };
 
     float queuePriority = 1.0f;

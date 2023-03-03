@@ -61,7 +61,7 @@ int main()
                 "Sun",
                 "lightSphere.obj",
                 glm::fvec3(1.0f),
-                glm::fvec3(-1.5 * 10.9f, 1.5 * 87.0f, -1.5 * 10.6f),
+                glm::fvec3( -10.9f, 87.0f, -10.6f),
                 glm::fvec3(30.6f, -61.0f, 0.66f),
                 glm::fvec3(0.125f)
             );

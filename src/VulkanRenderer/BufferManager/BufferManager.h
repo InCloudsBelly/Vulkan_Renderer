@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 
 namespace BufferManager
 {
@@ -14,6 +15,17 @@ namespace BufferManager
         const VkMemoryPropertyFlags     memoryProperties,
         VkDeviceMemory&                 memory,
         VkBuffer&                       buffer
+    );
+
+    void createSharedConcurrentBuffer(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        const VkDeviceSize size,
+        const VkBufferUsageFlags usage,
+        const VkMemoryPropertyFlags memoryProperties,
+        const QueueFamilyIndices& queueFamilyIndices,
+        VkDeviceMemory& memory,
+        VkBuffer& buffer
     );
 
     template<typename T>
@@ -37,6 +49,14 @@ namespace BufferManager
 
     template<typename T>
     void fillBuffer(const VkDevice& logicalDevice, T* data,const VkDeviceSize offset,const VkDeviceSize size, VkDeviceMemory& memory);
+
+    void downloadDataFromBuffer(
+        const VkDevice& logicalDevice,
+        const VkDeviceSize& offset,
+        const VkDeviceSize& size,
+        const VkDeviceMemory& memory,
+        void* outData
+    );
 
     void allocBuffer(
         const VkDevice&             logicalDevice,

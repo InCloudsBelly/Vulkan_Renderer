@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
+#include "VulkanRenderer/Pipeline/Graphics.h"
 
 namespace FeaturesUtils
 {

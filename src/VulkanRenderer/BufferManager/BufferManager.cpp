@@ -1,4 +1,4 @@
-#include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/BufferManager/BufferManager.h"
 
 #include <stdexcept>
 #include <cstring>
@@ -8,9 +8,9 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Model/Attributes.h"
-#include "VulkanRenderer/Buffers/BufferUtils.h"
+#include "VulkanRenderer/BufferManager/BufferUtils.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
-#include "VulkanRenderer/Commands/CommandUtils.h"
+#include "VulkanRenderer/Commands/CommandManager.h"
 
 /*
  * It does:
@@ -34,9 +34,6 @@ void BufferManager::createBuffer(
     // Indicates for which purposeS the data in the buffer is going to be
     // used.
     bufferInfo.usage = usage;
-    // Indicates if the buffer can be owned by a specific queue family or
-    // be shared between multiple at the same time.
-    // (In this case we'll only use the graphics queue)
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     auto status = vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &buffer);
@@ -48,6 +45,62 @@ void BufferManager::createBuffer(
 
     bindBufferWithMemory(logicalDevice, buffer, memory);
 }
+
+
+/*
+ * Creates a buffer that can be shared between the graphics and compute queue.
+ */
+void BufferManager::createSharedConcurrentBuffer(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    const VkDeviceSize size,
+    const VkBufferUsageFlags usage,
+    const VkMemoryPropertyFlags memoryProperties,
+    const QueueFamilyIndices& queueFamilyIndices,
+    VkDeviceMemory& memory,
+    VkBuffer& buffer )
+{
+    std::vector<uint32_t> necessaryIndices;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = size;
+    // Indicates for which purposes the data in the buffer is going to be used.
+    bufferInfo.usage = usage;
+    bufferInfo.queueFamilyIndexCount = 2;
+
+    // Indicates if the buffer can be owned by a specific queue family or
+    // be shared between multiple at the same time.
+    // .VK_SHARING_MODE_EXCLUSIVE specifies that access to any range or image
+    // subresource of the object will be exclusive to a single queue family at
+    // a time.
+    // .VK_SHARING_MODE_CONCURRENT specifies that concurrent access to any range
+    // or image subresource of the object from multiple queue families is
+    // supported.
+
+    if (queueFamilyIndices.graphicsFamily.has_value() && queueFamilyIndices.computeFamily.has_value())
+    {
+        necessaryIndices = { queueFamilyIndices.graphicsFamily.value(),queueFamilyIndices.computeFamily.value() };
+
+        bufferInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        bufferInfo.pQueueFamilyIndices = necessaryIndices.data();
+    }
+    else 
+    {
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        bufferInfo.pQueueFamilyIndices = nullptr;
+    }
+
+    auto status = vkCreateBuffer(logicalDevice, &bufferInfo, nullptr, &buffer);
+
+    if (status != VK_SUCCESS)
+        throw std::runtime_error("Failed to create buffer of usage: " + usage);
+
+    allocBuffer(logicalDevice, physicalDevice, memoryProperties, buffer, memory);
+
+    bindBufferWithMemory(logicalDevice, buffer, memory);
+}
+
 
 void BufferManager::bindBufferWithMemory(const VkDevice& logicalDevice, VkBuffer& buffer, VkDeviceMemory& memory)
 {
@@ -70,11 +123,11 @@ void BufferManager::copyBuffer(const std::shared_ptr<CommandPool>& commandPool, 
     copyRegion.dstOffset = 0;
     copyRegion.size = size;
 
-    CommandUtils::ACTION::copyBufferToBuffer(srcBuffer, dstBuffer, 1, copyRegion, commandBuffer);
+    CommandManager::ACTION::copyBufferToBuffer(srcBuffer, dstBuffer, 1, copyRegion, commandBuffer);
 
     commandPool->endCommandBuffer(commandBuffer);
 
-    commandPool->submitCommandBuffer(graphicsQueue, commandBuffer);
+    commandPool->submitCommandBuffer(graphicsQueue, { commandBuffer }, true);
 }
 
 void BufferManager::allocBuffer(const VkDevice& logicalDevice, const VkPhysicalDevice& physicalDevice,
@@ -248,6 +301,21 @@ template void BufferManager::fillBuffer<float>(
         VkDeviceMemory&             memory
     );
 ///////////////////////////////////////////////////////////////////////////////
+
+void BufferManager::downloadDataFromBuffer(
+    const VkDevice& logicalDevice,
+    const VkDeviceSize& offset,
+    const VkDeviceSize& size,
+    const VkDeviceMemory& memory,
+    void* outData
+) {
+    void* memoryMap = nullptr;
+
+    vkMapMemory(logicalDevice, memory, offset, size, 0, &memoryMap);
+        memcpy(outData, memoryMap, size);
+    vkUnmapMemory(logicalDevice, memory);
+}
+
 
 void BufferManager::destroyBuffer(const VkDevice& logicalDevice,VkBuffer& buffer) 
 {

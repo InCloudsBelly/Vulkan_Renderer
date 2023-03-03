@@ -4,7 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Buffers/bufferManager.h"
+#include "VulkanRenderer/BufferManager/bufferManager.h"
 #include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
 
 UBO::UBO(const VkPhysicalDevice physicalDevice,const VkDevice logicalDevice,const uint32_t nSets, const size_t size)

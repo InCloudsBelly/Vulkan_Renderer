@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 #include <stdexcept>
 
-#include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
+#include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 #include "VulkanRenderer/Images/ImageManager.h"
 #include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/Features/MSAA.h"

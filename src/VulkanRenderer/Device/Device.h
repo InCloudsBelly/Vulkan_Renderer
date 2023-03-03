@@ -4,7 +4,7 @@
 
 #include <vector>
 
-#include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
+#include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
 
 class Device

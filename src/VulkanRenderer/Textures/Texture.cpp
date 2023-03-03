@@ -14,8 +14,8 @@
 
 #include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Images/ImageManager.h"
-#include "VulkanRenderer/Buffers/BufferManager.h"
-#include "VulkanRenderer/Commands/CommandUtils.h"
+#include "VulkanRenderer/BufferManager/BufferManager.h"
+#include "VulkanRenderer/Commands/CommandManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Descriptors/Types/Sampler/Sampler.h"
 
@@ -137,19 +137,19 @@ void Texture::transitionImageLayout(
             throw std::invalid_argument("Unsupported layout transition!");
 
 
-        CommandUtils::SYNCHRONIZATION::recordPipelineBarrier(
+        CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
             sourceStage,
             destinationStage, 
             0,
-            0, nullptr,
-            0, nullptr,
-            1, &imgMemoryBarrier,
-            commandBuffer
+            commandBuffer,
+            {},
+            {},
+            { imgMemoryBarrier }
         );
 
     commandPool->endCommandBuffer(commandBuffer);
 
-    commandPool->submitCommandBuffer(graphicsQueue,commandBuffer);
+    commandPool->submitCommandBuffer(graphicsQueue, { commandBuffer }, true);
 }
 
 void Texture::createTextureImage(

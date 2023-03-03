@@ -15,7 +15,7 @@
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Descriptors/DescriptorSetLayoutUtils.h"
 #include "VulkanRenderer/Textures/Texture.h"
-#include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
+#include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
@@ -23,7 +23,7 @@
 #include "VulkanRenderer/Descriptors/DescriptorSets.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Model/Attributes.h"
-#include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/BufferManager/BufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 
 Skybox::Skybox(const std::string& name, const std::string& textureFolderName)
@@ -88,10 +88,7 @@ void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescrip
             mesh.textures,
             opUBOs,
             descriptorSetLayout,
-            descriptorPool,
-            std::nullopt,
-            std::nullopt,
-            std::nullopt
+            descriptorPool
         );
     }
 }

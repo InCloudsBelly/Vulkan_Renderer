@@ -14,7 +14,7 @@
 #include <glm/gtx/hash.hpp>
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
-#include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/BufferManager/BufferManager.h"
 #include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
 
 

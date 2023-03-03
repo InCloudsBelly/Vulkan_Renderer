@@ -7,7 +7,7 @@
 #include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptors/Types/UBO/UBOutils.h"
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
-#include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/BufferManager/BufferManager.h"
 #include "VulkanRenderer/Model/Types/Light.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 

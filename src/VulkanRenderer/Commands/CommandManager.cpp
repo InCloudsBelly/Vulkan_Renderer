@@ -1,10 +1,10 @@
-#include "VulkanRenderer/Commands/CommandUtils.h"
+#include "VulkanRenderer/Commands/CommandManager.h"
 
 #include <vector>
 
 //////////////////////////////////ACTION CMDs//////////////////////////////////
 
-void CommandUtils::ACTION::copyBufferToImage(
+void CommandManager::ACTION::copyBufferToImage(
     const VkBuffer& srcBuffer,
     const VkImage& dstImage,
     const VkImageLayout& dstImageLayout,
@@ -15,7 +15,7 @@ void CommandUtils::ACTION::copyBufferToImage(
     vkCmdCopyBufferToImage(commandBuffer,srcBuffer,dstImage,dstImageLayout,regionCount,&regions);
 }
 
-void CommandUtils::ACTION::copyBufferToBuffer(
+void CommandManager::ACTION::copyBufferToBuffer(
     const VkBuffer& srcBuffer,
     const VkBuffer& dstBuffer,
     const uint32_t& regionCount,
@@ -26,7 +26,7 @@ void CommandUtils::ACTION::copyBufferToBuffer(
 }
 
 
-void CommandUtils::ACTION::drawIndexed(
+void CommandManager::ACTION::drawIndexed(
     const uint32_t& indexCount,
     const uint32_t& instanceCount,
     const uint32_t& firstIndex,
@@ -38,16 +38,31 @@ void CommandUtils::ACTION::drawIndexed(
 }
 
 
-//////////////////////////////////////STATE////////////////////////////////////
-
-void CommandUtils::STATE::bindPipeline(
-    const VkPipeline& pipeline,
+void CommandManager::ACTION::dispatch(
+    const uint32_t& xSize,
+    const uint32_t& ySize,
+    const uint32_t& zSize,
     const VkCommandBuffer& commandBuffer
 ) {
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vkCmdDispatch(commandBuffer, xSize, ySize, zSize);
 }
 
-void CommandUtils::STATE::bindVertexBuffers(
+
+//////////////////////////////////////STATE////////////////////////////////////
+
+void CommandManager::STATE::bindPipeline(
+    const VkPipeline& pipeline,
+    const PipelineType& pipelineType,
+    const VkCommandBuffer& commandBuffer
+) {
+    vkCmdBindPipeline(commandBuffer,
+        // TODO: make it a separated function to run it faster?
+        ((pipelineType == PipelineType::GRAPHICS) ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE),
+        pipeline
+    );
+}
+
+void CommandManager::STATE::bindVertexBuffers(
     const std::vector<VkBuffer>& vertexBuffers,
     const std::vector<VkDeviceSize>& offsets,
     const uint32_t& indexOfFirstBinding,
@@ -57,7 +72,7 @@ void CommandUtils::STATE::bindVertexBuffers(
     vkCmdBindVertexBuffers(commandBuffer, indexOfFirstBinding, bindingCount, vertexBuffers.data(), offsets.data());
 }
 
-void CommandUtils::STATE::bindIndexBuffer(
+void CommandManager::STATE::bindIndexBuffer(
     const VkBuffer& indexBuffer,
     const VkDeviceSize& offset,
     const VkIndexType& indexType,
@@ -67,7 +82,7 @@ void CommandUtils::STATE::bindIndexBuffer(
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 }
 
-void CommandUtils::STATE::setViewport(
+void CommandManager::STATE::setViewport(
     const float& x,
     const float& y,
     const VkExtent2D& extent,
@@ -88,7 +103,7 @@ void CommandUtils::STATE::setViewport(
     vkCmdSetViewport(commandBuffer, firstViewport, viewportCount, &viewport);
 }
 
-void CommandUtils::STATE::setScissor(
+void CommandManager::STATE::setScissor(
     const VkOffset2D& offset,
     const VkExtent2D& extent,
     const uint32_t& firstScissor,
@@ -102,8 +117,9 @@ void CommandUtils::STATE::setScissor(
     vkCmdSetScissor(commandBuffer, firstScissor, scissorCount, &scissor);
 }
 
-void CommandUtils::STATE::bindDescriptorSets(
+void CommandManager::STATE::bindDescriptorSets(
     const VkPipelineLayout& pipelineLayout,
+    const PipelineType& pipelineType,
     const uint32_t& firstSet,
     const std::vector<VkDescriptorSet>& descriptorSets,
     const std::vector<uint32_t>& dynamicOffsets,
@@ -111,7 +127,7 @@ void CommandUtils::STATE::bindDescriptorSets(
 ) {
     vkCmdBindDescriptorSets(
         commandBuffer,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        ((pipelineType == PipelineType::GRAPHICS) ? VK_PIPELINE_BIND_POINT_GRAPHICS : VK_PIPELINE_BIND_POINT_COMPUTE),
         pipelineLayout,
         // Index of the first descriptor set.
         firstSet,
@@ -128,17 +144,14 @@ void CommandUtils::STATE::bindDescriptorSets(
 ////////////////////////////////////Sync. CMDs/////////////////////////////////
 
 
-void CommandUtils::SYNCHRONIZATION::recordPipelineBarrier(
+void CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
     const VkPipelineStageFlags& srcStageFlags,
     const VkPipelineStageFlags& dstStageFlags,
     const VkDependencyFlags& dependencyFlags,
-    const uint32_t& memoryBarrierCount,
-    const VkMemoryBarrier* memoryBarriers,
-    const uint32_t& bufferMemoryBarrierCount,
-    const VkBufferMemoryBarrier* bufferMemoryBarriers,
-    const uint32_t& imageMemoryBarrierCount,
-    const VkImageMemoryBarrier* imageMemoryBarriers,
-    const VkCommandBuffer& commandBuffer
+    const VkCommandBuffer& commandBuffer,
+    const std::vector<VkMemoryBarrier>& memoryBarriers,
+    const std::vector<VkBufferMemoryBarrier>& bufferMemoryBarriers,
+    const std::vector<VkImageMemoryBarrier>& imageMemoryBarriers
 ) {
 
     vkCmdPipelineBarrier(
@@ -153,8 +166,8 @@ void CommandUtils::SYNCHRONIZATION::recordPipelineBarrier(
         // References arrays of pipeline barries of the three available
         // types: memory barriers, buffer memory barriers, and image memory
         // barriers.
-        memoryBarrierCount, memoryBarriers,
-        bufferMemoryBarrierCount, bufferMemoryBarriers,
-        imageMemoryBarrierCount, imageMemoryBarriers
+        memoryBarriers.size(), memoryBarriers.data(),
+        bufferMemoryBarriers.size(), bufferMemoryBarriers.data(),
+        imageMemoryBarriers.size(), imageMemoryBarriers.data()
     );
 }

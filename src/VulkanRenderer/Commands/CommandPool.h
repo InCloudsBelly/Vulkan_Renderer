@@ -4,8 +4,9 @@
 
 #include <vector>
 #include <memory>
+#include <optional>
 
-#include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
+#include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 
 class CommandPool
 {
@@ -23,7 +24,18 @@ public:
 	void allocCommandBuffer(VkCommandBuffer& commandBuffer, const bool isOneTimeUsage);
 	
 	void allocCommandBuffers(const uint32_t& commandBuffersCount);
-	void submitCommandBuffer(const VkQueue& graphicsQueue,const VkCommandBuffer& commandBuffer);
+	
+	void submitCommandBuffer(
+		const VkQueue&									queue,
+		const std::vector<VkCommandBuffer>&				commandBuffers,
+		const bool										waitForCompletition,
+		const std::optional<std::vector<VkSemaphore>>	waitSemaphores = std::nullopt,
+		const std::optional<VkPipelineStageFlags>		waitStages = std::nullopt,
+		const std::optional<std::vector<VkSemaphore>>	signalSemaphores = std::nullopt,
+		const std::optional<VkFence>					fence = std::nullopt
+	);
+	
+	
 	const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
 	
 	void resetCommandBuffer(const uint32_t index);

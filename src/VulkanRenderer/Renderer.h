@@ -8,15 +8,17 @@
 
 #include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/GUI/GUI.h"
-#include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
-#include "VulkanRenderer/QueueFamily/QueueFamilyHandles.h"
+#include "VulkanRenderer/Queue/QueueFamilyIndices.h"
+#include "VulkanRenderer/Queue/QueueFamilyHandles.h"
 #include "VulkanRenderer/Swapchain/Swapchain.h"
-#include "VulkanRenderer/GraphicsPipeline/GraphicsPipeline.h"
+#include "VulkanRenderer/Computation/Computation.h"
+#include "VulkanRenderer/Pipeline/Graphics.h"
+#include "VulkanRenderer/Pipeline/Compute.h"
 #include "VulkanRenderer/Features/DepthBuffer.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
 #include "VulkanRenderer/Device/Device.h"
-#include "VulkanRenderer/Buffers/BufferManager.h"
+#include "VulkanRenderer/BufferManager/BufferManager.h"
 #include "VulkanRenderer/Descriptors/DescriptorPool.h"
 #include "VulkanRenderer/Textures/Texture.h"
 #include "VulkanRenderer/Model/Model.h"
@@ -91,11 +93,13 @@ public:
 	);
 
 private:
-	void createGraphicsPipelines();
+	void createPipelines();
+	void createCommandPools();
+
 	void uploadModels();
 
 	void initWindow();
-
+	void initComputations();
 	void handleInput();
 	static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
@@ -107,12 +111,13 @@ private:
 	void createSceneRenderPass();
 
 	void createDescriptorSetLayouts();
+	void doComputations();
 
 	void recordCommandBuffer(
 		const VkFramebuffer& framebuffer,
 		const RenderPass& renderPass,
 		const VkExtent2D& extent,
-		const std::vector<GraphicsPipeline>& graphicsPipelines,
+		const std::vector<Graphics>& graphicsPipelines,
 		const uint32_t currentFrame,
 		const VkCommandBuffer& commandBuffer,
 		const std::vector<VkClearValue>& clearValues,
@@ -122,7 +127,7 @@ private:
 	template <typename T>
 	void bindAllMeshesData(
 		const std::shared_ptr<T>& model,
-		const GraphicsPipeline& graphicsPipeline,
+		const Graphics& graphicsPipeline,
 		const VkCommandBuffer& commandBuffer,
 		const uint32_t currentFrame
 	);
@@ -164,15 +169,22 @@ private:
 	// TODO: delete this
 	size_t								m_mainModelIndex;
 
-	GraphicsPipeline                    m_graphicsPipelinePBR;
-	GraphicsPipeline                    m_graphicsPipelineSkybox;
-	GraphicsPipeline                    m_graphicsPipelineLight;
-	GraphicsPipeline                    m_graphicsPipelineShadowMap;
+	// Pipelines
+	Graphics                            m_graphicsPipelinePBR;
+	Graphics                            m_graphicsPipelineSkybox;
+	Graphics                            m_graphicsPipelineLight;
+	Graphics                            m_graphicsPipelineShadowMap;
 
-	// Command buffer for main drawing commands.
-	std::shared_ptr<CommandPool>        m_commandPool;
+	//Computations
+	Computation                         m_BRDF;
 
-	DescriptorPool                      m_descriptorPool;
+	// Command Pool for main drawing commands.
+	std::shared_ptr<CommandPool>        m_commandPoolGraphics;
+	std::shared_ptr<CommandPool>        m_commandPoolCompute;
+
+	DescriptorPool                      m_descriptorPoolGraphics;
+	DescriptorPool                      m_descriptorPoolComputations;
+
 	VkDescriptorSetLayout               m_descriptorSetLayoutNormalPBR;
 	VkDescriptorSetLayout               m_descriptorSetLayoutLight;
 	VkDescriptorSetLayout               m_descriptorSetLayoutSkybox;

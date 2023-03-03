@@ -6,13 +6,15 @@
 
 namespace QueueFamilyUtils
 {
-    bool isGraphicsQueueSupported(const VkQueueFamilyProperties& queueFamilySupported);
-
     bool isPresentQueueSupported(
         const int queueFamilySupportedIndex,
         const VkSurfaceKHR& surface,
         const VkPhysicalDevice& physicalDevice
     );
+
+    bool isGraphicsQueueSupported(const VkQueueFamilyProperties& qfSupported);
+
+    bool isComputeQueueSupported(const VkQueueFamilyProperties& qfSupported);
 
     void getSupportedQueueFamilies(
         const VkPhysicalDevice& physicalDevice,

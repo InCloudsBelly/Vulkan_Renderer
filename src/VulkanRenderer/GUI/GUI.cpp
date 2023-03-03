@@ -181,7 +181,7 @@ void GUI::uploadFonts(const VkQueue& graphicsQueue)
     ImGui_ImplVulkan_CreateFontsTexture(newCommandBuffer);
 
     m_commandPool->endCommandBuffer(newCommandBuffer);
-    m_commandPool->submitCommandBuffer(graphicsQueue, newCommandBuffer);
+    m_commandPool->submitCommandBuffer(graphicsQueue, { newCommandBuffer }, true);
 }
 
 void GUI::createFrameBuffers()

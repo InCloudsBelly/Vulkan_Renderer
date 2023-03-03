@@ -4,6 +4,7 @@ find_program(glslc_executable NAMES glslc HINTS Vulkan::glslc)
 file (GLOB SHADERS
    ${SHADER_DIR}/*.vert
    ${SHADER_DIR}/*.frag
+   ${SHADER_DIR}/*.comp
 )
  set(SPV_SHADERS "")
 

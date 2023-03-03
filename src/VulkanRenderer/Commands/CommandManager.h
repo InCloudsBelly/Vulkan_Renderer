@@ -4,7 +4,9 @@
 
 #include <vector>
 
-namespace CommandUtils
+#include "VulkanRenderer/Pipeline/Pipeline.h"
+
+namespace CommandManager
 {
     namespace ACTION {
         void copyBufferToBuffer(
@@ -32,12 +34,20 @@ namespace CommandUtils
             const VkCommandBuffer& commandBuffer
         );
 
+        void dispatch(
+            const uint32_t& xSize,
+            const uint32_t& ySize,
+            const uint32_t& zSize,
+            const VkCommandBuffer& commandBuffer
+        );
+
     };
 
     namespace STATE
     {
         void bindPipeline(
             const VkPipeline& pipeline,
+            const PipelineType& pipelineType,
             const VkCommandBuffer& commandBuffer
         );
         void bindVertexBuffers(
@@ -56,6 +66,7 @@ namespace CommandUtils
 
         void bindDescriptorSets(
             const VkPipelineLayout& pipelineLayout,
+            const PipelineType& pipelineType,
             const uint32_t& firstSet,
             const std::vector<VkDescriptorSet>& descriptorSets,
             const std::vector<uint32_t>& dynamicOffsets,
@@ -91,13 +102,10 @@ namespace CommandUtils
             const VkPipelineStageFlags& srcStageFlags,
             const VkPipelineStageFlags& dstStageFlags,
             const VkDependencyFlags& dependencyFlags,
-            const uint32_t& memoryBarrierCount,
-            const VkMemoryBarrier* memoryBarriers,
-            const uint32_t& bufferMemoryBarrierCount,
-            const VkBufferMemoryBarrier* bufferMemoryBarriers,
-            const uint32_t& imageMemoryBarrierCount,
-            const VkImageMemoryBarrier* imageMemoryBarrriers,
-            const VkCommandBuffer& commandBuffer
+            const VkCommandBuffer& commandBuffer,
+            const std::vector<VkMemoryBarrier>& memoryBarriers,
+            const std::vector<VkBufferMemoryBarrier>& bufferMemoryBarriers,
+            const std::vector<VkImageMemoryBarrier>& imageMemoryBarriers
         );
     };
 };

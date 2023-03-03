@@ -1,14 +1,22 @@
-#include "VulkanRenderer/QueueFamily/QueueFamilyUtils.h"
+#include "VulkanRenderer/Queue/QueueFamilyUtils.h"
 
 #include <vulkan/vulkan.h>
 
 /*
- * Checks if the queue supported is a graphic's queue.
+ * Checks if the queue supported is a graphics queue.
  */
 bool QueueFamilyUtils::isGraphicsQueueSupported(
     const VkQueueFamilyProperties& queueFamilySupported
 ) {
     return queueFamilySupported.queueFlags & VK_QUEUE_GRAPHICS_BIT;
+}
+
+/*
+ * Checks if the queue supported is a compute queue.
+ */
+bool QueueFamilyUtils::isComputeQueueSupported(const VkQueueFamilyProperties& qfSupported) 
+{
+    return qfSupported.queueFlags & VK_QUEUE_COMPUTE_BIT;
 }
 
 /*
@@ -30,6 +38,8 @@ bool QueueFamilyUtils::isPresentQueueSupported(
 
     return isSupported;
 }
+
+
 
 /*
  * Gets all the queue families supported by the device with their properties.

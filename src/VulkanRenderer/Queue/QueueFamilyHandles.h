@@ -2,15 +2,17 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/QueueFamily/QueueFamilyIndices.h"
+#include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 
 struct QueueFamilyHandles
 {
     VkQueue graphicsQueue;
     VkQueue presentQueue;
+    VkQueue computeQueue;
 
     void setQueueHandles(
         const VkDevice& logicalDevice,
         const QueueFamilyIndices& qfIndices
     );
+
 };

@@ -85,6 +85,11 @@ add_subdirectory(${ASSIMP_DIR})
 set(THREADS_PREFER_PTRHEAD_FLAG ON)
 find_package(Threads REQUIRED)
 
+# - Gli
+set(GLI_DIR "${PROJECT_LIBRARIES_DIR}/gli")
+add_subdirectory(${GLI_DIR} EXCLUDE_FROM_ALL)
+
+
 # - Tracy
 option(TRACY_ENABLE "" ON)
 option(TRACY_ON_DEMAND "" ON)
@@ -128,6 +133,7 @@ target_link_libraries(${PROJECT_NAME}
    assimp
    imgui
    Tracy::TracyClient
+   gli
 
    PRIVATE
    ${CMAKE_DL_LIBS}

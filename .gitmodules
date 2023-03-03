@@ -13,3 +13,6 @@
 [submodule "libs/tracy"]
 	path = libs/tracy
 	url = https://github.com/wolfpld/tracy.git
+[submodule "libs/gli"]
+	path = libs/gli
+	url = https://github.com/g-truc/gli.git

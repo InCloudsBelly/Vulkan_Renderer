@@ -2,9 +2,9 @@
 
 #include <stdexcept>
 
-#include "VulkanRenderer/Commands/CommandUtils.h"
+#include "VulkanRenderer/Commands/CommandManager.h"
 #include "VulkanRenderer/Commands/CommandPool.h"
-#include "VulkanRenderer/Buffers/BufferUtils.h"
+#include "VulkanRenderer/BufferManager/BufferUtils.h"
 
 void ImageManager::createImage(
     const VkPhysicalDevice& physicalDevice,
@@ -169,9 +169,9 @@ void ImageManager::copyBufferToImage(
     region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { width,height,1 };
 
-    CommandUtils::ACTION::copyBufferToImage(buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, region, commandBuffer);
+    CommandManager::ACTION::copyBufferToImage(buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, region, commandBuffer);
 
     commandPool->endCommandBuffer(commandBuffer);
 
-    commandPool->submitCommandBuffer(graphicsQueue, commandBuffer);
+    commandPool->submitCommandBuffer(graphicsQueue, { commandBuffer }, true);
 }

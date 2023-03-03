@@ -26,6 +26,14 @@ public:
 		const std::optional<VkSampler>				shadowMapSampler = std::nullopt
 	);
 
+	DescriptorSets(
+		const VkDevice						logicalDevice,
+		const std::vector<DescriptorInfo>&	buffersInfo,
+		const std::vector<VkBuffer>&		buffers,
+		const VkDescriptorSetLayout&		descriptorSetLayout,
+		DescriptorPool&						descriptorPool
+	);
+
 	DescriptorSets(const DescriptorSets& other);
 	DescriptorSets& operator=(const DescriptorSets& other);
 

@@ -5,12 +5,16 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptors/Types/Sampler/Sampler.h"
-#include "VulkanRenderer/Descriptors/DescriptorSets.h"
-#include "VulkanRenderer/Commands/CommandPool.h"
-#include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
+#include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
+#include "VulkanRenderer/Descriptor/DescriptorSets.h"
+#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Command/CommandPool.h"
+#include "VulkanRenderer/Pipeline/Graphics.h"
+#include "VulkanRenderer/Model/Mesh.h"
 
+
+template<typename T>
 class ShadowMap
 {
 public:
@@ -22,7 +26,8 @@ public:
 		const uint32_t height,
 		const VkFormat& format,
 		const VkDescriptorSetLayout& descriptorSetLayout,
-		const uint32_t& uboCount
+		const uint32_t& uboCount,
+		const std::vector<Mesh<T>>* meshes
 	);
 
 	~ShadowMap();
@@ -37,6 +42,8 @@ public:
 		const float zFar,
 		const uint32_t& currentFrame
 	);
+
+	void bindData(const Graphics& graphicsPipeline, const VkCommandBuffer& commandBuffer, const uint32_t currentFrame);
 
 	void createFramebuffer(const VkRenderPass& renderPass, const uint32_t& imagesCount);
 	void createCommandPool(const VkCommandPoolCreateFlags& flags, const uint32_t& graphicsFamilyIndex);
@@ -77,5 +84,7 @@ private:
 	std::vector<VkFramebuffer>       m_framebuffers;
 
 	DescriptorTypes::UniformBufferObject::ShadowMap m_basicInfo;
+
+	const std::vector<Mesh<T>>*		 m_opMeshes;
 
 };

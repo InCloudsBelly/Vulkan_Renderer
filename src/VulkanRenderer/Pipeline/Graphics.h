@@ -7,6 +7,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Pipeline/Pipeline.h"
+#include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 
 enum class GraphicsPipelineType
 {
@@ -27,12 +28,13 @@ public:
 		const GraphicsPipelineType type,
 		const VkExtent2D& extent,
 		const VkRenderPass& renderPass,
-		const VkDescriptorSetLayout& descriptorSetLayout,
 		const std::vector<ShaderInfo>& shaderInfos,
 		const VkSampleCountFlagBits& samplesCount,
 		VkVertexInputBindingDescription vertexBindingDescriptions,
 		std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
-		std::vector<size_t>* modelIndices
+		std::vector<size_t>* modelIndices,
+		const std::vector<DescriptorInfo>& uboInfo,
+		const std::vector<DescriptorInfo>& samplersInfo
 	);
 
 
@@ -40,6 +42,8 @@ public:
 	const std::vector<size_t>& getModelIndices() const;
 
 private:
+
+	void createDescriptorSetLayout(const std::vector<DescriptorInfo>& uboInfo,const std::vector<DescriptorInfo>& samplersInfo);
 
 	void createShaderStageInfo(
 		const VkShaderModule& shaderModule,

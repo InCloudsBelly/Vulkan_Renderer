@@ -17,6 +17,9 @@ struct ShaderInfo
 {
     shaderType type;
     std::string fileName;
+
+    ShaderInfo(const shaderType& sType, const std::string& fName)
+        : type(sType), fileName(fName) {}
 };
 
 enum class PipelineType
@@ -37,6 +40,7 @@ public:
     const VkPipeline& get() const;
     const VkPipelineLayout& getPipelineLayout() const;
     const PipelineType& getType() const;
+    const VkDescriptorSetLayout& getDescriptorSetLayout() const;
     void destroy();
 
 protected:
@@ -45,10 +49,12 @@ protected:
     void createShaderModule(const ShaderInfo& shaderInfos,VkShaderModule& shaderModule);
     void createPipelineLayout(const VkDescriptorSetLayout& descriptorSetLayout);
 
-    VkDevice             m_logicalDevice;
+    PipelineType            m_type;
 
-    VkPipeline           m_pipeline;
-    VkPipelineLayout     m_pipelineLayout;
+    VkDevice                m_logicalDevice;
 
-    PipelineType         m_type;
+    VkPipeline              m_pipeline;
+    VkPipelineLayout        m_pipelineLayout;
+
+    VkDescriptorSetLayout   m_descriptorSetLayout;
 };

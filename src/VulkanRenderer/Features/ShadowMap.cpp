@@ -6,25 +6,30 @@
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Settings/Config.h"
-#include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptors/Types/Sampler/Sampler.h"
-#include "VulkanRenderer/Descriptors/DescriptorSets.h"
-#include "VulkanRenderer/Descriptors/DescriptorPool.h"
-#include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptors/Types/UBO/UBOutils.h"
-#include "VulkanRenderer/Images/ImageManager.h"
-#include "VulkanRenderer/Framebuffer/FramebufferUtils.h"
+#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
+#include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
+#include "VulkanRenderer/Descriptor/DescriptorSets.h"
+#include "VulkanRenderer/Descriptor/DescriptorPool.h"
+#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptor/Types/UBO/UBOutils.h"
+#include "VulkanRenderer/Image/ImageManager.h"
+#include "VulkanRenderer/Framebuffer/FramebufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
+#include "VulkanRenderer/Command/CommandManager.h"
+#include "VulkanRenderer/Model/Attributes.h"
 
-ShadowMap::ShadowMap(
+
+template<typename T>
+ShadowMap<T>::ShadowMap(
     const VkPhysicalDevice& physicalDevice,
     const VkDevice& logicalDevice,
     const uint32_t width,
     const uint32_t height,
     const VkFormat& format,
     const VkDescriptorSetLayout& descriptorSetLayout,
-    const uint32_t& uboCount
-) : m_logicalDevice(logicalDevice), m_width(width), m_height(height) {
+    const uint32_t& uboCount,
+    const std::vector<Mesh<T>>* meshes
+) : m_logicalDevice(logicalDevice), m_width(width), m_height(height), m_opMeshes(meshes) {
 
     m_image = Image(
         physicalDevice, logicalDevice, 
@@ -49,14 +54,17 @@ ShadowMap::ShadowMap(
     createDescriptorSets( descriptorSetLayout);
 }
 
-ShadowMap::~ShadowMap() {}
+template<typename T>
+ShadowMap<T>::~ShadowMap() {}
 
-void ShadowMap::createCommandPool(const VkCommandPoolCreateFlags& flags,const uint32_t& graphicsFamilyIndex) 
+template<typename T>
+void ShadowMap<T>::createCommandPool(const VkCommandPoolCreateFlags& flags,const uint32_t& graphicsFamilyIndex)
 {
     m_commandPool = std::make_shared<CommandPool>(m_logicalDevice,flags,graphicsFamilyIndex);
 }
 
-void ShadowMap::updateUBO(
+template<typename T>
+void ShadowMap<T>::updateUBO(
     const glm::mat4 modelM,
     const glm::fvec4 directionalLightStartPos,
     const glm::fvec4 directionalLightEndPos,
@@ -66,7 +74,7 @@ void ShadowMap::updateUBO(
     const uint32_t& currentFrame
 ) {
     // TODO: Improve this.
-    // The model? and projection matrix don't need to be updated every frame.
+    // The model and projection matrix don't need to be updated every frame.
     m_basicInfo.model = modelM;
     glm::mat4 proj = MathUtils::getUpdatedProjMatrix(glm::radians( Config::FOV), aspect,zNear, zFar);
 
@@ -80,31 +88,36 @@ void ShadowMap::updateUBO(
     UBOutils::updateUBO(m_logicalDevice, m_ubo, size, &m_basicInfo, currentFrame);
 }
 
-const VkCommandBuffer& ShadowMap::getCommandBuffer(const uint32_t index) const
+template<typename T>
+const VkCommandBuffer& ShadowMap<T>::getCommandBuffer(const uint32_t index) const
 {
     return m_commandPool->getCommandBuffer(index);
 }
 
-void ShadowMap::allocCommandBuffers(const uint32_t& commandBuffersCount)
+template<typename T>
+void ShadowMap<T>::allocCommandBuffers(const uint32_t& commandBuffersCount)
 {
     m_commandPool->allocCommandBuffers(commandBuffersCount);
 }
 
-void ShadowMap::createDescriptorPool()
+template<typename T>
+void ShadowMap<T>::createDescriptorPool()
 {
     m_descriptorPool = DescriptorPool(
         m_logicalDevice,
-        { {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,15 * GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT} },
+        { {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 15 * GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT} },
         15 // TODO: Improve this.
     );
 }
 
-void ShadowMap::createUBO(const VkPhysicalDevice& physicalDevice, const uint32_t& uboCount)
+template<typename T>
+void ShadowMap<T>::createUBO(const VkPhysicalDevice& physicalDevice, const uint32_t& uboCount)
 {
     m_ubo = std::make_shared<UBO>(physicalDevice, m_logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::ShadowMap));
 }
 
-void ShadowMap::createDescriptorSets(const VkDescriptorSetLayout& descriptorSetLayout) 
+template<typename T>
+void ShadowMap<T>::createDescriptorSets(const VkDescriptorSetLayout& descriptorSetLayout)
 {
 
     std::vector<UBO*> opUBOs = { m_ubo.get() };
@@ -116,46 +129,100 @@ void ShadowMap::createDescriptorSets(const VkDescriptorSetLayout& descriptorSetL
         {},
         opUBOs,
         descriptorSetLayout,
-        m_descriptorPool,
-        std::nullopt,
-        std::nullopt,
-        std::nullopt
+        m_descriptorPool
     );
 }
 
 
-const VkImageView& ShadowMap::getShadowMapView() const
+template<typename T>
+const VkImageView& ShadowMap<T>::getShadowMapView() const
 {
     return m_image.getImageView();
 }
 
-const VkSampler& ShadowMap::getSampler() const
+template<typename T>
+const VkSampler& ShadowMap<T>::getSampler() const
 {
     return m_image.getSampler();
 }
 
+template<typename T>
+void ShadowMap<T>::bindData(const Graphics& graphicsPipeline,const VkCommandBuffer& commandBuffer,const uint32_t currentFrame) 
+{
+    for (auto mesh = m_opMeshes->begin(); mesh != m_opMeshes->end(); mesh++)
+    {
+        CommandManager::STATE::bindVertexBuffers(
+            { mesh->vertexBuffer },
+            // Offsets.
+            { 0 },
+            // Index of first binding.
+            0,
+            // Bindings count.
+            1,
+            commandBuffer
+        );
+        CommandManager::STATE::bindIndexBuffer(
+            mesh->indexBuffer,
+            // Offset.
+            0,
+            VK_INDEX_TYPE_UINT32,
+            commandBuffer
+        );
 
-const VkDescriptorSet& ShadowMap::getDescriptorSet(const uint32_t index) const
+        CommandManager::STATE::bindDescriptorSets(
+            graphicsPipeline.getPipelineLayout(),
+            PipelineType::GRAPHICS,
+            // Index of first descriptor set.
+            0,
+            { getDescriptorSet(currentFrame) },
+            // Dynamic offsets.
+            {},
+            commandBuffer
+        );
+
+        CommandManager::ACTION::drawIndexed(
+            // Index Count
+            mesh->indices.size(),
+            // Instance Count
+            1,
+            // First index.
+            0,
+            // Vertex Offset.
+            0,
+            // First Intance.
+            0,
+            commandBuffer
+        );
+    }
+}
+
+
+template<typename T>
+const VkDescriptorSet& ShadowMap<T>::getDescriptorSet(const uint32_t index) const
 {
     return m_descriptorSets.get(index);
 }
 
-const VkFramebuffer& ShadowMap::getFramebuffer(const uint32_t imageIndex) const
+template<typename T>
+const VkFramebuffer& ShadowMap<T>::getFramebuffer(const uint32_t imageIndex) const
 {
     return m_framebuffers[imageIndex];
 }
 
-const std::shared_ptr<CommandPool>& ShadowMap::getCommandPool()
+template<typename T>
+const std::shared_ptr<CommandPool>& ShadowMap<T>::getCommandPool()
 {
     return m_commandPool;
 }
 
-const glm::mat4& ShadowMap::getLightSpace() const
+template<typename T>
+const glm::mat4& ShadowMap<T>::getLightSpace() const
 {
     return m_basicInfo.lightSpace;
 }
 
-void ShadowMap::createFramebuffer(const VkRenderPass& renderPass,const uint32_t& imagesCount) 
+template<typename T>
+void ShadowMap<T>::createFramebuffer(const VkRenderPass& renderPass,const uint32_t& imagesCount)
 {
 
     m_framebuffers.resize(imagesCount);
@@ -165,11 +232,12 @@ void ShadowMap::createFramebuffer(const VkRenderPass& renderPass,const uint32_t&
 
     for (uint32_t i = 0; i < imagesCount; i++)
     {
-        FramebufferUtils::createFramebuffer(m_logicalDevice, renderPass, attachments, m_width, m_height, 1, m_framebuffers[i]);
+        FramebufferManager::createFramebuffer(m_logicalDevice, renderPass, attachments, m_width, m_height, 1, m_framebuffers[i]);
     }
 }
 
-void ShadowMap::destroy()
+template<typename T>
+void ShadowMap<T>::destroy()
 {
     m_descriptorPool.destroy();
     m_image.destroy();
@@ -178,3 +246,6 @@ void ShadowMap::destroy()
     for (auto& framebuffer : m_framebuffers)
         vkDestroyFramebuffer(m_logicalDevice, framebuffer, nullptr);
 }
+
+////////////////////////////////////INSTANCES//////////////////////////////////
+template class ShadowMap<Attributes::PBR::Vertex>;

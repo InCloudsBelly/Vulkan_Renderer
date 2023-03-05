@@ -49,12 +49,20 @@ int main()
             );*/
             app.addSkybox("Apartment.hdr", "Apartment");
 
-            app.addObjectPBR(
+         /*   app.addObjectPBR(
                 "Sponza",
                 "Sponza.gltf",
                 glm::fvec3(0.0f),
                 glm::fvec3(1.0f, -1.555, 1.0f),
                 glm::fvec3(0.05f)
+            );*/
+
+            app.addObjectPBR(
+                "DamagedHelmet",
+                "DamagedHelmet.gltf",
+                glm::fvec3(0.0f),
+                glm::fvec3(1.227f, 0.0f, 0.0f),
+                glm::fvec3(1.0f)
             );
 
             app.addDirectionalLight(
@@ -66,7 +74,8 @@ int main()
                 glm::fvec3(0.125f)
             );
 
-            app.addPointLight(
+            //Point Lights have no contributes to our view now;
+   /*         app.addPointLight(
                 "PointLight1",
                 "lightSphere.obj",
                 glm::fvec3(1.0f),
@@ -74,7 +83,7 @@ int main()
                 glm::fvec3(0.125f),
                 0.5f,
                 3.0f
-            );
+            );*/
 
         }
 

@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "VulkanRenderer/Descriptors/DescriptorInfo.h"
+#include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 
 
 namespace GRAPHICS_PIPELINE
@@ -28,12 +28,19 @@ namespace GRAPHICS_PIPELINE
             {3,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
             {4,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
             {5,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
-            //For shadow mapping  (IMPORTANT: Always leave it as the last sampler)
-            {6,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)}
+            {6,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+            // Env. Map (IMPORTANT: Always leave it positioned before the irradiance map)
+            {7,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+            // Irradiance Map (IMPORTANT: Always leave it positioned before the BRDF lut map)
+            {8,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+            // BRDF lut (IMPORTANT: Always leave it positioned before the shadow map)            
+            {9,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+            // Shadow Map (IMPORTANT: Always leave it as the last sampler)
+            {10,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)}
         };
 
-        // We won't count the shadow and irradiance map.
-        inline const uint32_t TEXTURES_PER_MESH_COUNT = SAMPLERS_INFO.size() - 2;
+        // We don't count the shadow , env., BRDF and irradiance map.
+        inline const uint32_t TEXTURES_PER_MESH_COUNT = SAMPLERS_INFO.size() - 4;
 
         inline const uint32_t SAMPLERS_PER_MESH_COUNT = SAMPLERS_INFO.size();
 

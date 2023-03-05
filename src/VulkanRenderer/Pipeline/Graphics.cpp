@@ -8,8 +8,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "VulkanRenderer/ShaderManager/ShaderManager.h"
+#include "VulkanRenderer/Shader/ShaderManager.h"
 #include "VulkanRenderer/Features/FeaturesUtils.h"
+#include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
 
 Graphics::Graphics() {}
 
@@ -22,14 +23,18 @@ Graphics::Graphics(
     const GraphicsPipelineType type,
     const VkExtent2D& extent,
     const VkRenderPass& renderPass,
-    const VkDescriptorSetLayout& descriptorSetLayout,
     const std::vector<ShaderInfo>& shaderInfos,
     const VkSampleCountFlagBits& samplesCount,
     VkVertexInputBindingDescription vertexBindingDescriptions,
     std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
-    std::vector<size_t>* modelIndices )
+    std::vector<size_t>* modelIndices,
+    const std::vector<DescriptorInfo>& uboInfo,
+    const std::vector<DescriptorInfo>& samplersInfo)
     : Pipeline(logicalDevice, PipelineType::GRAPHICS),m_gType(type),m_opModelIndices(modelIndices)
 {
+
+    createDescriptorSetLayout(uboInfo, samplersInfo);
+
     // -------------------Shader Modules--------------------
     std::vector<VkShaderModule> shaderModules(shaderInfos.size());
     std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
@@ -94,7 +99,7 @@ Graphics::Graphics(
     createColorBlendingGlobalInfo(colorBlendAttachment, colorBlendingInfo);
 
     // Pipeline layout
-    createPipelineLayout(descriptorSetLayout);
+    createPipelineLayout(m_descriptorSetLayout);
 
     // Depth and stencil
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
@@ -331,4 +336,16 @@ const std::vector<size_t>& Graphics::getModelIndices() const
 const GraphicsPipelineType Graphics::getGraphicsPipelineType() const
 {
     return m_gType;
+}
+
+void Graphics::createDescriptorSetLayout(
+    const std::vector<DescriptorInfo>& uboInfo,
+    const std::vector<DescriptorInfo>& samplersInfo
+) {
+    DescriptorSetLayoutManager::Graphics::createDescriptorSetLayout(
+        m_logicalDevice,
+        uboInfo,
+        samplersInfo,
+        m_descriptorSetLayout
+    );
 }

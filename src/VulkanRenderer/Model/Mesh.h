@@ -4,9 +4,9 @@
 #include <string>
 #include <memory>
 
-#include "VulkanRenderer/Images/Image.h"
-#include "VulkanRenderer/Textures/Texture.h"
-#include "VulkanRenderer/Descriptors/DescriptorSets.h"
+#include "VulkanRenderer/Image/Image.h"
+#include "VulkanRenderer/Texture/Texture.h"
+#include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Model/Attributes.h"
 
 template<typename T>

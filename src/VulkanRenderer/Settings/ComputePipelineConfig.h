@@ -4,7 +4,7 @@
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Descriptors/DescriptorInfo.h"
+#include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 
 
 namespace COMPUTE_PIPELINE

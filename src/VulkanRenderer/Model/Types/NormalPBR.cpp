@@ -2,22 +2,20 @@
 
 #include <iostream>
 
-#include "VulkanRenderer/Textures/Texture.h"
-#include "VulkanRenderer/Settings/Config.h"
-#include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptors/Types/UBO/UBOutils.h"
+
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
-#include "VulkanRenderer/BufferManager/BufferManager.h"
+#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptor/Types/UBO/UBOutils.h"
+#include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Model/Types/Light.h"
 #include "VulkanRenderer/Math/MathUtils.h"
+#include "VulkanRenderer/Texture/Type/NormalTexture.h"
+#include "VulkanRenderer/Command/CommandManager.h"
 
-NormalPBR::NormalPBR(const std::string& name, const std::string& modelFileName,
-	const glm::fvec4& pos,
-	const glm::fvec3& rot,
-	const glm::fvec3& size
-) : Model(name, ModelType::NORMAL_PBR, pos, rot, size) 
+NormalPBR::NormalPBR(ModelInfo& modelInfo)
+	: Model(modelInfo.name, ModelType::NORMAL_PBR, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size) 
 {
-	loadModel((std::string(MODEL_DIR) + modelFileName).c_str());
+	loadModel((std::string(MODEL_DIR) + modelInfo.modelFileName).c_str());
 }
 
 NormalPBR::~NormalPBR() {}
@@ -117,18 +115,33 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 	{
 		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
+		//TODO: Duplicated code
+
 		TextureToLoadInfo info;
 		info.name = getMaterialTextureName(material, aiTextureType_DIFFUSE, "DIFFUSE", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_SRGB;
+		info.desiredChannels = 4;
 		newMesh.texturesToLoadInfo.push_back(info);
 
 		info.name = getMaterialTextureName(material,aiTextureType_UNKNOWN,"METALIC_ROUGHNESS", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_SRGB;
+		info.desiredChannels = 4;
+		newMesh.texturesToLoadInfo.push_back(info);
+
+		info.name = getMaterialTextureName(material,aiTextureType_EMISSIVE,"EMISSIVE","textures/default.jpg");
+		info.format = VK_FORMAT_R8G8B8A8_SRGB;
+		info.desiredChannels = 4;
+		newMesh.texturesToLoadInfo.push_back(info);
+
+		info.name = getMaterialTextureName(material,aiTextureType_LIGHTMAP,"AO","textures/default.jpg");
+		info.format = VK_FORMAT_R8G8B8A8_SRGB;
+		info.desiredChannels = 4;
 		newMesh.texturesToLoadInfo.push_back(info);
 
 		info.name = getMaterialTextureName(material,aiTextureType_NORMALS,"NORMALS", "textures/default.jpg");
 		info.format = VK_FORMAT_R8G8B8A8_UNORM;
-		if (info.name == "textures/default.png")
+		info.desiredChannels = 4;
+		if (info.name == "textures/default.jpg")
 			m_hasNormalMap = false;
 		else
 			m_hasNormalMap = true;
@@ -144,7 +157,21 @@ void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice,cons
 	m_uboLights = std::make_shared<UBO>(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10);
 }
 
-void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout, const Texture& irradianceMap, const std::shared_ptr<ShadowMap>& shadowMap, DescriptorPool& descriptorPool)
+void NormalPBR::bindData(const Graphics& graphicsPipeline,const VkCommandBuffer& commandBuffer,const uint32_t currentFrame) 
+{
+	for (auto& mesh : m_meshes)
+	{
+		CommandManager::STATE::bindVertexBuffers({ mesh.vertexBuffer }, { 0 }, 0, 1, commandBuffer);
+		CommandManager::STATE::bindIndexBuffer(mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
+
+		CommandManager::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
+
+		CommandManager::ACTION::drawIndexed(mesh.indices.size(), 1, 0, 0, 0, commandBuffer);
+	}
+}
+
+
+void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)
 {
 	std::vector<UBO*> opUBOs = { (m_ubo.get()),(m_uboLights.get()) };
 
@@ -158,9 +185,8 @@ void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescr
 			opUBOs,
 			descriptorSetLayout,
 			descriptorPool,
-			std::make_optional(irradianceMap),
-			std::make_optional(shadowMap->getShadowMapView()),
-			std::make_optional(shadowMap->getSampler())
+			// TODO: Improve this
+			info
 		);
 	}
 }
@@ -201,7 +227,7 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const Vk
 /*
  * Creates and loads all the samplers used in the shader of each mesh.
  */
-void NormalPBR::loadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, VkQueue& graphicsQueue)
+void NormalPBR::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, VkQueue& graphicsQueue)
 {
 	const size_t nTextures = GRAPHICS_PIPELINE::PBR::TEXTURES_PER_MESH_COUNT;
 
@@ -214,7 +240,7 @@ void NormalPBR::loadTextures(const VkPhysicalDevice& physicalDevice,const VkDevi
 
 			if (it == m_texturesID.end())
 			{
-				mesh.textures.push_back(std::make_shared<Texture>(physicalDevice,logicalDevice, mesh.texturesToLoadInfo[i],samplesCount,commandPool,graphicsQueue));
+				mesh.textures.push_back(std::make_shared<NormalTexture>(physicalDevice,logicalDevice, mesh.texturesToLoadInfo[i],samplesCount,commandPool,graphicsQueue, UsageType::TO_COLOR));
 				m_texturesLoaded.push_back(mesh.textures[i]);
 				m_texturesID[mesh.texturesToLoadInfo[i].name] = (m_texturesLoaded.size() - 1);
 			}
@@ -231,29 +257,24 @@ const glm::mat4& NormalPBR::getModelM() const
 
 void NormalPBR::updateUBO(
 	const VkDevice&				logicalDevice,
-	const glm::vec4&			cameraPos,
-	const glm::mat4&			view,
-	const glm::mat4&			proj,
-	const glm::mat4&			lightSpace,
-	const int&					lightsCount,
-	const std::vector<std::shared_ptr<Model>>& models,
-	const uint32_t&				currentFrame
+	const uint32_t&				currentFrame,
+	const UBOinfo&				uboInfo
 ) {
 
 	m_dataInShader.model = MathUtils::getUpdatedModelMatrix(m_pos, m_rot, m_size);
-	m_dataInShader.view = view;
-	m_dataInShader.proj = proj;
-	m_dataInShader.lightSpace = lightSpace;
+	m_dataInShader.view = uboInfo.view;
+	m_dataInShader.proj = uboInfo.proj;
+	m_dataInShader.lightSpace = uboInfo.lightSpace;
 
-	m_dataInShader.cameraPos = cameraPos;
-	m_dataInShader.lightsCount = lightsCount;
+	m_dataInShader.cameraPos = uboInfo.cameraPos;
+	m_dataInShader.lightsCount = uboInfo.lightsCount;
 	m_dataInShader.hasNormalMap = m_hasNormalMap;
 
 	size_t size = sizeof(m_dataInShader);
 	UBOutils::updateUBO(logicalDevice, m_ubo, size, &m_dataInShader, currentFrame);
 }
 
-void NormalPBR::updateUBOlightsInfo(
+void NormalPBR::updateUBOlights(
 	const VkDevice& logicalDevice,
 	const std::vector<size_t> lightModelIndices,
 	const std::vector<std::shared_ptr<Model>>& models,
@@ -277,4 +298,10 @@ void NormalPBR::updateUBOlightsInfo(
 	size_t size = sizeof(m_lightsInfo[0]) * 10;
 
 	UBOutils::updateUBO(logicalDevice,m_uboLights,size,&m_lightsInfo,currentFrame);
+}
+
+
+const std::vector<Mesh<Attributes::PBR::Vertex>>& NormalPBR::getMeshes() const
+{
+	return m_meshes;
 }

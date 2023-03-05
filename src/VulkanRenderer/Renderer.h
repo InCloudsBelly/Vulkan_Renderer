@@ -16,35 +16,18 @@
 #include "VulkanRenderer/Pipeline/Compute.h"
 #include "VulkanRenderer/Features/DepthBuffer.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
-#include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Device/Device.h"
-#include "VulkanRenderer/BufferManager/BufferManager.h"
-#include "VulkanRenderer/Descriptors/DescriptorPool.h"
-#include "VulkanRenderer/Textures/Texture.h"
+#include "VulkanRenderer/Descriptor/DescriptorPool.h"
+#include "VulkanRenderer/Texture/Texture.h"
+#include "VulkanRenderer/Model/ModelInfo.h"
 #include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/Model/Types/Skybox.h"
 #include "VulkanRenderer/Model/Types/Light.h"
 #include "VulkanRenderer/Camera/Camera.h"
 #include "VulkanRenderer/Camera/Types/Arcball.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
-
-
-struct ModelToLoadInfo
-{
-	ModelType   type;
-	std::string name;
-	std::string modelFileName;
-	glm::fvec3  color;
-	glm::fvec3  pos;
-	glm::fvec3  rot;
-	glm::fvec3  size;
-
-	// For light models.
-	LightType   lType;
-	glm::fvec3  endPos;
-	const float attenuation;
-	const float radius;
-};
+#include "VulkanRenderer/VKinstance/VKinstance.h"
 
 
 class Renderer
@@ -53,8 +36,7 @@ public:
 
 	void run();
 
-	void loadModel(const size_t startI, const size_t chunckSize);
-	void loadModels();
+	
 
 	void addObjectPBR(const std::string& name, const  const std::string& modelFileName,
 		const glm::fvec3& pos = glm::fvec4(0.0f),
@@ -97,7 +79,8 @@ private:
 	void createCommandPools();
 
 	void uploadModels();
-
+	void loadModel(const size_t startI, const size_t chunckSize);
+	void loadModels();
 	void initWindow();
 	void initComputations();
 	void handleInput();
@@ -110,8 +93,9 @@ private:
 	void createShadowMapRenderPass();
 	void createSceneRenderPass();
 
-	void createDescriptorSetLayouts();
 	void doComputations();
+	void loadBRDFlut();
+	void configureUserInputs();
 
 	void recordCommandBuffer(
 		const VkFramebuffer& framebuffer,
@@ -124,17 +108,7 @@ private:
 		const std::shared_ptr<CommandPool>& commandPool
 	);
 
-	template <typename T>
-	void bindAllMeshesData(
-		const std::shared_ptr<T>& model,
-		const Graphics& graphicsPipeline,
-		const VkCommandBuffer& commandBuffer,
-		const uint32_t currentFrame
-	);
-
 	void drawFrame(uint8_t& currentFrame);
-
-	void createVkInstance();
 
 	void createSyncObjects();
 	void destroySyncObjects();
@@ -143,13 +117,13 @@ private:
 	std::unique_ptr<GUI>                m_GUI;
 	std::shared_ptr<Camera>             m_camera;
 
-	VkInstance                          m_vkInstance;
-	Device                              m_device;
+	std::unique_ptr<VKinstance>         m_vkInstance;
+	std::unique_ptr<Device>             m_device;
 	VkDebugUtilsMessengerEXT            m_debugMessenger;
 	QueueFamilyIndices                  m_qfIndices;
 	QueueFamilyHandles                  m_qfHandles;
 
-	std::unique_ptr<Swapchain>          m_swapchain;
+	std::shared_ptr<Swapchain>          m_swapchain;
 	RenderPass                          m_renderPass;
 	RenderPass                          m_renderPassShadowMap;
 
@@ -157,13 +131,13 @@ private:
 	std::vector<VkSemaphore>            m_renderFinishedSemaphores;
 	std::vector<VkFence>                m_inFlightFences;
 
-	std::vector<ModelToLoadInfo>        m_modelsToLoadInfo;
+	std::vector<ModelInfo>              m_modelsToLoadInfo;
+	std::shared_ptr<Skybox>             m_skybox;
 	std::vector<std::shared_ptr<Model>> m_models;
 	std::vector<size_t>                 m_objectModelIndices;
 	std::vector<size_t>                 m_lightModelIndices;
 	std::vector<size_t>                 m_skyboxModelIndex;
 	std::optional<size_t>               m_directionalLightIndex;
-	std::shared_ptr<Skybox>             m_skybox;
 
 	
 	// TODO: delete this
@@ -176,7 +150,10 @@ private:
 	Graphics                            m_graphicsPipelineShadowMap;
 
 	//Computations
-	Computation                         m_BRDF;
+	Computation                         m_BRDFcomp;
+
+	//
+	std::shared_ptr<Texture>            m_BRDFlut;
 
 	// Command Pool for main drawing commands.
 	std::shared_ptr<CommandPool>        m_commandPoolGraphics;
@@ -185,10 +162,6 @@ private:
 	DescriptorPool                      m_descriptorPoolGraphics;
 	DescriptorPool                      m_descriptorPoolComputations;
 
-	VkDescriptorSetLayout               m_descriptorSetLayoutNormalPBR;
-	VkDescriptorSetLayout               m_descriptorSetLayoutLight;
-	VkDescriptorSetLayout               m_descriptorSetLayoutSkybox;
-	VkDescriptorSetLayout               m_descriptorSetLayoutShadowMap;
 
 	std::vector<VkClearValue>			m_clearValues;
 	std::vector<VkClearValue>			m_clearValuesShadowMap;
@@ -197,6 +170,5 @@ private:
 	//---------------------------Features--------------------------------------
 	DepthBuffer							m_depthBuffer;
 	MSAA								m_msaa;
-	std::shared_ptr<ShadowMap>			m_shadowMap;
-	std::shared_ptr<Texture>			m_irradianceMap;
+	std::shared_ptr<ShadowMap<Attributes::PBR::Vertex>> m_shadowMap;
 };

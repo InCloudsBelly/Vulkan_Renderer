@@ -1,51 +1,34 @@
 #pragma once
 
 #include "VulkanRenderer/Model/Model.h"
+#include "VulkanRenderer/Model/ModelInfo.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 
 #include <GLFW/glfw3.h>
-
-enum class LightType
-{
-    DIRECTIONAL_LIGHT = 0,
-    POINT_LIGHT = 1,
-    SPOT_LIGHT = 2,
-    NONE = 3
-};
 
 class Light : public Model
 {
 public:
 
-    Light(const std::string& name, const std::string& modelFilename, const LightType& lightType,
-        const glm::fvec4& lightColor,
-        const glm::fvec4& pos = glm::fvec4(0.0f),
-        const glm::fvec4& targetPos = glm::fvec4(1.0f),
-        const glm::fvec3& rot = glm::fvec3(0.0f),
-        const glm::fvec3& size = glm::fvec3(1.0f),
-        const float attenuation = 1.0f,
-        const float radius = 1.0f
-    );
+    Light(ModelInfo& modelInfo);
 
     ~Light() override;
 
     void destroy(const VkDevice& logicalDevice) override;
 
-    void createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorPool& descriptorPool);
+    void createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)override;
 
-    void createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) override;
-
-    void uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool) override;
-
-    void loadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool,VkQueue& graphicsQueue) override;
+    void bindData(
+        const Graphics& graphicsPipeline,
+        const VkCommandBuffer& commandBuffer,
+        const uint32_t currentFrame
+    ) override;
 
     void updateUBO(
         const VkDevice& logicalDevice,
-        const glm::vec4& cameraPos,
-        const glm::mat4& view,
-        const glm::mat4& proj,
-        const uint32_t& currentFrame
-    );
+        const uint32_t& currentFrame,
+        const UBOinfo& uboInfo
+    )override;
 
     const glm::fvec4& getColor() const;
     const glm::fvec4& getTargetPos() const;
@@ -60,14 +43,28 @@ public:
     void setRadius(const float& radius);
     void setTargetPos(const glm::fvec4& pos);
 
-    // Info to update UBO.
-    float extremeX[2];
-    float extremeY[2];
-    float extremeZ[2];
-
-    std::vector<Mesh<Attributes::LIGHT::Vertex>> m_meshes;
-
 private:
+    
+    void createUniformBuffers(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        const uint32_t& uboCount
+    ) override;
+    
+    void uploadVertexData(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        VkQueue& graphicsQueue,
+        const std::shared_ptr<CommandPool>& commandPool
+    ) override;
+    
+    void uploadTextures(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        const VkSampleCountFlagBits& samplesCount,
+        const std::shared_ptr<CommandPool>& commandPool,
+        VkQueue& graphicsQueue
+    ) override;
 
     void processMesh(aiMesh* mesh, const aiScene* scene) override;
 
@@ -79,5 +76,6 @@ private:
     float      m_intensity;
     LightType  m_lightType;
 
+    std::vector<Mesh<Attributes::LIGHT::Vertex>> m_meshes;
     DescriptorTypes::UniformBufferObject::Light m_dataInShader;
 };

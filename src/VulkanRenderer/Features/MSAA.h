@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Images/Image.h"
+#include "VulkanRenderer/Image/Image.h"
 
 class MSAA
 {

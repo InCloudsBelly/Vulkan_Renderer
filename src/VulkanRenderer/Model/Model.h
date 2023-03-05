@@ -3,7 +3,6 @@
 #include <vector>
 #include <array>
 #include <string>
-#include <optional>
 #include <unordered_map>
 
 #include <glm/glm.hpp>
@@ -13,11 +12,12 @@
 
 
 #include "VulkanRenderer/Model/Mesh.h"
-#include "VulkanRenderer/Textures/Texture.h"
-#include "VulkanRenderer/Commands/CommandPool.h"
-#include "VulkanRenderer/Descriptors/DescriptorInfo.h"
-#include "VulkanRenderer/Descriptors/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptors/DescriptorSets.h"
+#include "VulkanRenderer/Texture/Texture.h"
+#include "VulkanRenderer/Command/CommandPool.h"
+#include "VulkanRenderer/Descriptor/DescriptorInfo.h"
+#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
+#include "VulkanRenderer/Descriptor/Types/UBO/UBOinfo.h"
+#include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 
 enum class ModelType
@@ -40,22 +40,32 @@ public:
 	virtual ~Model() = 0;
 	virtual void destroy(const VkDevice& logicalDevice) = 0;
 
-	virtual void uploadVertexData(
-		const VkPhysicalDevice& physicalDevice,
-		const VkDevice&			logicalDevice,
-		VkQueue&				graphicsQueue,
-		const std::shared_ptr<CommandPool>& commandPool
-	) = 0;
-
-	virtual void loadTextures(
-		const VkPhysicalDevice&			physicalDevice,
-		const VkDevice&					logicalDevice,
-		const VkSampleCountFlagBits&	samplesCount,
+	void upload(
+		const VkPhysicalDevice&				physicalDevice,
+		const VkDevice&						logicalDevice,
+		VkQueue&							graphicsQueue,
 		const std::shared_ptr<CommandPool>& commandPool,
-		VkQueue&						graphicsQueue
+		const uint32_t						uboCount
+	);
+
+	virtual void bindData(
+		const Graphics&				graphicsPipeline,
+		const VkCommandBuffer&		commandBUffer,
+		const uint32_t				currentFrame
 	) = 0;
 
-	virtual void createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount) = 0;
+	virtual void createDescriptorSets(
+		const VkDevice&					logicalDevice, 
+		const VkDescriptorSetLayout&	descriptorSetLayout,
+		DescriptorSetInfo*				info,
+		DescriptorPool&					descriptorPool
+	) = 0;
+
+	virtual void updateUBO(
+		const VkDevice&		logicalDevice,
+		const uint32_t&		currentFrame,
+		const UBOinfo&		uboInfo
+	) = 0;
 
 	const std::string& getName() const;
 	const ModelType& getType() const;
@@ -71,6 +81,25 @@ public:
 protected:
 	virtual void processMesh(aiMesh* mesh, const aiScene* scene) = 0;
 	void loadModel(const char* pathToModel);
+
+	virtual void uploadVertexData(
+		const VkPhysicalDevice& physicalDevice,
+		const VkDevice& logicalDevice,
+		VkQueue& graphicsQueue,
+		const std::shared_ptr<CommandPool>& commandPool
+	) = 0;
+	virtual void uploadTextures(
+		const VkPhysicalDevice& physicalDevice,
+		const VkDevice& logicalDevice,
+		const VkSampleCountFlagBits& samplesCount,
+		const std::shared_ptr<CommandPool>& commandPool,
+		VkQueue& graphicsQueue
+	) = 0;
+	virtual void createUniformBuffers(
+		const VkPhysicalDevice& physicalDevice,
+		const VkDevice& logicalDevice,
+		const uint32_t& uboCount
+	) = 0;
 
 	ModelType            m_type;
 	std::string          m_name;

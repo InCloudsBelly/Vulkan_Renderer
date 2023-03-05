@@ -16,8 +16,8 @@
 #include <glm/glm.hpp>
 
 #include "VulkanRenderer/Settings/Config.h"
-#include "VulkanRenderer/Descriptors/DescriptorPool.h"
-#include "VulkanRenderer/Commands/CommandPool.h"
+#include "VulkanRenderer/Descriptor/DescriptorPool.h"
+#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/SwapChain/Swapchain.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
@@ -26,14 +26,14 @@
 #include "VulkanRenderer/Model/Types/Light.h"
 
 GUI::GUI(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
-    const VkInstance& vkInstance,
-    const Swapchain& swapchain,
-    const uint32_t& graphicsFamilyIndex,
-    const VkQueue& graphicsQueue,
-    const std::shared_ptr<Window>& window
-) : m_logicalDevice(logicalDevice), m_opSwapchain(&swapchain) {
+    const VkPhysicalDevice&             physicalDevice,
+    const VkDevice&                     logicalDevice,
+    const VkInstance&                   vkInstance,
+    const std::shared_ptr<Swapchain>&   swapchain,
+    const uint32_t&                     graphicsFamilyIndex,
+    const VkQueue&                      graphicsQueue,
+    const std::shared_ptr<Window>&      window
+) : m_logicalDevice(logicalDevice), m_opSwapchain(&(*swapchain)) {
     // -Descriptor Pool
 
     // (calculates the total size of the pool depending of the descriptors

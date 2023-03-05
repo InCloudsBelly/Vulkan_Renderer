@@ -14,8 +14,8 @@
 #include <glm/gtx/hash.hpp>
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
-#include "VulkanRenderer/BufferManager/BufferManager.h"
-#include "VulkanRenderer/Descriptors/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
 
 
 Model::Model(const std::string& name, const ModelType& type,
@@ -78,6 +78,22 @@ void Model::loadModel(const char* pathToModel)
     }
     processNode(scene->mRootNode, scene);
 }
+
+
+void Model::upload(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    VkQueue& graphicsQueue,
+    const std::shared_ptr<CommandPool>& commandPool,
+    const uint32_t uboCount
+) {
+    uploadVertexData(physicalDevice,logicalDevice,graphicsQueue,commandPool);
+    
+    uploadTextures(physicalDevice,logicalDevice,VK_SAMPLE_COUNT_1_BIT,commandPool,graphicsQueue);
+    
+    createUniformBuffers(physicalDevice,logicalDevice,uboCount);
+}
+
 
 const glm::fvec4& Model::getPos() const
 {

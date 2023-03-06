@@ -19,7 +19,7 @@ NormalTexture::NormalTexture(
     const TextureToLoadInfo& textureInfo,
     const VkSampleCountFlagBits& samplesCount,
     const std::shared_ptr<CommandPool>& commandPool,
-    VkQueue& graphicsQueue,
+    const VkQueue& graphicsQueue,
     const UsageType& usage 
 )
     :Texture(logicalDevice, TextureType::NORMAL_TEXTURE, samplesCount, textureInfo.desiredChannels, usage)
@@ -48,8 +48,7 @@ NormalTexture::NormalTexture(
             m_logicalDevice,
             imageSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             stagingBufferMemory,
             stagingBuffer
         );

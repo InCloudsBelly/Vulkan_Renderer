@@ -23,7 +23,7 @@ class Skybox : public Model
 {
 public:
 
-    Skybox(ModelInfo& modelInfo);
+    Skybox(const ModelInfo& modelInfo);
 
 	~Skybox() override;
 
@@ -37,7 +37,7 @@ public:
     )override;
 
     void bindData(
-        const Graphics& graphicsPipeline,
+        const Graphics* graphicsPipeline,
         const VkCommandBuffer& commandBuffer,
         const uint32_t currentFrame
     )override;
@@ -61,21 +61,21 @@ private:
         const TextureToLoadInfo& textureInfo,
         const VkSampleCountFlagBits& samplesCount,
         const std::shared_ptr<CommandPool>& commandPool,
-        VkQueue& graphicsQueue
+        const VkQueue& graphicsQueue
     );
 
     void uploadVertexData(
         const VkPhysicalDevice& physicalDevice,
         const VkDevice& logicalDevice,
-        VkQueue& graphicsQueue,
+        const VkQueue& graphicsQueue,
         const std::shared_ptr<CommandPool>& commandPool
-    );
+    )override;
     void uploadTextures(
         const VkPhysicalDevice& physicalDevice,
         const VkDevice& logicalDevice,
         const VkSampleCountFlagBits& samplesCount,
         const std::shared_ptr<CommandPool>& commandPool,
-        VkQueue& graphicsQueue
+        const VkQueue& graphicsQueue
     ) override;
     void createUniformBuffers(
         const VkPhysicalDevice& physicalDevice,

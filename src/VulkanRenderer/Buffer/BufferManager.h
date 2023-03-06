@@ -35,7 +35,7 @@ namespace BufferManager
         const VkDevice&                         logicalDevice,
         T*                                      data,
         size_t                                  size,
-        VkQueue&                                graphicsQueue,
+        const VkQueue&                          graphicsQueue,
         const VkBufferUsageFlags                usageDstBuffer,
         VkDeviceMemory&                         memory,
         VkBuffer&                               buffer
@@ -45,7 +45,7 @@ namespace BufferManager
     void destroyBuffer(const VkDevice& logicalDevice, VkBuffer& buffer);
 
     void copyBuffer(const std::shared_ptr<CommandPool>& commandPool, const VkDeviceSize size,
-        VkBuffer& srcBuffer, VkBuffer& dstBuffer, VkQueue& graphicsQueue);
+        VkBuffer& srcBuffer, VkBuffer& dstBuffer, const VkQueue& graphicsQueue);
 
     template<typename T>
     void fillBuffer(const VkDevice& logicalDevice, T* data,const VkDeviceSize offset,const VkDeviceSize size, VkDeviceMemory& memory);

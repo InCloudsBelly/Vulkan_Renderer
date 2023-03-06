@@ -109,7 +109,7 @@ void BufferManager::bindBufferWithMemory(const VkDevice& logicalDevice, VkBuffer
 }
 
 void BufferManager::copyBuffer(const std::shared_ptr<CommandPool>& commandPool, const VkDeviceSize size,
-    VkBuffer& srcBuffer, VkBuffer& dstBuffer, VkQueue& graphicsQueue) 
+    VkBuffer& srcBuffer, VkBuffer& dstBuffer, const VkQueue& graphicsQueue)
 {
     VkCommandBuffer commandBuffer;
     commandPool->allocCommandBuffer(commandBuffer, true);
@@ -167,7 +167,7 @@ void BufferManager::createBufferAndTransferToDevice(
     const VkDevice&             logicalDevice,
     T*                          data,
     const size_t                size,
-    VkQueue&                    graphicsQueue,
+    const VkQueue&              graphicsQueue,
     const VkBufferUsageFlags    usageDstBuffer,
     VkDeviceMemory&             memory,
     VkBuffer&                   buffer
@@ -201,7 +201,7 @@ template void BufferManager::createBufferAndTransferToDevice<uint32_t>(
         const VkDevice&             logicalDevice,
         uint32_t*                   data,
         const size_t                size,
-        VkQueue&                    graphicsQueue,
+        const VkQueue&              graphicsQueue,
         const VkBufferUsageFlags    usageDstBuffer,
         VkDeviceMemory&             memory,
         VkBuffer&                   buffer
@@ -214,7 +214,7 @@ template void BufferManager::createBufferAndTransferToDevice<Attributes::PBR::Ve
         const VkDevice&             logicalDevice,
         Attributes::PBR::Vertex*    data,
         const size_t                size,
-        VkQueue&                    graphicsQueue,
+        const VkQueue&              graphicsQueue,
         const VkBufferUsageFlags    usageDstBuffer,
         VkDeviceMemory&             memory,
         VkBuffer&                   buffer
@@ -226,7 +226,7 @@ template void BufferManager::createBufferAndTransferToDevice< Attributes::SKYBOX
         const VkDevice&             logicalDevice,
         Attributes::SKYBOX::Vertex* data,
         const size_t                size,
-        VkQueue&                    graphicsQueue,
+        const VkQueue&              graphicsQueue,
         const VkBufferUsageFlags    usageDstBuffer,
         VkDeviceMemory&             memory,
         VkBuffer&                   buffer
@@ -238,7 +238,7 @@ template void BufferManager::createBufferAndTransferToDevice<Attributes::LIGHT::
         const VkDevice&             logicalDevice,
         Attributes::LIGHT::Vertex*  data,
         const size_t                size,
-        VkQueue&                    graphicsQueue,
+        const VkQueue&              graphicsQueue,
         const VkBufferUsageFlags    usageDstBuffer,
         VkDeviceMemory&             memory,
         VkBuffer&                   buffer

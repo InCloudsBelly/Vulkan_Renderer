@@ -8,6 +8,7 @@
 #include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/Features/MSAA.h"
 #include "VulkanRenderer/Features/DepthBuffer.h"
+#include "VulkanRenderer/RenderPass/RenderPass.h"
 
 struct SwapchainSupportedProperties
 {
@@ -36,7 +37,7 @@ public:
 	);
 	~Swapchain();
 
-	void createFramebuffers(const VkRenderPass& renderPass, const DepthBuffer& depthBuffer, const MSAA& msaa);
+	void createFramebuffers(const RenderPass& renderPass, const DepthBuffer& depthBuffer, const MSAA& msaa);
 
 	void presentImage(const uint32_t imageIndex, const std::vector<VkSemaphore> signalSemaphores, const VkQueue& presentQueue);
 

@@ -10,7 +10,7 @@ class Light : public Model
 {
 public:
 
-    Light(ModelInfo& modelInfo);
+    Light(const ModelInfo& modelInfo);
 
     ~Light() override;
 
@@ -19,7 +19,7 @@ public:
     void createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)override;
 
     void bindData(
-        const Graphics& graphicsPipeline,
+        const Graphics* graphicsPipeline,
         const VkCommandBuffer& commandBuffer,
         const uint32_t currentFrame
     ) override;
@@ -54,7 +54,7 @@ private:
     void uploadVertexData(
         const VkPhysicalDevice& physicalDevice,
         const VkDevice& logicalDevice,
-        VkQueue& graphicsQueue,
+        const VkQueue& graphicsQueue,
         const std::shared_ptr<CommandPool>& commandPool
     ) override;
     
@@ -63,7 +63,7 @@ private:
         const VkDevice& logicalDevice,
         const VkSampleCountFlagBits& samplesCount,
         const std::shared_ptr<CommandPool>& commandPool,
-        VkQueue& graphicsQueue
+        const VkQueue& graphicsQueue
     ) override;
 
     void processMesh(aiMesh* mesh, const aiScene* scene) override;

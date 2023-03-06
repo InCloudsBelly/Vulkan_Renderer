@@ -8,6 +8,7 @@
 
 #include "VulkanRenderer/Pipeline/Pipeline.h"
 #include "VulkanRenderer/Descriptor/DescriptorInfo.h"
+#include "VulkanRenderer/RenderPass/RenderPass.h"
 
 enum class GraphicsPipelineType
 {
@@ -27,12 +28,12 @@ public:
 		const VkDevice& logicalDevice,
 		const GraphicsPipelineType type,
 		const VkExtent2D& extent,
-		const VkRenderPass& renderPass,
+		const RenderPass& renderPass,
 		const std::vector<ShaderInfo>& shaderInfos,
 		const VkSampleCountFlagBits& samplesCount,
 		VkVertexInputBindingDescription vertexBindingDescriptions,
 		std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
-		std::vector<size_t>* modelIndices,
+		const std::vector<size_t>& modelIndices,
 		const std::vector<DescriptorInfo>& uboInfo,
 		const std::vector<DescriptorInfo>& samplersInfo
 	);
@@ -70,6 +71,5 @@ private:
 
 	GraphicsPipelineType m_gType;
 
-	// Observer pointer
-	std::vector<size_t>* m_opModelIndices;
+	std::vector<size_t> m_modelIndices;
 };

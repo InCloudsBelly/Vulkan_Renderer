@@ -33,7 +33,7 @@ void Texture::transitionImageLayout(
     const VkImageLayout& oldLayout,
     const VkImageLayout& newLayout,
     const std::shared_ptr<CommandPool>& commandPool,
-    VkQueue& graphicsQueue )
+    const VkQueue& graphicsQueue )
 {
     VkCommandBuffer commandBuffer;
 

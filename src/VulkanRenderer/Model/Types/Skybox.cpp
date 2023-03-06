@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include <cstring>
-#include <iostream>
 
 #include <vulkan/vulkan.h>
 
@@ -29,7 +28,7 @@
 #include "VulkanRenderer/Texture/Type/Cubemap.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
-Skybox::Skybox(ModelInfo& modelInfo)
+Skybox::Skybox(const ModelInfo& modelInfo)
     : Model(modelInfo.name, ModelType::SKYBOX),
     m_textureFolderName(modelInfo.modelFileName)
 {
@@ -107,7 +106,7 @@ void Skybox::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const V
     );
 }
 
-void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
 {
     for (auto& mesh : m_meshes)
     {
@@ -139,7 +138,7 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDev
     }
 }
 
-void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, VkQueue& graphicsQueue)
+void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::SKYBOX::TEXTURES_PER_MESH_COUNT;
     TextureToLoadInfo info = {m_name, VK_FORMAT_R32G32B32A32_SFLOAT, 4 };
@@ -180,7 +179,7 @@ void Skybox::loadIrradianceMap(
     const TextureToLoadInfo& textureInfo,
     const VkSampleCountFlagBits& samplesCount,
     const std::shared_ptr<CommandPool>& commandPool,
-    VkQueue& graphicsQueue
+    const VkQueue& graphicsQueue
 ) {
     m_irradianceMap = std::make_shared<Cubemap>(
         physicalDevice,
@@ -209,13 +208,13 @@ void Skybox::updateUBO(
     UBOutils::updateUBO(logicalDevice, m_ubo, size, &newUBO, currentFrame);
 }
 
-void Skybox::bindData(const Graphics& graphicsPipeline, const VkCommandBuffer& commandBuffer, const uint32_t currentFrame)
+void Skybox::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& commandBuffer, const uint32_t currentFrame)
 {
     for (auto& mesh : m_meshes)
     {
         CommandManager::STATE::bindVertexBuffers({ mesh.vertexBuffer }, { 0 }, 0, 1, commandBuffer);
         CommandManager::STATE::bindIndexBuffer({ mesh.indexBuffer }, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
-        CommandManager::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
+        CommandManager::STATE::bindDescriptorSets(graphicsPipeline->getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
 
         CommandManager::ACTION::drawIndexed(mesh.indices.size(), 1, 0, 0, 0, commandBuffer);
     }

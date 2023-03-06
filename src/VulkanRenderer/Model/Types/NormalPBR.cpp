@@ -12,7 +12,7 @@
 #include "VulkanRenderer/Texture/Type/NormalTexture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
-NormalPBR::NormalPBR(ModelInfo& modelInfo)
+NormalPBR::NormalPBR(const ModelInfo& modelInfo)
 	: Model(modelInfo.name, ModelType::NORMAL_PBR, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size) 
 {
 	loadModel((std::string(MODEL_DIR) + modelInfo.modelFileName).c_str());
@@ -157,14 +157,14 @@ void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice,cons
 	m_uboLights = std::make_shared<UBO>(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10);
 }
 
-void NormalPBR::bindData(const Graphics& graphicsPipeline,const VkCommandBuffer& commandBuffer,const uint32_t currentFrame) 
+void NormalPBR::bindData(const Graphics* graphicsPipeline,const VkCommandBuffer& commandBuffer,const uint32_t currentFrame) 
 {
 	for (auto& mesh : m_meshes)
 	{
 		CommandManager::STATE::bindVertexBuffers({ mesh.vertexBuffer }, { 0 }, 0, 1, commandBuffer);
 		CommandManager::STATE::bindIndexBuffer(mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
 
-		CommandManager::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
+		CommandManager::STATE::bindDescriptorSets(graphicsPipeline->getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
 
 		CommandManager::ACTION::drawIndexed(mesh.indices.size(), 1, 0, 0, 0, commandBuffer);
 	}
@@ -191,7 +191,7 @@ void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescr
 	}
 }
 
-void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
 {
 
 	for (auto& mesh : m_meshes)
@@ -227,7 +227,7 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice,const Vk
 /*
  * Creates and loads all the samplers used in the shader of each mesh.
  */
-void NormalPBR::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, VkQueue& graphicsQueue)
+void NormalPBR::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
 	const size_t nTextures = GRAPHICS_PIPELINE::PBR::TEXTURES_PER_MESH_COUNT;
 

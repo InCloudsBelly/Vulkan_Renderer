@@ -8,7 +8,7 @@
 #include "VulkanRenderer/Texture/Type/NormalTexture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
-Light::Light(ModelInfo& modelInfo)
+Light::Light(const ModelInfo& modelInfo)
     : Model(modelInfo.name, ModelType::LIGHT, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size), 
     m_targetPos(glm::fvec4(modelInfo.endPos, 1.0f)),
     m_color(glm::fvec4(modelInfo.color, 1.0f)),
@@ -101,7 +101,7 @@ void Light::createDescriptorSets(const VkDevice& logicalDevice,const VkDescripto
 }
 
 void Light::bindData(
-    const Graphics& graphicsPipeline,
+    const Graphics* graphicsPipeline,
     const VkCommandBuffer& commandBuffer,
     const uint32_t currentFrame
 ) {
@@ -110,13 +110,13 @@ void Light::bindData(
         CommandManager::STATE::bindVertexBuffers({ mesh.vertexBuffer }, { 0 }, 0, 1, commandBuffer);
         CommandManager::STATE::bindIndexBuffer(mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
 
-        CommandManager::STATE::bindDescriptorSets(graphicsPipeline.getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
+        CommandManager::STATE::bindDescriptorSets(graphicsPipeline->getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
 
         CommandManager::ACTION::drawIndexed(mesh.indices.size(), 1, 0, 0, 0, commandBuffer);
     }
 }
 
-void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
 {
 
     for (auto& mesh : m_meshes)
@@ -149,7 +149,7 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevi
     }
 }
 
-void Light::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool,VkQueue& graphicsQueue)
+void Light::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::LIGHT::TEXTURES_PER_MESH_COUNT;
     const TextureToLoadInfo info = {"textures/default.jpg",VK_FORMAT_R8G8B8A8_SRGB , 4};

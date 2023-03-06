@@ -142,7 +142,7 @@ void Swapchain::createAllImageViews()
 	}
 }
 
-void Swapchain::createFramebuffers(const VkRenderPass& renderPass,const DepthBuffer& depthBuffer,const MSAA& msaa)
+void Swapchain::createFramebuffers(const RenderPass& renderPass,const DepthBuffer& depthBuffer,const MSAA& msaa)
 {
 	m_framebuffers.resize(m_imageViews.size());
 
@@ -157,7 +157,7 @@ void Swapchain::createFramebuffers(const VkRenderPass& renderPass,const DepthBuf
 
 		FramebufferManager::createFramebuffer(
 			m_logicalDevice, 
-			renderPass,
+			renderPass.get(),
 			attachments,
 			m_extent.width,
 			m_extent.height,

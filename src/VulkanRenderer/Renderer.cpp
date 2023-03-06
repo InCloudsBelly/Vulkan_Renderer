@@ -74,8 +74,6 @@ void Renderer::run()
     ZoneScoped;
 #endif
 
-    loadModels();
-
     // TODO: Improve this!
     // NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
     m_clearValues.resize(2);
@@ -88,12 +86,6 @@ void Renderer::run()
     m_clearValuesShadowMap[0].depthStencil.stencil = 0.0f;
     m_clearValuesShadowMap[1].depthStencil.stencil = 0.0f;
 
-    if (m_models.size() == 0)
-    {
-        std::cout << "Nothing to render..\n";
-        return;
-    }
-
     initWindow();
     initVulkan();
 
@@ -102,7 +94,14 @@ void Renderer::run()
 
     loadBRDFlut();
 
-    uploadModels();
+    m_scene.upload(
+        m_device->getPhysicalDevice(),
+        m_qfHandles.graphicsQueue,
+        m_commandPoolGraphics,
+        m_descriptorPoolGraphics,
+        m_shadowMap,
+        m_BRDFlut
+    );
 
     m_camera = std::make_shared<Arcball>(
             m_window->get(),
@@ -140,72 +139,7 @@ void Renderer::configureUserInputs()
     glfwSetScrollCallback(m_window->get(), scrollCallback);
 }
 
-void Renderer::loadModel(const size_t startI, const size_t chunckSize)
-{
-   const size_t endI = startI + chunckSize;
 
-   for (size_t i = startI; i < endI; i++)
-   {
-       ModelInfo& modelInfo = m_modelsToLoadInfo[i];
-      switch (modelInfo.type)
-      {
-         case ModelType::SKYBOX:
-         {
-            m_models.push_back(std::make_shared<Skybox>(modelInfo));
-            m_skyboxModelIndex.push_back(m_models.size() - 1);
-            m_skybox = std::dynamic_pointer_cast<Skybox>(m_models[m_skyboxModelIndex[0]]);
-            break;
-         }
-         case ModelType::NORMAL_PBR:
-         {
-            m_models.push_back(std::make_shared<NormalPBR>(modelInfo));
-            m_objectModelIndices.push_back(m_models.size() - 1);
-
-            // TODO: delete this
-            m_mainModelIndex = m_models.size() - 1;
-            break;
-         }
-         case ModelType::LIGHT:
-         {
-             m_models.push_back(std::make_shared<Light>(modelInfo));
-             m_lightModelIndices.push_back(m_models.size() - 1);
-
-             // TODO: Improve this.
-             if (modelInfo.lType == LightType::DIRECTIONAL_LIGHT)
-                 m_directionalLightIndex = m_models.size() - 1;
-
-            break;
-         }
-      }
-   }
-}
-
-void Renderer::loadModels()
-{
-
-#ifdef RELEASE_MODE_ON
-    ZoneScoped;
-#endif
-
-    std::vector<std::thread> threads;
-
-    const size_t maxThreadsCount = std::thread::hardware_concurrency() - 1;
-
-    size_t chunckSize = ((m_modelsToLoadInfo.size() < maxThreadsCount) ? 1 : m_modelsToLoadInfo.size() / maxThreadsCount);
-
-    const size_t threadsCount = ((m_modelsToLoadInfo.size() < maxThreadsCount) ? m_modelsToLoadInfo.size() : maxThreadsCount);
-
-    for (size_t i = 0; i < threadsCount; i++)
-    {
-        if (i == threadsCount - 1 && maxThreadsCount < m_modelsToLoadInfo.size())
-        {
-            chunckSize = (m_modelsToLoadInfo.size() - (threadsCount * chunckSize));
-        }
-        threads.push_back(std::thread(&Renderer::loadModel, this, i, chunckSize));
-    }
-    for (auto& thread : threads)
-        thread.join();
-}
 
 
 void Renderer::initWindow()
@@ -252,271 +186,6 @@ void Renderer::createSyncObjects()
     }
 }
 
-
-void Renderer::createShadowMapRenderPass()
-{
-
-#ifdef RELEASE_MODE_ON
-    ZoneScoped;
-#endif
-
-    // - Attachments
-
-    VkAttachmentDescription shadowMapAttachment{};
-    AttachmentUtils::createAttachmentDescriptionWithStencil(
-        m_depthBuffer.getFormat(),
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VK_ATTACHMENT_STORE_OP_STORE,
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        shadowMapAttachment
-    );
-
-    // Attachment references
-
-    VkAttachmentReference shadowMapAttachmentRef{};
-    AttachmentUtils::createAttachmentReference(0,VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,shadowMapAttachmentRef);
-
-    // Subpasses
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.flags = 0;
-    subpass.pDepthStencilAttachment = &shadowMapAttachmentRef;
-
-    m_renderPassShadowMap = RenderPass(m_device->getLogicalDevice(),{ shadowMapAttachment },{ subpass },{});
-}
-
-void Renderer::createSceneRenderPass()
-{
-
-#ifdef RELEASE_MODE_ON
-    ZoneScoped;
-#endif
-
-    // -Attachments
-    
-    // Color Attachment
-    VkAttachmentDescription colorAttachment{};
-    AttachmentUtils::createAttachmentDescription(
-        m_swapchain->getImageFormat(),
-        m_msaa.getSamplesCount(),
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        VK_ATTACHMENT_STORE_OP_STORE,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        colorAttachment
-    );
-
-    // Depth Attachment
-    VkAttachmentDescription depthAttachment{};
-    AttachmentUtils::createAttachmentDescriptionWithStencil(
-        m_depthBuffer.getFormat(),
-        m_msaa.getSamplesCount(),
-        VK_ATTACHMENT_LOAD_OP_CLEAR,
-        // We don't care about storing the depth data, because it will not be
-        // used after drawing has finished.
-        VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        // Just like the color buffer, we don't care about the previous depth
-        // contents.
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        depthAttachment
-    );
-
-    // Color Resolve Attachment(needed by MSAA)
-    VkAttachmentDescription colorResolveAttachment{};
-    AttachmentUtils::createAttachmentDescriptionWithStencil(
-        m_swapchain->getImageFormat(),
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        VK_ATTACHMENT_STORE_OP_STORE,
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        VK_ATTACHMENT_STORE_OP_DONT_CARE,
-        VK_IMAGE_LAYOUT_UNDEFINED,
-        // Here is not
-        // 'VK_IMAGE_LAYOUT_PRESENT_SRC_KHR'
-        // because the GUI will be the last and the one
-        // to present.
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        colorResolveAttachment
-    );
-
-    // Attachment references 
-    
-    VkAttachmentReference colorAttachmentRef{};
-    AttachmentUtils::createAttachmentReference(0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorAttachmentRef);
-
-    VkAttachmentReference depthAttachmentRef{};
-    AttachmentUtils::createAttachmentReference(1, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, depthAttachmentRef);
-
-    VkAttachmentReference colorResolveAttachmentRef{};
-    AttachmentUtils::createAttachmentReference(2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, colorResolveAttachmentRef);
-
-
-    // Subpasses
-    std::vector<VkAttachmentReference> allAttachments = { colorAttachmentRef };
-    VkSubpassDescription subPassDescript{};
-    SubPassUtils::createSubPassDescription(
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        &colorAttachmentRef,
-        &depthAttachmentRef,
-        &colorResolveAttachmentRef,
-        subPassDescript
-    );
-
-    // Subpass dependencies
-
-    VkSubpassDependency dependency{};
-    SubPassUtils::createSubPassDependency(
-        // -Source parameters.
-        //VK_SUBPASS_EXTERNAL means anything outside of a given render pass
-        //scope. When used for srcSubpass it specifies anything that happened 
-        //before the render pass. 
-        VK_SUBPASS_EXTERNAL,
-        // Operations that the subpass needs to wait on. 
-        (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT),
-        0,
-        // -Destination parameters.
-        0,
-        (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT),
-        (VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
-        (VkDependencyFlagBits)0,
-        dependency
-    );
-
-    m_renderPass = RenderPass(
-        m_device->getLogicalDevice(),
-        { colorAttachment, depthAttachment, colorResolveAttachment },
-        { subPassDescript },
-        { dependency }
-    );
-}
-
-/*
- * Uploads the data of each model to the gpu.
- */
-void Renderer::uploadModels()
-{
-
-#ifdef RELEASE_MODE_ON
-    ZoneScoped;
-#endif
-
-    // First we upload the skybox because we need some dependencies from it for
-    // the descriptor sets of the other models.
-
-    m_skybox->upload(m_device->getPhysicalDevice(), m_device->getLogicalDevice(), m_qfHandles.graphicsQueue, m_commandPoolGraphics, Config::MAX_FRAMES_IN_FLIGHT);
-    m_skybox->createDescriptorSets(m_device->getLogicalDevice(), m_graphicsPipelineSkybox.getDescriptorSetLayout(), nullptr, m_descriptorPoolGraphics);
-    
-
-    VkDescriptorSetLayout descriptorSetLayout;
-    DescriptorSetInfo descriptorSetInfo = {
-       &(m_skybox->getEnvMap()),
-       &(m_skybox->getIrradianceMap()),
-       &(*m_BRDFlut),
-       &(m_shadowMap->getShadowMapView()),
-       &(m_shadowMap->getSampler())
-    };
-
-    for (auto& model : m_models)
-    {
-        auto type = model->getType();
-        if (type == ModelType::SKYBOX)
-            continue;
-
-        model->upload(m_device->getPhysicalDevice(), m_device->getLogicalDevice(), m_qfHandles.graphicsQueue, m_commandPoolGraphics, Config::MAX_FRAMES_IN_FLIGHT);
-
-        // Descriptor Sets
-        if (type == ModelType::NORMAL_PBR)
-        {
-            descriptorSetLayout = (m_graphicsPipelinePBR.getDescriptorSetLayout());
-        }
-        else if (type == ModelType::LIGHT)
-        {
-            descriptorSetLayout = (m_graphicsPipelineLight.getDescriptorSetLayout());
-        }
-        else
-        {
-            std::cout << "TODO";
-        }
-        model->createDescriptorSets(m_device->getLogicalDevice(), descriptorSetLayout, &descriptorSetInfo, m_descriptorPoolGraphics);
-    }
-}
-
-void Renderer::createPipelines()
-{
-
-#ifdef RELEASE_MODE_ON
-    ZoneScoped;
-#endif
-
-    // --------------------------------GRAPHICS---------------------------------
-    {
-        // - Models
-        m_graphicsPipelineSkybox = Graphics(
-            m_device->getLogicalDevice(),
-            GraphicsPipelineType::SKYBOX,
-            m_swapchain->getExtent(),
-            m_renderPass.get(),
-            { { shaderType::VERTEX,"skybox"},{shaderType::FRAGMENT,"skybox"} },
-            m_msaa.getSamplesCount(),
-            Attributes::SKYBOX::getBindingDescription(),
-            Attributes::SKYBOX::getAttributeDescriptions(),
-            & m_skyboxModelIndex,
-            GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
-            GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO
-        );
-
-        m_graphicsPipelinePBR = Graphics(
-            m_device->getLogicalDevice(),
-            GraphicsPipelineType::PBR,
-            m_swapchain->getExtent(),
-            m_renderPass.get(),
-            { { shaderType::VERTEX,"scene"},{shaderType::FRAGMENT,"scene"} },
-            m_msaa.getSamplesCount(),
-            Attributes::PBR::getBindingDescription(),
-            Attributes::PBR::getAttributeDescriptions(),
-            & m_objectModelIndices,
-            GRAPHICS_PIPELINE::PBR::UBOS_INFO,
-            GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO
-        );
-
-        m_graphicsPipelineLight = Graphics(
-            m_device->getLogicalDevice(),
-            GraphicsPipelineType::LIGHT,
-            m_swapchain->getExtent(),
-            m_renderPass.get(),
-            { { shaderType::VERTEX,"light"},{shaderType::FRAGMENT,"light"} },
-            m_msaa.getSamplesCount(),
-            Attributes::LIGHT::getBindingDescription(),
-            Attributes::LIGHT::getAttributeDescriptions(),
-            & m_lightModelIndices,
-            GRAPHICS_PIPELINE::LIGHT::UBOS_INFO,
-            GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO
-        );
-
-        // - Features
-        m_graphicsPipelineShadowMap = Graphics(
-            m_device->getLogicalDevice(),
-            GraphicsPipelineType::SHADOWMAP,
-            m_swapchain->getExtent(),
-            m_renderPassShadowMap.get(),
-            { {shaderType::VERTEX, "shadowMap"} },
-            VK_SAMPLE_COUNT_1_BIT,
-            Attributes::SHADOWMAP::getBindingDescription(),
-            Attributes::SHADOWMAP::getAttributeDescriptions(),
-            & m_objectModelIndices,
-            GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
-            {}
-        );
-    }
-
-}
 
 void Renderer::createCommandPools()
 {
@@ -610,34 +279,31 @@ void Renderer::initVulkan()
     m_depthBuffer = DepthBuffer(m_device->getPhysicalDevice(),m_device->getLogicalDevice(),m_swapchain->getExtent(), m_msaa.getSamplesCount());
 
  
-    //----------------------------------RenderPasses------------------------------
-    createShadowMapRenderPass();
-    createSceneRenderPass();
-
-    //----------------------------------Pipelines-------------------------------
-    createPipelines();
+    m_scene = Scene(
+        m_device->getLogicalDevice(),
+        m_swapchain->getImageFormat(),
+        m_swapchain->getExtent(),
+        m_msaa.getSamplesCount(),
+        m_depthBuffer.getFormat(),
+        m_modelsToLoadInfo
+    );
 
 
     //-----------------------------Secondary Features---------------------------
-    //(these features they are not used by all the pipelines and need
-    //dependencies)
+    //(these features they are not used by all the pipelines and need dependencies)
     m_shadowMap = std::make_shared<ShadowMap<Attributes::PBR::Vertex>>(
             m_device->getPhysicalDevice(),
             m_device->getLogicalDevice(),
-            m_swapchain->getExtent().width,
-            m_swapchain->getExtent().height,
+            m_swapchain->getExtent(),
+            m_swapchain->getImageCount(),
             m_depthBuffer.getFormat(),
-            m_graphicsPipelineShadowMap.getDescriptorSetLayout(),
             Config::MAX_FRAMES_IN_FLIGHT,
-            &(std::dynamic_pointer_cast<NormalPBR>(m_models[m_mainModelIndex])->getMeshes())
+            &(std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel())->getMeshes()),
+            m_scene.getObjectModelIndices()
         );
 
-    //----------------------------------Framebuffers----------------------------
-
-    m_swapchain->createFramebuffers(m_renderPass.get(), m_depthBuffer, m_msaa);
-    m_shadowMap->createFramebuffer(m_renderPassShadowMap.get(), m_swapchain->getImageCount());
-
-
+    //----------------------------------Framebuffer----------------------------
+    m_swapchain->createFramebuffers(m_scene.getRenderPass(), m_depthBuffer, m_msaa);
 
     //--------------------------------------------------------------------------
     createCommandPools();
@@ -650,7 +316,7 @@ void Renderer::recordCommandBuffer(
     const VkFramebuffer& framebuffer,
     const RenderPass& renderPass,
     const VkExtent2D& extent,
-    const std::vector<Graphics>& graphicsPipelines,
+    const std::vector<const Graphics*>& graphicsPipelines,
     const uint32_t currentFrame,
     const VkCommandBuffer& commandBuffer,
     const std::vector<VkClearValue>& clearValues,
@@ -667,22 +333,22 @@ void Renderer::recordCommandBuffer(
 
 
         //---------------------------------CMDs-------------------------------
-        for (const auto& graphicsPipeline : graphicsPipelines)
+        for (auto graphicsPipeline : graphicsPipelines)
         {
-            CommandManager::STATE::bindPipeline(graphicsPipeline.get(), PipelineType::GRAPHICS, commandBuffer);
+            CommandManager::STATE::bindPipeline(graphicsPipeline->get(), PipelineType::GRAPHICS, commandBuffer);
             // Set Dynamic States
             CommandManager::STATE::setViewport(0.0f, 0.0f, extent, 0.0f, 1.0f, 0, 1, commandBuffer);
             CommandManager::STATE::setScissor({ 0, 0 }, extent, 0, 1, commandBuffer);
 
-            if (graphicsPipeline.getGraphicsPipelineType() ==GraphicsPipelineType::SHADOWMAP) 
+            if (graphicsPipeline->getGraphicsPipelineType() ==GraphicsPipelineType::SHADOWMAP) 
             {
-                m_shadowMap->bindData(graphicsPipeline,commandBuffer,currentFrame);
+                m_shadowMap->bindData(commandBuffer, currentFrame);
                 continue;
             }
 
-            for (const size_t& i : graphicsPipeline.getModelIndices())
+            for (auto i : graphicsPipeline->getModelIndices())
             {
-                const auto& model = m_models[i];
+                auto& model = m_scene.getModel(i);
                 model->bindData(graphicsPipeline,commandBuffer,currentFrame);
 
             }
@@ -714,11 +380,10 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
     // First we update the shadow map since the other models of the scene have dependencies with it.
     // Shadow Map
-    if (m_directionalLightIndex.has_value())
     {
-        auto pLight = std::dynamic_pointer_cast<Light>(m_models[m_directionalLightIndex.value()]);
-        // TODO: improve this
-        auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_models[m_mainModelIndex]);
+        auto pLight = std::dynamic_pointer_cast<Light>(m_scene.getDirectionalLight());
+
+        auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel());
 
         m_shadowMap->updateUBO(
             // TODO: make it for more than 1 model
@@ -732,26 +397,12 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         );
     }
 
-
-    UBOinfo uboInfo = {
-      m_camera->getPos(),
-      m_camera->getViewM(),
-      m_camera->getProjectionM(),
-      m_shadowMap->getLightSpace(),
-      m_lightModelIndices.size(),
-      m_swapchain->getExtent()
-    };
-
-    // Scene
-    for (auto& model : m_models)
-    {
-        model->updateUBO(m_device->getLogicalDevice(), currentFrame, uboInfo);
-
-        if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
-        {
-            pModel->updateUBOlights(m_device->getLogicalDevice(), m_lightModelIndices, m_models, currentFrame);
-        }
-    }
+    m_scene.updateUBO(
+        m_camera,
+        m_shadowMap->getLightSpace(),
+        m_swapchain->getExtent(),
+        currentFrame
+    );
 
     //--------------------Acquires an image from the swapchain------------------
 
@@ -763,9 +414,9 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     // Shadow Mapping
     recordCommandBuffer(
         m_shadowMap->getFramebuffer(imageIndex),
-        m_renderPassShadowMap,
+        m_shadowMap->getRenderPass(),
         m_swapchain->getExtent(),
-        {m_graphicsPipelineShadowMap},
+        { &m_shadowMap->getGraphicsPipeline() },
         currentFrame,
         m_shadowMap->getCommandBuffer(currentFrame),
         m_clearValuesShadowMap,
@@ -775,9 +426,9 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     // Scene
     recordCommandBuffer(
         m_swapchain->getFramebuffer(imageIndex),
-        m_renderPass,
+        m_scene.getRenderPass(),
         m_swapchain->getExtent(),
-        { m_graphicsPipelineLight,m_graphicsPipelinePBR, m_graphicsPipelineSkybox },
+        { &m_scene.getLightPipeline(),&m_scene.getPBRpipeline(), &m_scene.getSkyboxPipeline() },
         currentFrame,
         m_commandPoolGraphics->getCommandBuffer(currentFrame),
         m_clearValues,
@@ -873,7 +524,7 @@ void Renderer::mainLoop()
     while (m_window->isWindowClosed() == false)
     {
         handleInput();
-        m_GUI->draw(m_models, m_camera, m_objectModelIndices, m_lightModelIndices);
+        m_GUI->draw(m_scene.getModels(), m_camera, m_scene.getObjectModelIndices(),m_scene.getLightModelIndices());
         drawFrame(currentFrame);
     }
     vkDeviceWaitIdle(m_device->getLogicalDevice());
@@ -905,7 +556,7 @@ void Renderer::loadBRDFlut()
         }
     }
 
-    std::string pathToTexture = (std::string(SKYBOX_DIR) + m_skybox->getTextureFolderName() + "/" + "BRDFlut.ktx");
+    std::string pathToTexture = (std::string(SKYBOX_DIR) +/* m_skybox->getTextureFolderName()*/ "Apartment" + "/" + "BRDFlut.ktx");
 
     gli::save_ktx(lutTexture, pathToTexture);
 
@@ -1004,24 +655,15 @@ void Renderer::cleanup()
     // Swapchain
     m_swapchain->destroy();
 
-    // Graphics Pipelines
-    m_graphicsPipelinePBR.destroy();
-    m_graphicsPipelineSkybox.destroy();
-    m_graphicsPipelineLight.destroy();
-    m_graphicsPipelineShadowMap.destroy();
-
     // Computations
     m_BRDFcomp.destroy();
     m_BRDFlut->destroy();
 
-    // Renderpass
-    m_renderPass.destroy();
-    m_renderPassShadowMap.destroy();
+    // Scenes
+    m_scene.destroy();
 
     // Models -> Buffers, Memories and Textures.
     m_shadowMap->destroy();
-    for (auto& model : m_models)
-        model->destroy(m_device->getLogicalDevice());
    
     // Descriptor Pool
     m_descriptorPoolGraphics.destroy();
@@ -1090,28 +732,19 @@ void Renderer::addDirectionalLight(
     const glm::fvec3& endPos,
     const glm::fvec3& size
 ) {
-    if (!m_directionalLightIndex.has_value())
-    {
-        m_modelsToLoadInfo.push_back({
-            ModelType::LIGHT,
-            name,
-            modelFileName,
-            color,
-            pos,
-            glm::fvec3(0.0f),
-            size,
-            LightType::DIRECTIONAL_LIGHT,
-            endPos,
-            0.0f,
-            0.0f
-            });
-    }
-    else
-    {
-        throw std::runtime_error(
-            "Just one directional light per scene is allowed to be added."
-        );
-    }
+    m_modelsToLoadInfo.push_back({
+        ModelType::LIGHT,
+        name,
+        modelFileName,
+        color,
+        pos,
+        glm::fvec3(0.0f),
+        size,
+        LightType::DIRECTIONAL_LIGHT,
+        endPos,
+        0.0f,
+        0.0f
+        });
 }
 
 void Renderer::addPointLight(

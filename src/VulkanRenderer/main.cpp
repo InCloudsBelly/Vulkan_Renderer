@@ -49,7 +49,7 @@ int main()
             );*/
             app.addSkybox("Apartment.hdr", "Apartment");
 
-         /*   app.addObjectPBR(
+           /* app.addObjectPBR(
                 "Sponza",
                 "Sponza.gltf",
                 glm::fvec3(0.0f),

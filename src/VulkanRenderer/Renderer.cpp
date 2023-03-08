@@ -257,10 +257,10 @@ void Renderer::initVulkan()
         m_device->getLogicalDevice(),
         {
             // TODO: Make the size more precise.
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1500/*,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1500/*,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2000/*,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)*/},
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2000/*,static_cast<uint32_t> (m_models.size() * Config::MAX_FRAMES_IN_FLIGHT)*/}
         },
-        1500
+        2000
         /*m_models.size() * Config::MAX_FRAMES_IN_FLIGHT*/
     );
 
@@ -532,35 +532,8 @@ void Renderer::mainLoop()
 
 void Renderer::loadBRDFlut()
 {
-    const uint32_t bufferSize = (2 * sizeof(float) * Config::BRDF_WIDTH * Config::BRDF_HEIGHT);
-    float* lutData = new float[bufferSize];
-   
-    m_BRDFcomp.downloadData(0, (uint8_t*)lutData, bufferSize);
-
-    gli::texture lutTexture = gli::texture2d(
-        gli::FORMAT_RG16_SFLOAT_PACK16,
-        gli::extent2d(Config::BRDF_WIDTH, Config::BRDF_HEIGHT),
-        1
-    );
-
-    const float* data = lutData;
-    for (int y = 0; y < Config::BRDF_HEIGHT; y++)
-    {
-        for (int x = 0; x < Config::BRDF_WIDTH; x++)
-        {
-            const int ofs = y * Config::BRDF_HEIGHT + x;
-            const gli::vec2 value(data[ofs * 2 + 0], data[ofs * 2 + 1]);
-            const gli::texture::extent_type uv = { x, y, 0 };
-
-            lutTexture.store<glm::uint32>(uv, 0, 0, 0, gli::packHalf2x16(value));
-        }
-    }
-
-    std::string pathToTexture = (std::string(SKYBOX_DIR) +/* m_skybox->getTextureFolderName()*/ "Apartment" + "/" + "BRDFlut.ktx");
-
-    gli::save_ktx(lutTexture, pathToTexture);
-
-    TextureToLoadInfo info = { pathToTexture,VK_FORMAT_R16G16_SFLOAT,4 };
+    std::string pathToTexture = "/textures/default/BRDF_LUT.tga";
+    TextureToLoadInfo info = { pathToTexture,VK_FORMAT_R8G8B8A8_SRGB,4 };
 
     m_BRDFlut = std::make_shared<NormalTexture>(
         m_device->getPhysicalDevice(),
@@ -569,7 +542,7 @@ void Renderer::loadBRDFlut()
         VK_SAMPLE_COUNT_1_BIT,
         m_commandPoolGraphics,
         m_qfHandles.graphicsQueue,
-        UsageType::BRDF
+        UsageType::TO_COLOR
         );
 
 }
@@ -698,9 +671,7 @@ void Renderer::addSkybox(const std::string& name, const std::string& textureFold
          glm::fvec3(0.0f),
          glm::fvec3(0.0f),
          LightType::NONE,
-         glm::fvec3(0.0f),
-         0.0f,
-         0.0f
+         glm::fvec3(0.0f)
         });
 }
 
@@ -718,9 +689,7 @@ void Renderer::addObjectPBR(const std::string& name, const std::string& modelFil
          rot,
          size,
          LightType::NONE,
-         glm::fvec3(0.0f),
-         0.0f,
-         0.0f
+         glm::fvec3(0.0f)
         });
 }
 
@@ -741,9 +710,7 @@ void Renderer::addDirectionalLight(
         glm::fvec3(0.0f),
         size,
         LightType::DIRECTIONAL_LIGHT,
-        endPos,
-        0.0f,
-        0.0f
+        endPos
         });
 }
 
@@ -752,9 +719,7 @@ void Renderer::addPointLight(
     const std::string& modelFileName,
     const glm::fvec3& color,
     const glm::fvec3& pos,
-    const glm::fvec3& size,
-    const float attenuation,
-    const float radius
+    const glm::fvec3& size
 ) {
     m_modelsToLoadInfo.push_back({
           ModelType::LIGHT,
@@ -765,9 +730,7 @@ void Renderer::addPointLight(
           glm::fvec3(0.0f),
           size,
           LightType::POINT_LIGHT,
-          glm::fvec3(0.0f),
-          attenuation,
-          radius
+          glm::fvec3(0.0f)
         });
 }
 
@@ -778,9 +741,7 @@ void Renderer::addSpotLight(
     const glm::fvec3& pos,
     const glm::fvec3& endPos,
     const glm::fvec3& rot,
-    const glm::fvec3& size,
-    const float attenuation,
-    const float radius
+    const glm::fvec3& size
 ) {
     m_modelsToLoadInfo.push_back({
           ModelType::LIGHT,
@@ -791,8 +752,6 @@ void Renderer::addSpotLight(
           rot,
           size,
           LightType::SPOT_LIGHT,
-          endPos,
-          attenuation,
-          radius
+          endPos
         });
 }

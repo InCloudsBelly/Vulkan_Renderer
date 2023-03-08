@@ -28,7 +28,6 @@ enum UsageType
     TO_COLOR = 0,
     ENVIRONMENTAL_MAP = 1,
     IRRADIANCE_MAP = 2,
-    BRDF = 3
 };
 
 struct TextureToLoadInfo

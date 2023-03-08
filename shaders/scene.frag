@@ -81,7 +81,8 @@ struct IBLinfo
 {
    vec3 diffuseLight;
    vec3 specularLight;
-   vec3 brdf;
+//   vec3 brdf;
+   vec2 brdf;
 };
 
 const float PI = 3.14159265359;
@@ -154,7 +155,8 @@ void main()
 
       float mipCount = float(textureQueryLevels(envMapSampler));
       float lod = pbrInfo.perceptualRoughness * mipCount;
-      iblInfo.brdf = textureLod(BRDFlutSampler,brdfSamplePoint, 0).rgb;
+
+      iblInfo.brdf = texture(BRDFlutSampler, vec2( pbrInfo.NdotV, material.roughnessFactor)).rg;
 
       iblInfo.specularLight = textureLod(envMapSampler,reflection.xyz,lod).rgb;
    }
@@ -180,6 +182,7 @@ void main()
             pbrInfo.NdotH = max(dot(normal, halfway), 0.0);
             pbrInfo.VdotH = max(dot(halfway, view), 0.0);
         }
+
 
          if (lights[i].type == 0)
             color += calculateDirLight(i, material, pbrInfo);

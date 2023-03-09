@@ -300,6 +300,37 @@ template void BufferManager::fillBuffer<float>(
         const VkDeviceSize          size,
         VkDeviceMemory&             memory
     );
+
+///////////////////////////////////////////////////////////////////////////////
+template<typename T>
+void BufferManager::createAndFillStagingBuffer(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    const VkDeviceSize size,
+    const uint32_t offset,
+    const VkBufferUsageFlags usage,
+    const VkMemoryPropertyFlags memoryProperties,
+    VkDeviceMemory& memory,
+    VkBuffer& buffer,
+    T* data
+) {
+    BufferManager::createBuffer(physicalDevice, logicalDevice, size, usage, memoryProperties, memory, buffer);
+
+    BufferManager::fillBuffer(logicalDevice, data, offset, size, memory);
+}
+////////////////////////////////////Instances//////////////////////////////////
+template void BufferManager::createAndFillStagingBuffer<uint8_t>(
+    const VkPhysicalDevice& physicalDevice,
+    const VkDevice& logicalDevice,
+    const VkDeviceSize size,
+    const uint32_t offset,
+    const VkBufferUsageFlags usage,
+    const VkMemoryPropertyFlags memoryProperties,
+    VkDeviceMemory& memory,
+    VkBuffer& buffer,
+    uint8_t* data
+    );
+
 ///////////////////////////////////////////////////////////////////////////////
 
 void BufferManager::downloadDataFromBuffer(

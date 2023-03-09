@@ -1,6 +1,8 @@
 #include "VulkanRenderer/Texture/Type/Cubemap.h"
 
 #include <stdexcept>
+#include <iostream>
+#include <filesystem>
 
 #include "VulkanRenderer/Texture/MipmapUtils.h"
 #include "VulkanRenderer/Texture/Bitmap.h"
@@ -27,8 +29,6 @@ Cubemap::Cubemap(
 
     const std::string pathToTexture = (std::string(SKYBOX_DIR) + textureFolderName);
 
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingBufferMemory;
 
     const float* img = stbi_loadf(
         (pathToTexture + "/" + textureInfo.name).c_str(),
@@ -49,16 +49,13 @@ Cubemap::Cubemap(
         );
     }
 
-    // TODO: Verify if it's already created.
-    //if (m_usage)
-    //{
-    //cubemapUtils::createIrradianceHDR(
-    //      img,
-    //      m_width,
-    //      m_height,
-    //      pathToTexture + "/Irradiance.hdr"
-    //);
-    //}
+    if (m_usage == ENVIRONMENTAL_MAP)
+    {
+        if (!std::filesystem::exists(pathToTexture + "/Irradiance.hdr"))
+        {
+            cubemapUtils::createIrradianceHDR(img, m_width, m_height, pathToTexture + "/Irradiance.hdr");
+        }
+    }
 
     // Converts RGB -> RGBA
     // (Because Vulkan doesn't accept to use RGB format as sampler)
@@ -74,27 +71,6 @@ Cubemap::Cubemap(
 
     uint8_t* data = cubemap.data_.data();
     uint32_t imageSize = (cubemap.w_ * cubemap.h_ * 4 * Bitmap::getBytesPerComponent(cubemap.fmt_) * 6);
-
-    // Creates the textures of the faces.
-
-    BufferManager::createBuffer(
-        physicalDevice,
-        m_logicalDevice,
-        imageSize,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        stagingBufferMemory,
-        stagingBuffer
-    );
-
-    BufferManager::fillBuffer(
-        m_logicalDevice,
-        data,
-        0,
-        imageSize,
-        stagingBufferMemory
-    );
 
     m_image = Image(
         physicalDevice,
@@ -118,24 +94,19 @@ Cubemap::Cubemap(
     );
     
 
-    // We will transfer the pixels to the image object with a cmd buffer.
-    // (staging buffer to the image obj)
-    transitionImageLayout(textureInfo.format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, commandPool, graphicsQueue);
-
-    ImageManager::copyBufferToImage(cubemap.w_, cubemap.h_, true, graphicsQueue, stagingBuffer, commandPool, m_image.get());
-
-    // Another transition to sample from the shader.
-    transitionImageLayout(
+    ImageManager::copyDataToImage(
+        physicalDevice,
+        m_logicalDevice,
+        imageSize,
+        0,
+        data, cubemap.w_, cubemap.h_, 
         textureInfo.format,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        commandPool,
-        graphicsQueue
+        m_mipLevels, 
+        true, 
+        graphicsQueue, 
+        commandPool, 
+        m_image.get()
     );
-
-    vkDestroyBuffer(m_logicalDevice, stagingBuffer, nullptr);
-
-    vkFreeMemory(m_logicalDevice, stagingBufferMemory, nullptr);
 }
 
 Cubemap::~Cubemap() {}

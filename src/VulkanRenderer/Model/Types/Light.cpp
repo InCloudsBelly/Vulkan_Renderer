@@ -12,8 +12,6 @@ Light::Light(const ModelInfo& modelInfo)
     : Model(modelInfo.name, ModelType::LIGHT, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size), 
     m_targetPos(glm::fvec4(modelInfo.endPos, 1.0f)),
     m_color(glm::fvec4(modelInfo.color, 1.0f)),
-    m_attenuation(modelInfo.attenuation),
-    m_radius(modelInfo.radius),
     m_lightType(modelInfo.lType) 
 {
     if (modelInfo.lType == LightType::DIRECTIONAL_LIGHT)
@@ -152,7 +150,7 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevi
 void Light::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::LIGHT::TEXTURES_PER_MESH_COUNT;
-    const TextureToLoadInfo info = {"textures/default.jpg",VK_FORMAT_R8G8B8A8_SRGB , 4};
+    const TextureToLoadInfo info = {"textures/default/DefaultTexture.png", VK_FORMAT_R8G8B8A8_SRGB , 4};
 
     for (auto& mesh : m_meshes)
     {
@@ -203,16 +201,6 @@ const glm::fvec4& Light::getTargetPos() const
     return m_targetPos;
 }
 
-const float& Light::getAttenuation() const
-{
-    return m_attenuation;
-}
-
-const float& Light::getRadius() const
-{
-    return m_radius;
-}
-
 const LightType& Light::getLightType() const
 {
     return m_lightType;
@@ -231,14 +219,4 @@ void Light::setTargetPos(const glm::fvec4& pos)
 void Light::setIntensity(const float& intensity)
 {
     m_intensity = intensity;
-}
-
-void Light::setAttenuation(const float& attenuation)
-{
-    m_attenuation = attenuation;
-}
-
-void Light::setRadius(const float& radius)
-{
-    m_radius = radius;
 }

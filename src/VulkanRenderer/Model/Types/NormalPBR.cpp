@@ -42,21 +42,22 @@ std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextu
 {
 	if (material->GetTextureCount(type) > 0)
 	{
-		// TODO: manage  when there are several textures of the same type.
-
-		//for (size_t i = 0; i < material->GetTextureCount(type); i++)
-		//{
-		//   aiString str;
-		//   material->GetTexture(type, i, &str);
-		//}
 		aiString str;
 		material->GetTexture(type, 0, &str);
+
+		if (typeName == "NORMALS")
+			m_hasNormalMap = true;
 
 		return str.C_Str();
 
 	}
 	else
+	{
+		if (typeName == "NORMALS")
+			m_hasNormalMap = false;
+
 		return defaultTextureFile;
+	}
 	
 }
 
@@ -115,38 +116,33 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 	{
 		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-		//TODO: Duplicated code
+		struct MaterialInfo
+		{
+			aiTextureType type;
+			std::string   typeName;
+			std::string   defaultTextureFile;
+			VkFormat      format;
+			int           desiredChannels;
+		};
+
+		std::vector<MaterialInfo> materials =
+		{
+			{ aiTextureType_DIFFUSE,	"DIFFUSE",				"textures/default/DefaultTexture.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_UNKNOWN,	"METALIC_ROUGHNESS",	"textures/default/metallicRoughness.png",	VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_EMISSIVE,	"EMISSIVE",				"textures/default/emissiveColor.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_LIGHTMAP,	"AO",					"textures/default/ambientOcclusion.png",	VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_NORMALS,	"NORMALS",				"textures/default/DefaultNormal.png",		VK_FORMAT_R8G8B8A8_SRGB,	4}
+		};
 
 		TextureToLoadInfo info;
-		info.name = getMaterialTextureName(material, aiTextureType_DIFFUSE, "DIFFUSE", "textures/default.jpg");
-		info.format = VK_FORMAT_R8G8B8A8_SRGB;
-		info.desiredChannels = 4;
-		newMesh.texturesToLoadInfo.push_back(info);
+		for (auto& m : materials)
+		{
+			info.name = getMaterialTextureName(material, m.type, m.typeName, m.defaultTextureFile);
+			info.format = m.format;
+			info.desiredChannels = m.desiredChannels;
 
-		info.name = getMaterialTextureName(material,aiTextureType_UNKNOWN,"METALIC_ROUGHNESS", "textures/default.jpg");
-		info.format = VK_FORMAT_R8G8B8A8_SRGB;
-		info.desiredChannels = 4;
-		newMesh.texturesToLoadInfo.push_back(info);
-
-		info.name = getMaterialTextureName(material,aiTextureType_EMISSIVE,"EMISSIVE","textures/default.jpg");
-		info.format = VK_FORMAT_R8G8B8A8_SRGB;
-		info.desiredChannels = 4;
-		newMesh.texturesToLoadInfo.push_back(info);
-
-		info.name = getMaterialTextureName(material,aiTextureType_LIGHTMAP,"AO","textures/default.jpg");
-		info.format = VK_FORMAT_R8G8B8A8_SRGB;
-		info.desiredChannels = 4;
-		newMesh.texturesToLoadInfo.push_back(info);
-
-		info.name = getMaterialTextureName(material,aiTextureType_NORMALS,"NORMALS", "textures/default.jpg");
-		info.format = VK_FORMAT_R8G8B8A8_UNORM;
-		info.desiredChannels = 4;
-		if (info.name == "textures/default.jpg")
-			m_hasNormalMap = false;
-		else
-			m_hasNormalMap = true;
-
-		newMesh.texturesToLoadInfo.push_back(info);
+			newMesh.texturesToLoadInfo.push_back(info);
+		}
 	}
 	m_meshes.push_back(newMesh);
 }
@@ -289,8 +285,6 @@ void NormalPBR::updateUBOlights(
 			m_lightsInfo[i].pos = pModel->getPos();
 			m_lightsInfo[i].color = pModel->getColor();
 			m_lightsInfo[i].dir = pModel->getTargetPos() - pModel->getPos();
-			m_lightsInfo[i].attenuation = pModel->getAttenuation();
-			m_lightsInfo[i].radius = pModel->getRadius();
 			m_lightsInfo[i].intensity = pModel->getIntensity();
 			m_lightsInfo[i].type = (int)pModel->getLightType();
 		}

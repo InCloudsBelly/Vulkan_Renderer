@@ -1,3 +1,6 @@
+// Code from:
+// https://github.com/PacktPublishing/3D-Graphics-Rendering-Cookbook/blob/master/shared/UtilsCubemap.h
+
 #include "VulkanRenderer/Texture/cubemapUtils.h"
 
 #include <algorithm>

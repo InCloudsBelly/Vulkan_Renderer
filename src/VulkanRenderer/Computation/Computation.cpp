@@ -43,7 +43,8 @@ Computation::Computation(
         m_outBuffer
     );
 
-    m_pipeline = Compute(m_logicalDevice, ShaderInfo(shaderType::COMPUTE,"BRDF"), bufferInfos );
+    // TODO: Make it custom.
+    m_pipeline = Compute(m_logicalDevice, ShaderInfo(shaderType::COMPUTE, "BRDF"), bufferInfos, {});
 
     m_descriptorSet = DescriptorSets(m_logicalDevice, COMPUTE_PIPELINE::BRDF::BUFFERS_INFO, { m_inBuffer, m_outBuffer }, m_pipeline.getDescriptorSetLayout(), descriptorPool);
 

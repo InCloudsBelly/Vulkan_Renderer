@@ -134,6 +134,8 @@ bool Device::isPhysicalDeviceSuitable(
     // Vulkan version.
     vkGetPhysicalDeviceProperties(possiblePhysicalDevice, &deviceProperties);
 
+    m_deviceName = deviceProperties.deviceName;
+    m_apiVersion = deviceProperties.apiVersion;
     // - Device Features
     // Verifies if the device has the features we want.
     VkPhysicalDeviceFeatures deviceFeatures;
@@ -261,4 +263,14 @@ void Device::findSupportedProperties(
         supportedProperties.presentModes.resize(presentModeCount);
         vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, supportedProperties.presentModes.data());
     }
+}
+
+const std::string& Device::getDeviceName() const
+{
+    return m_deviceName;
+}
+
+const uint32_t& Device::getApiVersion() const
+{
+    return m_apiVersion;
 }

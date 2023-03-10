@@ -25,6 +25,13 @@ layout(location = 3) out vec3 outTangent;
 layout(location = 4) out vec3 outBitangent;
 layout(location = 5) out vec4 outShadowCoords;
 
+/*
+ * We need to compute the current fragment¡¯s position in the same
+ * space that the one we used when creating the shadowmap. So we need to
+ * transform it once with the usual MVP matrix, and another time with the
+ * depthMVP matrix. So this transforms [-1, 1] -> [0, 1].
+ */
+
 const mat4 bias = mat4(
       0.5, 0.0, 0.0, 0.0,
       0.0, 0.5, 0.0, 0.0,
@@ -41,13 +48,16 @@ void main()
    outPosition = vec3(ubo.model * vec4(inPosition, 1.0));
    outTexCoord = inTexCoord;
 
-   outTangent   = normalize(mat3(ubo.model) * inTangent);
-   outNormal    = normalize(mat3(ubo.model) * inNormal);
+   mat3 normalMatrix = transpose(inverse(mat3(ubo.model)));
+   outTangent   = normalize(normalMatrix * inTangent);
+   outNormal    = normalize(normalMatrix * inNormal);
 
+//   outTangent   = normalize(mat3(ubo.model) * inTangent);
+//   outNormal    = normalize(mat3(ubo.model) * inNormal);
    // Gram-Schmidt -> reorthogonalization
    outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
 
-   outBitangent = cross(outNormal, outTangent);
+   outBitangent = normalize(cross(outNormal, outTangent));
 
    outShadowCoords = ((bias * ubo.lightSpace * ubo.model) * vec4(inPosition, 1.0));
 }

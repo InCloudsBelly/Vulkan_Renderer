@@ -18,11 +18,13 @@
 #include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
 
 
-Model::Model(const std::string& name, const ModelType& type,
+Model::Model(
+    const std::string& name, const std::string& folderName, 
+    const ModelType& type,
     const glm::fvec4& pos,
     const glm::fvec3& rot,
     const glm::fvec3& size
-) : m_name(name), m_type(type), m_pos(pos), m_rot(rot), m_size(size), m_hideStatus(false) {}
+) : m_name(name), m_folderName(folderName), m_type(type), m_pos(pos), m_rot(rot), m_size(size), m_hideStatus(false) {}
 
 Model::~Model() {}
 
@@ -36,7 +38,7 @@ const ModelType& Model::getType() const
     return m_type;
 }
 
-const bool Model::isHided() const
+const bool Model::isHidden() const
 {
     return m_hideStatus;
 }
@@ -62,7 +64,7 @@ void Model::loadModel(const char* pathToModel)
 
     if (m_type == ModelType::NORMAL_PBR)
     {
-        flags = (aiProcess_Triangulate |aiProcess_FlipUVs |aiProcess_CalcTangentSpace);
+        flags = (aiProcess_Triangulate |aiProcess_FlipUVs |aiProcess_CalcTangentSpace | aiProcess_PreTransformVertices);
     }
     else
     {

@@ -48,16 +48,28 @@ VkFormat FeaturesUtils::findSupportedFormat(
 void FeaturesUtils::createDepthStencilStateInfo(const GraphicsPipelineType& type, VkPipelineDepthStencilStateCreateInfo& depthStencil)
 {
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    // Specifies if the depth of new fragments shoud be compared to the depth
-    // buffer to see if they should be discarded.
-    depthStencil.depthTestEnable = VK_TRUE;
-    // Specifies if the new depth of fragments that pass the depth test should
-    // actually be written to the depth buffer.
-    depthStencil.depthWriteEnable = VK_TRUE;
+    if (type == GraphicsPipelineType::PREFILTER_ENV_MAP)
+    {
+        depthStencil.depthTestEnable = VK_FALSE;
+        depthStencil.depthWriteEnable = VK_FALSE;
+    }
+    else
+    {
+        // Specifies if the depth of new fragments shoud be compared to the depth
+        // buffer to see if they should be discarded.
+        depthStencil.depthTestEnable = VK_TRUE;
+        // Specifies if the new depth of fragments that pass the depth test should
+        // actually be written to the depth buffer.
+        depthStencil.depthWriteEnable = VK_TRUE;
+    }
     // Specifies the comparasion that is performed to keep or discard
     // fragments. We're sticking to the convention of lower depth = closer,
     // so the depth of new fragments should be less.
     if (type == GraphicsPipelineType::SKYBOX || type == GraphicsPipelineType::SHADOWMAP)
+    {
+        depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    }
+    else if (type == GraphicsPipelineType::PREFILTER_ENV_MAP)
     {
         depthStencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     }
@@ -69,8 +81,16 @@ void FeaturesUtils::createDepthStencilStateInfo(const GraphicsPipelineType& type
     depthStencil.minDepthBounds = 0.0f;
     depthStencil.maxDepthBounds = 1.0f;
     // These 3 param. configure the stencil buffer operations.
-    // (Not used for now...)
+
     depthStencil.stencilTestEnable = VK_FALSE;
-    depthStencil.front = {};
-    depthStencil.back = {};
+    if (type == GraphicsPipelineType::PREFILTER_ENV_MAP)
+    {
+        depthStencil.front = depthStencil.back;
+        depthStencil.back.compareOp = VK_COMPARE_OP_ALWAYS;
+    }
+    else
+    {
+        depthStencil.front = {};
+        depthStencil.back = {};
+    }
 }

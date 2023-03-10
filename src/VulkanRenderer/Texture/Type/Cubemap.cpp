@@ -17,7 +17,6 @@ Cubemap::Cubemap(
     const VkPhysicalDevice& physicalDevice,
     const VkDevice& logicalDevice,
     const TextureToLoadInfo& textureInfo,
-    const std::string& textureFolderName,
     const VkSampleCountFlagBits& samplesCount,
     const std::shared_ptr<CommandPool>& commandPool,
     const VkQueue& graphicsQueue,
@@ -27,7 +26,7 @@ Cubemap::Cubemap(
 {
     m_mipLevels = 1;
 
-    const std::string pathToTexture = (std::string(SKYBOX_DIR) + textureFolderName);
+    const std::string pathToTexture = (std::string(SKYBOX_DIR) + textureInfo.folderName);
 
 
     const float* img = stbi_loadf(

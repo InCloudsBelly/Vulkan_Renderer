@@ -47,7 +47,7 @@ protected:
 
     virtual void createShaderStageInfo(const VkShaderModule& shaderModule,const shaderType& type,VkPipelineShaderStageCreateInfo& shaderStageInfo) = 0;
     void createShaderModule(const ShaderInfo& shaderInfos,VkShaderModule& shaderModule);
-    void createPipelineLayout(const VkDescriptorSetLayout& descriptorSetLayout);
+    void createPipelineLayout(const VkDescriptorSetLayout& descriptorSetLayout, const std::vector<VkPushConstantRange>& pushConstantRanges);
 
     PipelineType            m_type;
 

@@ -15,7 +15,7 @@ std::vector<char> ShaderManager::getBinaryDataFromFile(const std::string& filena
     );
 
     if (!file.is_open())
-        throw std::runtime_error("Failed to open file!");
+        throw std::runtime_error("Failed to open file: " + filename + ".spv");
 
     size_t fileSize = (size_t)file.tellg();
     std::vector<char> buffer(fileSize);

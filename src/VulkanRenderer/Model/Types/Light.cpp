@@ -9,7 +9,7 @@
 #include "VulkanRenderer/Command/CommandManager.h"
 
 Light::Light(const ModelInfo& modelInfo)
-    : Model(modelInfo.name, ModelType::LIGHT, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size), 
+    : Model(modelInfo.name, modelInfo.folderName, ModelType::LIGHT, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size),
     m_targetPos(glm::fvec4(modelInfo.endPos, 1.0f)),
     m_color(glm::fvec4(modelInfo.color, 1.0f)),
     m_lightType(modelInfo.lType) 
@@ -19,7 +19,7 @@ Light::Light(const ModelInfo& modelInfo)
     else
         m_intensity = 70.0f;
 
-    loadModel((std::string(MODEL_DIR) + modelInfo.modelFileName).c_str());
+    loadModel((std::string(MODEL_DIR) +modelInfo.folderName + "/" +modelInfo.fileName).c_str());
     m_rot = glm::fvec3(0.0f);
 }
 
@@ -61,7 +61,7 @@ void Light::processMesh(aiMesh* mesh, const aiScene* scene)
            mesh->mTextureCoords[0][i].y,
         };
 
-        newMesh.vertices.push_back(vertex);
+        newMesh.vertices.emplace_back(vertex);
 
     }
 
@@ -69,10 +69,10 @@ void Light::processMesh(aiMesh* mesh, const aiScene* scene)
     {
         auto face = mesh->mFaces[i];
         for (size_t j = 0; j < face.mNumIndices; j++)
-            newMesh.indices.push_back(face.mIndices[j]);
+            newMesh.indices.emplace_back(face.mIndices[j]);
     }
 
-    m_meshes.push_back(newMesh);
+    m_meshes.emplace_back(newMesh);
 }
 
 void Light::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
@@ -91,9 +91,10 @@ void Light::createDescriptorSets(const VkDevice& logicalDevice,const VkDescripto
             GRAPHICS_PIPELINE::LIGHT::UBOS_INFO,
             GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO,
             mesh.textures,
-            opUBOs,
             descriptorSetLayout,
-            descriptorPool
+            descriptorPool,
+            nullptr,
+            opUBOs
         );
     }
 }
@@ -150,7 +151,7 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevi
 void Light::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::LIGHT::TEXTURES_PER_MESH_COUNT;
-    const TextureToLoadInfo info = {"textures/default/DefaultTexture.png", VK_FORMAT_R8G8B8A8_SRGB , 4};
+    const TextureToLoadInfo info = {"DefaultTexture.png", "defaultTextures",VK_FORMAT_R8G8B8A8_SRGB , 4};
 
     for (auto& mesh : m_meshes)
     {

@@ -33,6 +33,7 @@ enum UsageType
 struct TextureToLoadInfo
 {
     std::string name;
+    std::string folderName;
     VkFormat    format;
     int         desiredChannels;
 };

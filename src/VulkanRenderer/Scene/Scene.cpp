@@ -3,6 +3,8 @@
 #include <thread>
 #include <iostream>
 
+#include "VulkanRenderer/Texture/Type/NormalTexture.h"
+
 Scene::Scene() {}
 
 Scene::Scene(
@@ -11,7 +13,11 @@ Scene::Scene(
     const VkExtent2D& extent,
     const VkSampleCountFlagBits& msaaSamplesCount,
     const VkFormat& depthBufferFormat,
-    const std::vector<ModelInfo>& modelsToLoadInfo
+    const std::vector<ModelInfo>& modelsToLoadInfo,
+    // Parameters needed for the computations.
+    const VkPhysicalDevice& physicalDevice,
+    const QueueFamilyIndices& queueFamilyIndices,
+    DescriptorPool& descriptorPoolForComputations
 ) : m_logicalDevice(logicalDevice), m_mainModelIndex(-1), m_directionalLightIndex(-1)
 {
     loadModels(modelsToLoadInfo);
@@ -19,6 +25,22 @@ Scene::Scene(
     createRenderPass(format, msaaSamplesCount, depthBufferFormat);
 
     createPipelines(format, extent, msaaSamplesCount);
+
+    initComputations(physicalDevice,queueFamilyIndices,descriptorPoolForComputations);
+}
+
+void Scene::initComputations(const VkPhysicalDevice& physicalDevice,const QueueFamilyIndices& queueFamilyIndices,DescriptorPool& descriptorPoolForComputations) 
+{
+    m_BRDFcomp = Computation(
+        physicalDevice,
+        m_logicalDevice,
+        "BRDF",
+        sizeof(float),
+        2 * sizeof(float) * Config::BRDF_HEIGHT * Config::BRDF_WIDTH,
+        queueFamilyIndices,
+        descriptorPoolForComputations,
+        COMPUTE_PIPELINE::BRDF::BUFFERS_INFO
+    );
 }
 
 Scene::~Scene() {}
@@ -144,7 +166,8 @@ void Scene::createPipelines(
         Attributes::SKYBOX::getAttributeDescriptions(),
         m_skyboxModelIndex,
         GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
-        GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO
+        GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
+        {}
     );
 
     m_graphicsPipelinePBR = Graphics(
@@ -159,7 +182,8 @@ void Scene::createPipelines(
         //Models asssocciated with this graphics pipeline.
         m_objectModelIndices,
         GRAPHICS_PIPELINE::PBR::UBOS_INFO,
-        GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO
+        GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO,
+        {}
     );
 
     m_graphicsPipelineLight = Graphics(
@@ -174,7 +198,8 @@ void Scene::createPipelines(
         // Models assocciated with this graphics pipeline.
         m_lightModelIndices,
         GRAPHICS_PIPELINE::LIGHT::UBOS_INFO,
-        GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO
+        GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO,
+        {}
     );
 }
 
@@ -333,8 +358,7 @@ void Scene::upload(
     const std::shared_ptr<CommandPool>& commandPool,
     DescriptorPool& descriptorPool,
     // Features
-    const std::shared_ptr<ShadowMap<Attributes::PBR::Vertex>> shadowMap,
-    const std::shared_ptr<Texture> BRDFlut
+    const std::shared_ptr<ShadowMap<Attributes::PBR::Vertex>> shadowMap
 ) {
     // First we upload the skybox because we need some dependencies from it for
     // the descriptor sets of the other models.
@@ -353,13 +377,30 @@ void Scene::upload(
         descriptorPool
     );
 
+    // IBL
+    {
+        loadBRDFlut(physicalDevice, graphicsQueue, commandPool);
+
+
+        m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap<Attributes::SKYBOX::Vertex>>(
+                physicalDevice,
+                m_logicalDevice,
+                graphicsQueue,
+                commandPool,
+                Config::PREF_ENV_MAP_DIM,
+                m_skybox->getMeshes(),
+                m_skybox->getEnvMap()
+            );
+    }
+
     VkDescriptorSetLayout descriptorSetLayout;
     DescriptorSetInfo descriptorSetInfo = {
-       &(m_skybox->getEnvMap()),
-       &(m_skybox->getIrradianceMap()),
-       &(*BRDFlut),
+       &(*m_skybox->getEnvMap()),
+       &(*m_skybox->getIrradianceMap()),
+       &(*m_BRDFlut),
        &(shadowMap->getShadowMapView()),
-       &(shadowMap->getSampler())
+       &(shadowMap->getSampler()),
+       &(m_prefilteredEnvMap->get())
     };
 
     for (auto& model : m_models)
@@ -397,6 +438,37 @@ void Scene::destroy()
     m_graphicsPipelineLight.destroy();
 
     m_renderPass.destroy();
+
+    // IBL
+    m_BRDFcomp.destroy();
+    m_BRDFlut->destroy();
+    m_prefilteredEnvMap->destroy();
+}
+
+void Scene::loadBRDFlut(
+    const VkPhysicalDevice& physicalDevice,
+    const VkQueue& graphicsQueue,
+    const std::shared_ptr<CommandPool>& commandPool
+) {
+   
+    std::string TextureName = "BRDF_LUT.tga";
+    TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4};
+
+    m_BRDFlut = std::make_shared<NormalTexture>(
+            physicalDevice,
+            m_logicalDevice,
+            info,
+            VK_SAMPLE_COUNT_1_BIT,
+            commandPool,
+            graphicsQueue,
+            UsageType::TO_COLOR
+        );
+}
+
+// In the future, it'll return a vector of computations.
+const Computation& Scene::getComputation() const
+{
+    return m_BRDFcomp;
 }
 
 const std::vector<size_t>& Scene::getObjectModelIndices() const

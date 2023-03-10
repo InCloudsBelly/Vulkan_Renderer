@@ -18,7 +18,8 @@ Compute::~Compute() {}
 Compute::Compute(
     const VkDevice& logicalDevice,
     const ShaderInfo& shaderInfo,
-    const std::vector<DescriptorInfo>& bufferInfos
+    const std::vector<DescriptorInfo>& bufferInfos,
+    const std::vector<VkPushConstantRange>& pushConstantRanges
 ) : Pipeline(logicalDevice, PipelineType::COMPUTE)
 {
     // ---------------Descriptor Set Layout----------------
@@ -36,7 +37,7 @@ Compute::Compute(
     //Fixed Functions
 
     //Pipeline Layout
-    createPipelineLayout(m_descriptorSetLayout);
+    createPipelineLayout(m_descriptorSetLayout, pushConstantRanges);
 
     // --------------Compute pipeline creation------------
 

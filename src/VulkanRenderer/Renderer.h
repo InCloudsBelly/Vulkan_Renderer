@@ -38,15 +38,19 @@ public:
 
 	
 
-	void addObjectPBR(const std::string& name, const  const std::string& modelFileName,
+	void addObjectPBR(const std::string& name, 
+		const std::string& folderName,
+		const std::string& fileName,
 		const glm::fvec3& pos = glm::fvec4(0.0f),
 		const glm::fvec3& rot = glm::fvec3(0.0f),
 		const glm::fvec3& size = glm::fvec3(1.0f)
 	);
 
-	void addSkybox(const std::string& name, const std::string& textureFolderName);
+	void addSkybox(const std::string& fileName, const std::string& textureFolderName);
 
-	void addDirectionalLight(const std::string& name, const std::string& modelFileName,
+	void addDirectionalLight(const std::string& name, 
+		const std::string& folderName,
+		const std::string& fileName,
 		const glm::fvec3& color,
 		const glm::fvec3& pos,
 		const glm::fvec3& endPos,
@@ -54,7 +58,8 @@ public:
 	);
 	void addSpotLight(
 		const std::string& name,
-		const std::string& modelFileName,
+		const std::string& folderName,
+		const std::string& fileName,
 		const glm::fvec3& color,
 		const glm::fvec3& pos,
 		const glm::fvec3& endPos,
@@ -64,7 +69,8 @@ public:
 
 	void addPointLight(
 		const std::string& name,
-		const std::string& modelFileName,
+		const std::string& folderName,
+		const std::string& fileName,
 		const glm::fvec3& color,
 		const glm::fvec3& pos,
 		const glm::fvec3& size
@@ -73,16 +79,15 @@ public:
 private:
 	void createCommandPools();
 	void initWindow();
-	void initComputations();
+	void doComputations();
 	void handleInput();
+	void calculateFrames(double& lastTime, int& framesCounter);
 	static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
 	void initVulkan();
 	void mainLoop();
 	void cleanup();
 
-	void doComputations();
-	void loadBRDFlut();
 	void configureUserInputs();
 
 	void recordCommandBuffer(
@@ -121,22 +126,20 @@ private:
 
 	std::vector<ModelInfo>              m_modelsToLoadInfo;
 
-	//Computations
-	Computation                         m_BRDFcomp;
-	std::shared_ptr<Texture>            m_BRDFlut;
-
 	// Command Pool for main drawing commands.
-	std::shared_ptr<CommandPool>        m_commandPoolGraphics;
-	std::shared_ptr<CommandPool>        m_commandPoolCompute;
+	std::shared_ptr<CommandPool>        m_commandPoolForGraphics;
+	std::shared_ptr<CommandPool>        m_commandPoolForCompute;
 
-	DescriptorPool                      m_descriptorPoolGraphics;
-	DescriptorPool                      m_descriptorPoolComputations;
+	DescriptorPool                      m_descriptorPoolForGraphics;
+	DescriptorPool                      m_descriptorPoolForComputations;
 
 
 	std::vector<VkClearValue>			m_clearValues;
 	std::vector<VkClearValue>			m_clearValuesShadowMap;
 	bool								m_isMouseInMotion;
 
+	// milliseconds per frame
+	double								m_mpf;
 	//---------------------------Features--------------------------------------
 	DepthBuffer											m_depthBuffer;
 	MSAA												m_msaa;

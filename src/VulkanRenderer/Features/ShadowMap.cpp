@@ -71,6 +71,7 @@ void ShadowMap<T>::createGraphicsPipeline(const VkExtent2D& extent)
         Attributes::SHADOWMAP::getAttributeDescriptions(),
         m_modelIndices,
         GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
+        {},
         {}
     );
 }
@@ -148,9 +149,10 @@ void ShadowMap<T>::createDescriptorSets()
         GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
         {},
         {},
-        opUBOs,
         m_graphicsPipeline.getDescriptorSetLayout(),
-        m_descriptorPool
+        m_descriptorPool,
+        nullptr,
+        opUBOs
     );
 }
 

@@ -13,9 +13,9 @@
 #include "VulkanRenderer/Command/CommandManager.h"
 
 NormalPBR::NormalPBR(const ModelInfo& modelInfo)
-	: Model(modelInfo.name, ModelType::NORMAL_PBR, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size) 
+	: Model(modelInfo.name, modelInfo.folderName, ModelType::NORMAL_PBR, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size)
 {
-	loadModel((std::string(MODEL_DIR) + modelInfo.modelFileName).c_str());
+	loadModel((std::string(MODEL_DIR) + modelInfo.folderName + "/" + modelInfo.fileName).c_str());
 }
 
 NormalPBR::~NormalPBR() {}
@@ -38,7 +38,7 @@ void NormalPBR::destroy(const VkDevice& logicalDevice)
 	}
 }
 
-std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextureType& type,const std::string& typeName, const std::string& defaultTextureFile)
+void NormalPBR::getMaterialTextureInfo(aiMaterial* material,const aiTextureType& type,const std::string& typeName, const std::string& defaultTextureFile, TextureToLoadInfo& info)
 {
 	if (material->GetTextureCount(type) > 0)
 	{
@@ -46,17 +46,25 @@ std::string NormalPBR::getMaterialTextureName(aiMaterial* material,const aiTextu
 		material->GetTexture(type, 0, &str);
 
 		if (typeName == "NORMALS")
-			m_hasNormalMap = true;
+			m_dataInShader.hasNormalMap = 1;
 
-		return str.C_Str();
-
+		if (typeName == "METALIC_ROUGHNESS")
+			m_dataInShader.hasMetallicRoughnessMap = 1;
+		
+		info.folderName = m_folderName;
+		info.name = str.C_Str();
 	}
 	else
 	{
 		if (typeName == "NORMALS")
-			m_hasNormalMap = false;
+			m_dataInShader.hasNormalMap = 0;
 
-		return defaultTextureFile;
+		if (typeName == "METALIC_ROUGHNESS")
+			m_dataInShader.hasMetallicRoughnessMap = 0;
+
+		info.folderName = "/defaultTextures";
+
+		info.name = defaultTextureFile;
 	}
 	
 }
@@ -101,21 +109,25 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 
 		vertex.posInLightSpace = glm::fvec4(1.0f);
 
-		newMesh.vertices.push_back(vertex);
+		newMesh.vertices.emplace_back(vertex);
 	}
 
 	for (size_t i = 0; i < mesh->mNumFaces; i++)
 	{
 		auto face = mesh->mFaces[i];
 		for (size_t j = 0; j < face.mNumIndices; j++)
-			newMesh.indices.push_back(face.mIndices[j]);
+			newMesh.indices.emplace_back(face.mIndices[j]);
 	}
 
 
 	if (mesh->mMaterialIndex >= 0)
 	{
 		aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+		// Roughness and metallic factor.
+		aiGetMaterialFloat(material,AI_MATKEY_METALLIC_FACTOR,&m_dataInShader.metallicFactor);
+		aiGetMaterialFloat(material,AI_MATKEY_ROUGHNESS_FACTOR,&m_dataInShader.roughnessFactor);
 
+		// Material Textures
 		struct MaterialInfo
 		{
 			aiTextureType type;
@@ -127,24 +139,24 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 
 		std::vector<MaterialInfo> materials =
 		{
-			{ aiTextureType_DIFFUSE,	"DIFFUSE",				"textures/default/DefaultTexture.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
-			{ aiTextureType_UNKNOWN,	"METALIC_ROUGHNESS",	"textures/default/metallicRoughness.png",	VK_FORMAT_R8G8B8A8_SRGB,	4},
-			{ aiTextureType_EMISSIVE,	"EMISSIVE",				"textures/default/emissiveColor.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
-			{ aiTextureType_LIGHTMAP,	"AO",					"textures/default/ambientOcclusion.png",	VK_FORMAT_R8G8B8A8_SRGB,	4},
-			{ aiTextureType_NORMALS,	"NORMALS",				"textures/default/DefaultNormal.png",		VK_FORMAT_R8G8B8A8_SRGB,	4}
+			{ aiTextureType_DIFFUSE,	"DIFFUSE",				"DefaultTexture.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_UNKNOWN,	"METALIC_ROUGHNESS",	"metallicRoughness.png",	VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_EMISSIVE,	"EMISSIVE",				"emissiveColor.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_LIGHTMAP,	"AO",					"ambientOcclusion.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
+			{ aiTextureType_NORMALS,	"NORMALS",				"DefaultNormal.png",		VK_FORMAT_R8G8B8A8_SRGB,	4}
 		};
 
 		TextureToLoadInfo info;
 		for (auto& m : materials)
 		{
-			info.name = getMaterialTextureName(material, m.type, m.typeName, m.defaultTextureFile);
+			getMaterialTextureInfo(material, m.type, m.typeName, m.defaultTextureFile, info);
 			info.format = m.format;
 			info.desiredChannels = m.desiredChannels;
 
-			newMesh.texturesToLoadInfo.push_back(info);
+			newMesh.texturesToLoadInfo.emplace_back(info);
 		}
 	}
-	m_meshes.push_back(newMesh);
+	m_meshes.emplace_back(newMesh);
 }
 
 void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
@@ -178,11 +190,10 @@ void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice,const VkDescr
 			GRAPHICS_PIPELINE::PBR::UBOS_INFO,
 			GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO,
 			mesh.textures,
-			opUBOs,
 			descriptorSetLayout,
 			descriptorPool,
-			// TODO: Improve this
-			info
+			info,
+			opUBOs
 		);
 	}
 }
@@ -264,7 +275,6 @@ void NormalPBR::updateUBO(
 
 	m_dataInShader.cameraPos = uboInfo.cameraPos;
 	m_dataInShader.lightsCount = uboInfo.lightsCount;
-	m_dataInShader.hasNormalMap = m_hasNormalMap;
 
 	size_t size = sizeof(m_dataInShader);
 	UBOutils::updateUBO(logicalDevice, m_ubo, size, &m_dataInShader, currentFrame);

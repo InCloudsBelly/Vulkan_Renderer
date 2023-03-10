@@ -32,7 +32,9 @@ enum class ModelType
 class Model
 {
 public:
-	Model(const std::string& name, const ModelType& type,
+	Model(
+		const std::string& name, const std::string& folderName, 
+		const ModelType& type,
 		const glm::fvec4& pos = glm::fvec4(0.0f),
 		const glm::fvec3& rot = glm::fvec3(0.0f),
 		const glm::fvec3& size = glm::fvec3(1.0f) );
@@ -72,7 +74,7 @@ public:
 	const glm::fvec4& getPos() const;
 	const glm::fvec3& getRot() const;
 	const glm::fvec3& getSize() const;
-	const bool isHided() const;
+	const bool isHidden() const;
 	void setPos(const glm::fvec4& newPos);
 	void setRot(const glm::fvec3& newRot);
 	void setSize(const glm::fvec3& newSize);
@@ -103,6 +105,7 @@ protected:
 
 	ModelType            m_type;
 	std::string          m_name;
+	std::string          m_folderName;
 	std::shared_ptr<UBO> m_ubo;
 
 	glm::fvec4           m_pos;

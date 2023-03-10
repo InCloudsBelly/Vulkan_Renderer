@@ -8,9 +8,24 @@
 #include <vulkan/vulkan.h>
 #include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypesUtils.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 #include "VulkanRenderer/Settings/Config.h"
+
+////////////////////////////////Helper functions///////////////////////////////
+inline static void createDescriptorBufferInfo(const VkBuffer& buffer,VkDescriptorBufferInfo& bufferInfo) 
+{
+    bufferInfo.buffer = buffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = VK_WHOLE_SIZE;
+}
+
+inline static void createDescriptorImageInfo(const VkImageView& imageView,const VkSampler& sampler,VkDescriptorImageInfo& imageInfo) 
+{
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = imageView;
+    imageInfo.sampler = sampler;
+}
+///////////////////////////////////////////////////////////////////////////////
 
 
 DescriptorSets::DescriptorSets() {}
@@ -21,10 +36,10 @@ DescriptorSets::DescriptorSets(
     const std::vector<DescriptorInfo>&          uboInfo,
     const std::vector<DescriptorInfo>&          samplersInfo,
     const std::vector<std::shared_ptr<Texture>>& textures,
-    std::vector<UBO*>&                          UBOs,
     const VkDescriptorSetLayout&                descriptorSetLayout,
     DescriptorPool&                             descriptorPool,
-    DescriptorSetInfo*                          additionalTextures)
+    DescriptorSetInfo*                          additionalTextures,
+    const std::vector<UBO*>&                    UBOs)
 {
     std::vector<VkDescriptorImageInfo> imageInfos;
     imageInfos.resize(samplersInfo.size());
@@ -42,7 +57,7 @@ DescriptorSets::DescriptorSets(
         std::vector<VkDescriptorBufferInfo> bufferInfos(UBOs.size());
         for (size_t j = 0; j < UBOs.size(); ++j)
         {
-            DescriptorTypesUtils::createDescriptorBufferInfo(UBOs[j]->get(i), bufferInfos[j]);
+            createDescriptorBufferInfo(UBOs[j]->get(i), bufferInfos[j]);
         }
 
         // TODO: Improve this.
@@ -50,36 +65,42 @@ DescriptorSets::DescriptorSets(
         // Samplers of textures
         for (size_t j = 0; j < textures.size(); j++)
         {
-            DescriptorTypesUtils::createDescriptorImageInfo(textures[j]->getImageView(),textures[j]->getSampler(), imageInfos[j]);
+            createDescriptorImageInfo(textures[j]->getImageView(),textures[j]->getSampler(), imageInfos[j]);
         }
 
         if (additionalTextures != nullptr)
         {
-            DescriptorTypesUtils::createDescriptorImageInfo(
+            createDescriptorImageInfo(
                 additionalTextures->envMap->getImageView(),
                 additionalTextures->envMap->getSampler(),
+                imageInfos[samplersInfo.size() - 5]
+            );
+
+            createDescriptorImageInfo(
+                additionalTextures->irradianceMap->getImageView(),
+                additionalTextures->irradianceMap->getSampler(),
                 imageInfos[samplersInfo.size() - 4]
             );
 
-            DescriptorTypesUtils::createDescriptorImageInfo(
-                additionalTextures->irradianceMap->getImageView(),
-                additionalTextures->irradianceMap->getSampler(),
+            createDescriptorImageInfo(
+                additionalTextures->BRDFlut->getImageView(),
+                additionalTextures->BRDFlut->getSampler(),
                 imageInfos[samplersInfo.size() - 3]
             );
 
-            DescriptorTypesUtils::createDescriptorImageInfo(
-                additionalTextures->BRDFlut->getImageView(),
-                additionalTextures->BRDFlut->getSampler(),
+            createDescriptorImageInfo(
+                additionalTextures->prefilteredEnvMap->getImageView(),
+                additionalTextures->prefilteredEnvMap->getSampler(),
                 imageInfos[samplersInfo.size() - 2]
             );
 
-            DescriptorTypesUtils::createDescriptorImageInfo(
+           createDescriptorImageInfo(
                 *(additionalTextures->shadowMapView),
                 *(additionalTextures->shadowMapSampler),
                 imageInfos[samplersInfo.size() - 1]
             );
 
-            DescriptorTypesUtils::createDescriptorImageInfo(*(additionalTextures->shadowMapView), *(additionalTextures->shadowMapSampler), imageInfos[samplersInfo.size() - 1]);
+           createDescriptorImageInfo(*(additionalTextures->shadowMapView), *(additionalTextures->shadowMapSampler), imageInfos[samplersInfo.size() - 1]);
         }
 
 
@@ -123,7 +144,7 @@ DescriptorSets::DescriptorSets(
     std::vector<VkDescriptorBufferInfo> descriptorBufferInfos(buffers.size());
     for (size_t i = 0; i < buffers.size(); i++)
     {
-        DescriptorTypesUtils::createDescriptorBufferInfo(buffers[i],descriptorBufferInfos[i]);
+        createDescriptorBufferInfo(buffers[i],descriptorBufferInfos[i]);
     }
 
     std::vector<VkWriteDescriptorSet> descriptorWrites(buffers.size());

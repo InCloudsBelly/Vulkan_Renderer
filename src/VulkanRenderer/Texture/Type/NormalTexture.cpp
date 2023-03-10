@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include <stdexcept>
+#include <iostream>
 
 #include "VulkanRenderer/Texture/MipmapUtils.h"
 #include "VulkanRenderer/Texture/Bitmap.h"
@@ -31,7 +32,7 @@ NormalTexture::NormalTexture(
     //TODO : BRDF does't need mipmap.
     if (usage == UsageType::TO_COLOR)
     {
-        const std::string pathToTexture = (std::string(MODEL_DIR) + textureInfo.name);
+        pathToTexture = (std::string(MODEL_DIR) +textureInfo.folderName + "/" +textureInfo.name);
 
         pixels = stbi_load(pathToTexture.c_str(), &m_width, &m_height, &m_channels, STBI_rgb_alpha);
 

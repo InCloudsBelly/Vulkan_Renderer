@@ -13,6 +13,9 @@
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
+#include "VulkanRenderer/Settings/ComputePipelineConfig.h"
+#include "VulkanRenderer/Computation/Computation.h"
+#include "VulkanRenderer/Features/PrefilteredEnvMap.h"
 
 class Scene
 {
@@ -24,7 +27,11 @@ public:
 		const VkExtent2D& extent,
 		const VkSampleCountFlagBits& msaaSamplesCount,
 		const VkFormat& depthBufferFormat,
-		const std::vector<ModelInfo>& modelsToLoadInfo
+		const std::vector<ModelInfo>& modelsToLoadInfo,
+		// Parameters needed by the computations.
+		const VkPhysicalDevice& physicalDevice,
+		const QueueFamilyIndices& queueFamilyIndices,
+		DescriptorPool& descriptorPoolForComputations
 	);
 
 	~Scene();
@@ -35,8 +42,7 @@ public:
 		const std::shared_ptr<CommandPool>& commandPool,
 		DescriptorPool& descriptorPool,
 		//Features
-		const std::shared_ptr<ShadowMap<Attributes::PBR::Vertex>> shadowMap,
-		const std::shared_ptr<Texture> BRDFlut
+		const std::shared_ptr<ShadowMap<Attributes::PBR::Vertex>> shadowMap
 	);
 
 	void updateUBO(
@@ -57,6 +63,7 @@ public:
 	const std::shared_ptr<Model>& getModel(uint32_t i) const;
 	const std::vector<size_t>& getObjectModelIndices() const;
 	const std::vector<size_t>& getLightModelIndices() const;
+	const Computation& getComputation() const;
 
 	void destroy();
 
@@ -65,6 +72,16 @@ private:
 	void loadModels(const std::vector<ModelInfo>& modelsToLoadInfo);
 	void loadModel(const size_t startI, const size_t chunckSize, const std::vector<ModelInfo>& modelsToLoadInfo);
 
+	void initComputations(
+		const VkPhysicalDevice& physicalDevice,
+		const QueueFamilyIndices& queueFamilyIndices,
+		DescriptorPool& descriptorPoolForComputations
+	);
+	void loadBRDFlut(
+		const VkPhysicalDevice& physicalDevice,
+		const VkQueue& graphicsQueue,
+		const std::shared_ptr<CommandPool>& commandPool
+	);
 	void createPipelines(const VkFormat& format, const VkExtent2D& extent, const VkSampleCountFlagBits& msaaSamplesCount);
 	void createRenderPass(const VkFormat& format, const VkSampleCountFlagBits& msaaSamplesCount, const VkFormat& depthBufferFormat);
 
@@ -84,6 +101,12 @@ private:
 	std::vector<size_t>		m_skyboxModelIndex;
 
 	// For now, this will be the only shadowable model of the scene.
-	int						m_mainModelIndex;
-	int						m_directionalLightIndex;
+	int                                 m_mainModelIndex;
+	int                                 m_directionalLightIndex;
+
+
+	// IBL
+	Computation                         m_BRDFcomp;
+	std::shared_ptr<Texture>            m_BRDFlut;
+	std::shared_ptr<PrefilteredEnvMap<Attributes::SKYBOX::Vertex>> m_prefilteredEnvMap;
 };

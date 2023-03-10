@@ -29,10 +29,9 @@
 #include "VulkanRenderer/Command/CommandManager.h"
 
 Skybox::Skybox(const ModelInfo& modelInfo)
-    : Model(modelInfo.name, ModelType::SKYBOX),
-    m_textureFolderName(modelInfo.modelFileName)
+    : Model(modelInfo.name, modelInfo.folderName, ModelType::SKYBOX)
 {
-	loadModel((std::string(MODEL_DIR) + "Cube.gltf").c_str());
+    loadModel((std::string(MODEL_DIR) + "cubeDefault/Cube.gltf").c_str());
 
 }
 
@@ -63,17 +62,17 @@ void Skybox::processMesh(aiMesh* mesh, const aiScene* scene)
     {
         Attributes::SKYBOX::Vertex vertex{};
         vertex.pos = {mesh->mVertices[i].x,mesh->mVertices[i].y,mesh->mVertices[i].z};
-        newMesh.vertices.push_back(vertex);
+        newMesh.vertices.emplace_back(vertex);
     }
 
     for (size_t i = 0; i < mesh->mNumFaces; i++)
     {
         auto face = mesh->mFaces[i];
         for (size_t j = 0; j < face.mNumIndices; j++)
-            newMesh.indices.push_back(face.mIndices[j]);
+            newMesh.indices.emplace_back(face.mIndices[j]);
     }
 
-    m_meshes.push_back(newMesh);
+    m_meshes.emplace_back(newMesh);
 }
 
 Skybox::~Skybox() {}
@@ -89,9 +88,10 @@ void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescrip
             GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
             GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
             mesh.textures,
-            opUBOs,
             descriptorSetLayout,
-            descriptorPool
+            descriptorPool,
+            nullptr,
+            opUBOs
         );
     }
 }
@@ -141,7 +141,7 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDev
 void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::SKYBOX::TEXTURES_PER_MESH_COUNT;
-    TextureToLoadInfo info = {m_name, VK_FORMAT_R32G32B32A32_SFLOAT, 4 };
+    TextureToLoadInfo info = {m_name, m_folderName, VK_FORMAT_R32G32B32A32_SFLOAT, 4 };
 
     for (auto& mesh : m_meshes)
     {
@@ -151,7 +151,7 @@ void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevic
 
             if (it == m_texturesID.end())
             {
-                mesh.textures.push_back(std::make_shared<Cubemap>(physicalDevice,logicalDevice, info, m_textureFolderName, samplesCount,commandPool,graphicsQueue, UsageType::ENVIRONMENTAL_MAP));
+                mesh.textures.push_back(std::make_shared<Cubemap>(physicalDevice,logicalDevice, info, samplesCount,commandPool,graphicsQueue, UsageType::ENVIRONMENTAL_MAP));
                 m_texturesLoaded.push_back(mesh.textures[i]);
                 m_texturesID[info.name] = (m_texturesLoaded.size() - 1);
 
@@ -162,30 +162,12 @@ void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevic
         }
     }
 
-    info = {"Irradiance.hdr",VK_FORMAT_R32G32B32A32_SFLOAT, 4};
-    loadIrradianceMap(
-        physicalDevice,
-        logicalDevice,
-        info,
-        samplesCount,
-        commandPool,
-        graphicsQueue
-    );
-}
+    info = {"Irradiance.hdr", m_folderName,VK_FORMAT_R32G32B32A32_SFLOAT, 4};
 
-void Skybox::loadIrradianceMap(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
-    const TextureToLoadInfo& textureInfo,
-    const VkSampleCountFlagBits& samplesCount,
-    const std::shared_ptr<CommandPool>& commandPool,
-    const VkQueue& graphicsQueue
-) {
     m_irradianceMap = std::make_shared<Cubemap>(
         physicalDevice,
         logicalDevice,
-        textureInfo,
-        m_textureFolderName,
+        info,
         samplesCount,
         commandPool,
         graphicsQueue,
@@ -222,15 +204,20 @@ void Skybox::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& c
 
 const std::string& Skybox::getTextureFolderName() const
 {
-    return m_textureFolderName;
+    return m_folderName;
 }
 
-const Texture& Skybox::getIrradianceMap() const
+const std::shared_ptr<Texture>& Skybox::getIrradianceMap() const
 {
-    return *m_irradianceMap;
+    return m_irradianceMap;
 }
 
-const Texture& Skybox::getEnvMap() const
+const std::shared_ptr<Texture>& Skybox::getEnvMap() const
 {
-    return *m_envMap;
+    return m_envMap;
+}
+
+const std::vector<Mesh<Attributes::SKYBOX::Vertex>>& Skybox::getMeshes() const
+{
+    return m_meshes;
 }

@@ -4,6 +4,7 @@
 
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
+#include <unordered_map>
 
 #include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
 #include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
@@ -19,6 +20,13 @@ template<typename T>
 class ShadowMap
 {
 public:
+
+	struct ShadowModelInfo
+	{
+		DescriptorSets			modelDescriptorSets;
+		std::shared_ptr<UBO>	modelUBO;
+	};
+
 
 	ShadowMap(
 		const VkPhysicalDevice& physicalDevice,
@@ -41,22 +49,29 @@ public:
 		const float aspect,
 		const float zNear,
 		const float zFar,
-		const uint32_t& currentFrame
+		const uint32_t& currentFrame,
+		size_t  index
 	);
 
-	void bindData(const VkCommandBuffer& commandBuffer, const uint32_t currentFrame);
+	void bindData(
+		const std::vector<Mesh<T>>* meshes,
+		const size_t index,
+		const VkCommandBuffer& commandBuffer,
+		const uint32_t currentFrame
+	);
 
 	void createCommandPool(const VkCommandPoolCreateFlags& flags, const uint32_t& graphicsFamilyIndex);
 
 	void allocCommandBuffers(const uint32_t& commandBuffersCount);
 
+
 	const VkImageView& getShadowMapView() const;
 	const VkSampler& getSampler() const;
 	const glm::mat4& getLightSpace() const;
-	const VkDescriptorSet& getDescriptorSet(const uint32_t index) const;
+	const VkDescriptorSet& getDescriptorSet(const size_t index, const uint32_t currentFrame) const;
 	const VkFramebuffer& getFramebuffer(const uint32_t imageIndex) const;
 	const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
-	
+
 	const std::shared_ptr<CommandPool>& getCommandPool() const;
 	const Graphics& getGraphicsPipeline() const;
 	const RenderPass& getRenderPass() const;
@@ -77,12 +92,11 @@ private:
 	uint32_t                         m_height;
 
 	Image                            m_image;
-	std::shared_ptr<UBO>             m_ubo;
 
 	RenderPass                       m_renderPass;
 
 	DescriptorPool                   m_descriptorPool;
-	DescriptorSets                   m_descriptorSets;
+	//DescriptorSets                   m_descriptorSets;
 
 	std::shared_ptr<CommandPool>     m_commandPool;
 
@@ -91,8 +105,8 @@ private:
 	Graphics                         m_graphicsPipeline;
 
 	DescriptorTypes::UniformBufferObject::ShadowMap m_basicInfo;
-
-	const std::vector<Mesh<T>>*		 m_opMeshes;
-	const std::vector<size_t>		 m_modelIndices;
+	
+	mutable std::unordered_map<size_t, ShadowModelInfo>	m_shadowModelInfo;
+	const std::vector<size_t>			m_modelIndices;
 
 };

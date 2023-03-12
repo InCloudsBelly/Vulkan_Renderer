@@ -32,13 +32,14 @@ ShadowMap<T>::ShadowMap(
     const uint32_t& uboCount,
     const std::vector<Mesh<T>>* meshes,
     const std::vector<size_t>& modelIndices
-) : m_logicalDevice(logicalDevice), m_width(extent.width), m_height(extent.height), m_opMeshes(meshes) {
+) : m_logicalDevice(logicalDevice), m_width(extent.width), m_height(extent.height), m_modelIndices(modelIndices) {
 
     m_image = Image(
-        physicalDevice, logicalDevice, 
-        m_width, m_height,format,
+        physicalDevice, logicalDevice,
+        m_width, m_height,
+        format,
         VK_IMAGE_TILING_OPTIMAL,
-        (VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |VK_IMAGE_USAGE_SAMPLED_BIT),
+        (VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         false,
         1,
@@ -51,6 +52,7 @@ ShadowMap<T>::ShadowMap(
         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
         VK_FILTER_LINEAR
     );
+
     createUBO(physicalDevice, uboCount);
     createRenderPass(format);
     createFramebuffer(imagesCount);
@@ -82,9 +84,9 @@ template<typename T>
 ShadowMap<T>::~ShadowMap() {}
 
 template<typename T>
-void ShadowMap<T>::createCommandPool(const VkCommandPoolCreateFlags& flags,const uint32_t& graphicsFamilyIndex)
+void ShadowMap<T>::createCommandPool(const VkCommandPoolCreateFlags& flags, const uint32_t& graphicsFamilyIndex)
 {
-    m_commandPool = std::make_shared<CommandPool>(m_logicalDevice,flags,graphicsFamilyIndex);
+    m_commandPool = std::make_shared<CommandPool>(m_logicalDevice, flags, graphicsFamilyIndex);
 }
 
 template<typename T>
@@ -95,25 +97,26 @@ void ShadowMap<T>::updateUBO(
     const float aspect,
     const float zNear,
     const float zFar,
-    const uint32_t& currentFrame
+    const uint32_t& currentFrame,
+    size_t  index
 ) {
     // TODO: Improve this.
     // The model and projection matrix don't need to be updated every frame.
     m_basicInfo.model = modelM;
-    glm::mat4 proj = MathUtils::getUpdatedProjMatrix(glm::radians( Config::FOV), aspect,zNear, zFar);
+    glm::mat4 proj = MathUtils::getUpdatedProjMatrix(glm::radians(Config::FOV), aspect, zNear, zFar);
     //glm::mat4 proj = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, 0.1f, 100.0f);
 
-    //proj[1][1] *= -1;
+    proj[1][1] *= -1;
 
     glm::fvec3 lightDir = glm::normalize(glm::fvec3(directionalLightEndPos) - glm::fvec3(directionalLightStartPos));
 
     //glm::mat4 view = glm::lookAt(glm::fvec3(directionalLightStartPos),glm::fvec3(directionalLightEndPos),glm::fvec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 view = glm::lookAt(glm::fvec3(directionalLightStartPos), glm::fvec3(directionalLightStartPos) + lightDir,glm::fvec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 view = glm::lookAt(glm::fvec3(directionalLightStartPos), glm::fvec3(directionalLightStartPos) + lightDir, glm::fvec3(0.0f, 0.0f, 1.0f));
 
     m_basicInfo.lightSpace = proj * view;
 
     size_t size = sizeof(m_basicInfo);
-    UBOutils::updateUBO(m_logicalDevice, m_ubo, size, &m_basicInfo, currentFrame);
+    UBOutils::updateUBO(m_logicalDevice, m_shadowModelInfo[index].modelUBO, size, &m_basicInfo, currentFrame);
 }
 
 template<typename T>
@@ -133,33 +136,36 @@ void ShadowMap<T>::createDescriptorPool()
 {
     m_descriptorPool = DescriptorPool(
         m_logicalDevice,
-        { {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 15 * GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT} },
-        15 // TODO: Improve this.
+        { {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, (uint32_t)m_modelIndices.size()*Config::MAX_FRAMES_IN_FLIGHT * GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT}},
+        m_modelIndices.size()* Config::MAX_FRAMES_IN_FLIGHT* GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT
     );
 }
 
 template<typename T>
 void ShadowMap<T>::createUBO(const VkPhysicalDevice& physicalDevice, const uint32_t& uboCount)
 {
-    m_ubo = std::make_shared<UBO>(physicalDevice, m_logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::ShadowMap));
+    for(auto i : m_modelIndices)
+        m_shadowModelInfo[i].modelUBO = std::make_shared<UBO>(physicalDevice, m_logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::ShadowMap));
 }
 
 template<typename T>
 void ShadowMap<T>::createDescriptorSets()
 {
-
-    std::vector<UBO*> opUBOs = { m_ubo.get() };
-
-    m_descriptorSets = DescriptorSets(
-        m_logicalDevice,
-        GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
-        {},
-        {},
-        m_graphicsPipeline.getDescriptorSetLayout(),
-        m_descriptorPool,
-        nullptr,
-        opUBOs
-    );
+    for (auto i : m_modelIndices)
+    {
+        const std::vector<UBO*>& ubo = { m_shadowModelInfo[i].modelUBO.get()};
+        
+        m_shadowModelInfo[i].modelDescriptorSets = DescriptorSets(
+            m_logicalDevice,
+            GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
+            {},
+            {},
+            m_graphicsPipeline.getDescriptorSetLayout(),
+            m_descriptorPool,
+            nullptr,
+            ubo
+        );
+    }
 }
 
 
@@ -176,9 +182,9 @@ const VkSampler& ShadowMap<T>::getSampler() const
 }
 
 template<typename T>
-void ShadowMap<T>::bindData(const VkCommandBuffer& commandBuffer,const uint32_t currentFrame) 
+void ShadowMap<T>::bindData(const std::vector<Mesh<T>>* meshes, const size_t index, const VkCommandBuffer& commandBuffer, const uint32_t currentFrame)
 {
-    for (auto mesh = m_opMeshes->begin(); mesh != m_opMeshes->end(); mesh++)
+    for (auto mesh = meshes->begin(); mesh != meshes->end(); mesh++)
     {
         CommandManager::STATE::bindVertexBuffers(
             { mesh->vertexBuffer },
@@ -203,7 +209,7 @@ void ShadowMap<T>::bindData(const VkCommandBuffer& commandBuffer,const uint32_t 
             PipelineType::GRAPHICS,
             // Index of first descriptor set.
             0,
-            { getDescriptorSet(currentFrame) },
+            { getDescriptorSet(index,currentFrame) },
             // Dynamic offsets.
             {},
             commandBuffer
@@ -227,9 +233,10 @@ void ShadowMap<T>::bindData(const VkCommandBuffer& commandBuffer,const uint32_t 
 
 
 template<typename T>
-const VkDescriptorSet& ShadowMap<T>::getDescriptorSet(const uint32_t index) const
+const VkDescriptorSet& ShadowMap<T>::getDescriptorSet(const size_t index, const uint32_t currentFrame) const
 {
-    return m_descriptorSets.get(index);
+    VkDescriptorSet ret = m_shadowModelInfo[index].modelDescriptorSets.get(currentFrame);
+    return ret;
 }
 
 template<typename T>
@@ -283,7 +290,10 @@ void ShadowMap<T>::destroy()
     m_graphicsPipeline.destroy();
     m_descriptorPool.destroy();
     m_image.destroy();
-    m_ubo->destroy();
+    
+    for (auto info : m_shadowModelInfo)
+        info.second.modelUBO->destroy();
+
     m_commandPool->destroy();
 
     m_renderPass.destroy();

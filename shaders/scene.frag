@@ -220,7 +220,7 @@ void main()
     color = pow(color,vec3(1.0/2.2));
 
     outColor = ambient * vec4(color, 1.0);
-//    outColor = vec4(normal, 1.0);
+//    outColor = vec4(vec3(texture(shadowMapSampler, inShadowCoords.xy / inShadowCoords.w * 0.5 + 0.5).r), 1.0);
 }
 
 vec3 getIBLcontribution(PBRinfo pbrInfo, IBLinfo iblInfo, Material material)

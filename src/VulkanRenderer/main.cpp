@@ -58,6 +58,14 @@ int main()
         {
             app.addSkybox("sky.hdr", "DaySky");
             app.addObjectPBR(
+                "DamagedHelmet",
+                "damagedHelmet",
+                "DamagedHelmet.gltf",
+                glm::fvec3(0.0f),
+                glm::fvec3(0.0f),
+                glm::fvec3(0.3f)
+            );
+            app.addObjectPBR(
                 "Sponza",
                 "sponzaTGA",
                 "SponzaPBR.obj",
@@ -65,6 +73,7 @@ int main()
                 glm::fvec3(1.0f, -1.555, 1.0f),
                 glm::fvec3(1.0f)
             );
+           
             //app.addPointLight(
             //      "Point",
             //      "lightSphere.obj",

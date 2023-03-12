@@ -285,7 +285,7 @@ void Renderer::initVulkan()
             shadowExtent,
             m_swapchain->getImageCount(),
             m_depthBuffer.getFormat(),
-            Config::MAX_FRAMES_IN_FLIGHT,
+            Config::MAX_FRAMES_IN_FLIGHT * m_scene.getObjectModelIndices().size(),
             &(std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel())->getMeshes()),
             m_scene.getObjectModelIndices()
         );
@@ -330,7 +330,14 @@ void Renderer::recordCommandBuffer(
 
             if (graphicsPipeline->getGraphicsPipelineType() ==GraphicsPipelineType::SHADOWMAP) 
             {
-                m_shadowMap->bindData(commandBuffer, currentFrame);
+                for (auto i : m_scene.getObjectModelIndices())
+                {
+                    auto& model = m_scene.getModel(i);
+                    if (model->isHidden() == false)
+                    {
+                        m_shadowMap->bindData(&(std::dynamic_pointer_cast<NormalPBR>(model)->getMeshes()),i, commandBuffer, currentFrame);
+                    }
+                }
                 continue;
             }
 
@@ -374,18 +381,22 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     {
         auto pLight = std::dynamic_pointer_cast<Light>(m_scene.getDirectionalLight());
 
-        auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel());
+      /*  auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel());*/
 
-        m_shadowMap->updateUBO(
-            // TODO: make it for more than 1 model
-            pMainModel->getModelM(),
-            pLight->getPos(),
-            pLight->getTargetPos(),
-            1.0,
-            Config::Z_NEAR_SHADOW,
-            Config::Z_FAR_SHADOW,
-            currentFrame
-        );
+        for (auto i : m_scene.getObjectModelIndices())
+        {
+            m_shadowMap->updateUBO(
+                // TODO: make it for more than 1 model
+                (std::dynamic_pointer_cast<NormalPBR>(m_scene.getModel(i)))->getModelM(),
+                pLight->getPos(),
+                pLight->getTargetPos(),
+                1.0,
+                Config::Z_NEAR_SHADOW,
+                Config::Z_FAR_SHADOW,
+                currentFrame,
+                i
+            );
+        }
     }
 
     m_scene.updateUBO(

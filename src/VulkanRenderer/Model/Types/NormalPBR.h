@@ -10,7 +10,6 @@
 class NormalPBR : public Model
 {
 public:
-
     NormalPBR(const ModelInfo& modelInfo);
 
 	~NormalPBR() override;

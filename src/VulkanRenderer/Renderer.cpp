@@ -277,10 +277,12 @@ void Renderer::initVulkan()
 
     //-----------------------------Secondary Features---------------------------
     //(these features they are not used by all the pipelines and need dependencies)
+
+    const VkExtent2D shadowExtent = { 2 * m_swapchain->getExtent().height, 2 * m_swapchain->getExtent().width };
     m_shadowMap = std::make_shared<ShadowMap<Attributes::PBR::Vertex>>(
             m_device->getPhysicalDevice(),
             m_device->getLogicalDevice(),
-            m_swapchain->getExtent(),
+            shadowExtent,
             m_swapchain->getImageCount(),
             m_depthBuffer.getFormat(),
             Config::MAX_FRAMES_IN_FLIGHT,
@@ -380,8 +382,8 @@ void Renderer::drawFrame(uint8_t& currentFrame)
             pLight->getPos(),
             pLight->getTargetPos(),
             1.0,
-            Config::Z_NEAR,
-            Config::Z_FAR,
+            Config::Z_NEAR_SHADOW,
+            Config::Z_FAR_SHADOW,
             currentFrame
         );
     }
@@ -401,10 +403,12 @@ void Renderer::drawFrame(uint8_t& currentFrame)
     //---------------------Records all the command buffer-----------------------    
 
     // Shadow Mapping
+    const VkExtent2D shadowExtent = { 2 * m_swapchain->getExtent().height, 2 * m_swapchain->getExtent().width };
+
     recordCommandBuffer(
         m_shadowMap->getFramebuffer(imageIndex),
         m_shadowMap->getRenderPass(),
-        m_swapchain->getExtent(),
+        shadowExtent,
         { &m_shadowMap->getGraphicsPipeline() },
         currentFrame,
         m_shadowMap->getCommandBuffer(currentFrame),

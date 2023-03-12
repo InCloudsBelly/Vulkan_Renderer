@@ -59,5 +59,5 @@ void main()
 
    outBitangent = normalize(cross(outNormal, outTangent));
 
-   outShadowCoords = ((bias * ubo.lightSpace * ubo.model) * vec4(inPosition, 1.0));
+   outShadowCoords = (( ubo.lightSpace * ubo.model) * vec4(inPosition, 1.0));
 }

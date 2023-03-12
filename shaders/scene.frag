@@ -116,8 +116,8 @@ vec3 calculateSpotLight(int i,vec3 normal,vec3 view,Material material,PBRinfo pb
 vec3 calculateDirLight(int i, Material material, PBRinfo pbrInfo);
 void calculatePointLight();
 
-float filterPCF(vec4 shadowCoords);
-float calculateShadow(vec4 shadowCoords, vec2 off);
+float filterPCF(vec3 shadowCoords);
+float calculateShadow(vec3 shadowCoords, vec2 off);
 
 vec3 getIBLcontribution(PBRinfo pbrInfo, IBLinfo iblInfo, Material material);
 float ambient = 0.3;
@@ -195,7 +195,7 @@ void main()
         // Directional Light
         if (lights[i].type == 0)
         {
-            float shadow = (1.0 - filterPCF(inShadowCoords / inShadowCoords.w));
+            float shadow = (1.0 - filterPCF(inShadowCoords.xyz / inShadowCoords.w));
             color += calculateDirLight(i,normal,view,material,pbrInfo) * shadow;
 
         // Point Light
@@ -243,8 +243,10 @@ vec3 calculateNormal()
         return inNormal; 
 }
 
-float filterPCF(vec4 shadowCoords)
+float filterPCF(vec3 shadowCoords)
 {
+    shadowCoords.xy = shadowCoords.xy * 0.5 + 0.5;
+
     vec2 texelSize = textureSize(shadowMapSampler, 0);
     float scale = 1.5;
     float dx = scale * 1.0 / float(texelSize.x);
@@ -266,17 +268,17 @@ float filterPCF(vec4 shadowCoords)
 }
 
 
-float calculateShadow(vec4 shadowCoords, vec2 off)
+float calculateShadow(vec3 shadowCoords, vec2 off)
 {
-    if (shadowCoords.z > -1.0 && shadowCoords.z < 1.0)
+    if (shadowCoords.z > -1.0 && shadowCoords.z < 1.0 && shadowCoords.x > 0.0 && shadowCoords.x < 1.0&& shadowCoords.y > 0.0 && shadowCoords.y < 1.0 )
     {
         float closestDepth = texture(shadowMapSampler, shadowCoords.xy + off).r;
         float currentDepth = shadowCoords.z;
 
-        if (closestDepth < currentDepth )
-            return 1.0;
+        if (closestDepth > currentDepth)
+            return 0.0;
     }
-    return 0.0;
+    return 1.0;
 }
   
 vec3 calculateDirLight(int i, vec3 normal, vec3 view, Material material, PBRinfo pbrInfo) 

@@ -89,7 +89,7 @@ int main()
                 glm::fvec3(1.0f),
                 glm::fvec3(1.2f, 13.3f, 2.14f),
                 glm::fvec3(5.735f, -40.0f, 2.14f),
-                glm::fvec3(14.5f)
+                glm::fvec3(0.3f)
             );
         }
 

@@ -15,7 +15,7 @@ Light::Light(const ModelInfo& modelInfo)
     m_lightType(modelInfo.lType) 
 {
     if (modelInfo.lType == LightType::DIRECTIONAL_LIGHT)
-        m_intensity = 3.0f;
+        m_intensity = 15.0f;
     else
         m_intensity = 70.0f;
 

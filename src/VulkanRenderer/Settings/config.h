@@ -18,8 +18,13 @@ namespace Config
 
 	//Camera settings
 	inline const float FOV = 45.0f;
-	inline const float Z_NEAR = 0.01f;
-	inline const float Z_FAR = 200.0f;
+	inline const float Z_NEAR = 0.1f;
+	inline const float Z_FAR = 100.0f;
+
+
+	//LIGHT Camera settings
+	inline const float Z_NEAR_SHADOW = 1.0f;
+	inline const float Z_FAR_SHADOW = 100.0f;
 
 	// Scene
 	inline const uint32_t LIGHTS_COUNT = 10;

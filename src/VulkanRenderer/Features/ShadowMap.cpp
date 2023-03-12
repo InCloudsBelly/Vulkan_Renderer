@@ -4,6 +4,9 @@
 
 #include <vulkan/vulkan.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
@@ -48,7 +51,6 @@ ShadowMap<T>::ShadowMap(
         VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
         VK_FILTER_LINEAR
     );
-
     createUBO(physicalDevice, uboCount);
     createRenderPass(format);
     createFramebuffer(imagesCount);
@@ -99,10 +101,14 @@ void ShadowMap<T>::updateUBO(
     // The model and projection matrix don't need to be updated every frame.
     m_basicInfo.model = modelM;
     glm::mat4 proj = MathUtils::getUpdatedProjMatrix(glm::radians( Config::FOV), aspect,zNear, zFar);
+    //glm::mat4 proj = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, 0.1f, 100.0f);
 
-    proj[1][1] *= -1;
+    //proj[1][1] *= -1;
 
-    glm::mat4 view = glm::lookAt(glm::fvec3(directionalLightStartPos),glm::fvec3(directionalLightEndPos),glm::fvec3(0.0f, 1.0f, 0.0f));
+    glm::fvec3 lightDir = glm::normalize(glm::fvec3(directionalLightEndPos) - glm::fvec3(directionalLightStartPos));
+
+    //glm::mat4 view = glm::lookAt(glm::fvec3(directionalLightStartPos),glm::fvec3(directionalLightEndPos),glm::fvec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 view = glm::lookAt(glm::fvec3(directionalLightStartPos), glm::fvec3(directionalLightStartPos) + lightDir,glm::fvec3(0.0f, 1.0f, 0.0f));
 
     m_basicInfo.lightSpace = proj * view;
 

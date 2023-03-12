@@ -115,8 +115,7 @@ void Image::init(
     ImageManager::createImage(
         physicalDevice,
         m_logicalDevice,
-        width,
-        height,
+        width,height,
         format,
         tiling,
         usage,

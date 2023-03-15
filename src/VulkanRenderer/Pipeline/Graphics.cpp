@@ -291,7 +291,7 @@ void Graphics::createMultisamplingInfo(const VkSampleCountFlagBits& samplesCount
     multisamplingInfo.sType = (
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
         );
-    multisamplingInfo.sampleShadingEnable = VK_TRUE;
+    multisamplingInfo.sampleShadingEnable = VK_FALSE;
     multisamplingInfo.rasterizationSamples = samplesCount;
     // Optional
     multisamplingInfo.minSampleShading = 1.0f;

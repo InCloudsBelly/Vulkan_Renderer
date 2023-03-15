@@ -13,7 +13,7 @@
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Command/CommandPool.h"
-
+#include "VulkanRenderer/Texture/Texture.h"
 
 struct PushBlockPrefilterEnv
 {
@@ -34,7 +34,7 @@ public:
         const std::shared_ptr<CommandPool>& commandPool,
         const uint32_t dim,
         const std::vector<Mesh<T>>& meshes,
-        const std::shared_ptr<Texture>& envMap
+        const std::shared_ptr<TextureBase>& envMap
     );
     ~PrefilteredEnvMap();
     void destroy();
@@ -51,7 +51,7 @@ private:
     void createRenderPass();
     void createTargetImage(const VkPhysicalDevice& physicalDevice);
     void createDescriptorPool();
-    void createDescriptorSet(const std::shared_ptr<Texture>& envMap);
+    void createDescriptorSet(const std::shared_ptr<TextureBase>& envMap);
     void copyRegionOfImage(
         float face,
         float mipLevel,

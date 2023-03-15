@@ -9,7 +9,7 @@
 #include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Model/Types/Light.h"
 #include "VulkanRenderer/Math/MathUtils.h"
-#include "VulkanRenderer/Texture/Type/NormalTexture.h"
+#include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
 NormalPBR::NormalPBR(const ModelInfo& modelInfo)
@@ -247,7 +247,13 @@ void NormalPBR::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDe
 
 			if (it == m_texturesID.end())
 			{
-				mesh.textures.push_back(std::make_shared<NormalTexture>(physicalDevice,logicalDevice, mesh.texturesToLoadInfo[i],samplesCount,commandPool,graphicsQueue, UsageType::TO_COLOR));
+				mesh.textures.push_back(std::make_shared<NormalTexture>(
+						mesh.texturesToLoadInfo[i].name,
+						std::string(MODEL_DIR) + mesh.texturesToLoadInfo[i].folderName, 
+						mesh.texturesToLoadInfo[i].format
+					)
+				);
+
 				m_texturesLoaded.push_back(mesh.textures[i]);
 				m_texturesID[mesh.texturesToLoadInfo[i].name] = (m_texturesLoaded.size() - 1);
 			}

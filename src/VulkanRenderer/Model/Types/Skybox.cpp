@@ -25,7 +25,7 @@
 #include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 
-#include "VulkanRenderer/Texture/Type/Cubemap.h"
+#include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
 Skybox::Skybox(const ModelInfo& modelInfo)
@@ -41,7 +41,6 @@ void Skybox::destroy(const VkDevice& logicalDevice)
 
     for (auto& texture : m_texturesLoaded)
         texture->destroy();
-    m_irradianceMap->destroy();
 
     for (auto& mesh : m_meshes)
     {
@@ -151,7 +150,9 @@ void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevic
 
             if (it == m_texturesID.end())
             {
-                mesh.textures.push_back(std::make_shared<Cubemap>(physicalDevice,logicalDevice, info, samplesCount,commandPool,graphicsQueue, UsageType::ENVIRONMENTAL_MAP));
+                //mesh.texturesCube.push_back(std::make_shared<Cubemap>(physicalDevice,logicalDevice, info, samplesCount,commandPool,graphicsQueue, UsageType::ENVIRONMENTAL_MAP));
+                mesh.textures.push_back(std::make_shared<CubeMapTexture>(info.name, info.folderName, info.format));
+                
                 m_texturesLoaded.push_back(mesh.textures[i]);
                 m_texturesID[info.name] = (m_texturesLoaded.size() - 1);
 
@@ -162,17 +163,7 @@ void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevic
         }
     }
 
-    info = {"Irradiance.hdr", m_folderName,VK_FORMAT_R32G32B32A32_SFLOAT, 4};
 
-    m_irradianceMap = std::make_shared<Cubemap>(
-        physicalDevice,
-        logicalDevice,
-        info,
-        samplesCount,
-        commandPool,
-        graphicsQueue,
-        UsageType::IRRADIANCE_MAP
-        );
 }
 
 void Skybox::updateUBO(
@@ -207,12 +198,8 @@ const std::string& Skybox::getTextureFolderName() const
     return m_folderName;
 }
 
-const std::shared_ptr<Texture>& Skybox::getIrradianceMap() const
-{
-    return m_irradianceMap;
-}
 
-const std::shared_ptr<Texture>& Skybox::getEnvMap() const
+const std::shared_ptr<TextureBase>& Skybox::getEnvMap() const 
 {
     return m_envMap;
 }

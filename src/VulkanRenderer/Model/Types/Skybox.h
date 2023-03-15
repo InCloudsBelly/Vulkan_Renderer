@@ -13,7 +13,9 @@
 #include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Model/ModelInfo.h"
-#include "VulkanRenderer/Texture/Type/Cubemap.h"
+
+#include "VulkanRenderer/Texture/Texture.h"
+
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
@@ -49,8 +51,9 @@ public:
     ) override;
 
     const std::string& getTextureFolderName() const;
-    const std::shared_ptr<Texture>& getEnvMap() const;
-    const std::shared_ptr<Texture>& getIrradianceMap() const;
+
+    const std::shared_ptr<TextureBase>& getEnvMap() const;
+
     const std::vector<Mesh<Attributes::SKYBOX::Vertex>>& getMeshes() const;
 
 private:
@@ -76,8 +79,7 @@ private:
         const uint32_t& uboCount
     ) override;
 
-    std::string                m_textureFolderName;
-    std::shared_ptr<Texture>   m_envMap;
-    std::shared_ptr<Texture>   m_irradianceMap;
+    std::string                     m_textureFolderName;
+    std::shared_ptr<TextureBase>    m_envMap;
     std::vector<Mesh<Attributes::SKYBOX::Vertex>> m_meshes;
 };

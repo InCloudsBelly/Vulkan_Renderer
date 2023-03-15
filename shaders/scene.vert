@@ -32,12 +32,6 @@ layout(location = 5) out vec4 outShadowCoords;
  * depthMVP matrix. So this transforms [-1, 1] -> [0, 1].
  */
 
-const mat4 bias = mat4(
-      0.5, 0.0, 0.0, 0.0,
-      0.0, 0.5, 0.0, 0.0,
-      0.0, 0.0, 1.0, 0.0,
-      0.5, 0.5, 0.0, 1.0
-);
 
 void main()
 {
@@ -52,12 +46,7 @@ void main()
    outTangent   = normalize(normalMatrix * inTangent);
    outNormal    = normalize(normalMatrix * inNormal);
 
-//   outTangent   = normalize(mat3(ubo.model) * inTangent);
-//   outNormal    = normalize(mat3(ubo.model) * inNormal);
-   // Gram-Schmidt -> reorthogonalization
-   outTangent = normalize(outTangent - dot(outTangent, outNormal) * outNormal);
-
-   outBitangent = normalize(cross(outNormal, outTangent));
+   outBitangent = normalize(cross(outTangent, outNormal));
 
    outShadowCoords = (( ubo.lightSpace * ubo.model) * vec4(inPosition, 1.0));
 }

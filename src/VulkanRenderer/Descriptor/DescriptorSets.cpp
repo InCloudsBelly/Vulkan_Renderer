@@ -30,16 +30,16 @@ inline static void createDescriptorImageInfo(const VkImageView& imageView,const 
 
 DescriptorSets::DescriptorSets() {}
 
-// Creates, allocates and configures the descriptor sets.
+
 DescriptorSets::DescriptorSets(
-    const VkDevice                              logicalDevice,
-    const std::vector<DescriptorInfo>&          uboInfo,
-    const std::vector<DescriptorInfo>&          samplersInfo,
-    const std::vector<std::shared_ptr<Texture>>& textures,
-    const VkDescriptorSetLayout&                descriptorSetLayout,
-    DescriptorPool&                             descriptorPool,
-    DescriptorSetInfo*                          additionalTextures,
-    const std::vector<UBO*>&                    UBOs)
+    const VkDevice                     logicalDevice,
+    const std::vector<DescriptorInfo>& uboInfo,
+    const std::vector<DescriptorInfo>& samplersInfo,
+    const std::vector<std::shared_ptr<TextureBase>>& textures,
+    const VkDescriptorSetLayout& descriptorSetLayout,
+    DescriptorPool& descriptorPool,
+    DescriptorSetInfo* additionalTextures,
+    const std::vector<UBO*>& UBOs)
 {
     std::vector<VkDescriptorImageInfo> imageInfos;
     imageInfos.resize(samplersInfo.size());
@@ -49,7 +49,7 @@ DescriptorSets::DescriptorSets(
     // create descriptors sets with one same Descriptor Set Layout.
     m_descriptorSetLayouts.resize(Config::MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
 
-    descriptorPool.allocDescriptorSets(m_descriptorSetLayouts,m_descriptorSets);
+    descriptorPool.allocDescriptorSets(m_descriptorSetLayouts, m_descriptorSets);
 
     // Configures the descriptor sets
     for (size_t i = 0; i < m_descriptorSets.size(); i++)
@@ -65,17 +65,11 @@ DescriptorSets::DescriptorSets(
         // Samplers of textures
         for (size_t j = 0; j < textures.size(); j++)
         {
-            createDescriptorImageInfo(textures[j]->getImageView(),textures[j]->getSampler(), imageInfos[j]);
+            createDescriptorImageInfo(textures[j]->getImageView(), textures[j]->getSampler(), imageInfos[j]);
         }
 
         if (additionalTextures != nullptr)
         {
-            createDescriptorImageInfo(
-                additionalTextures->envMap->getImageView(),
-                additionalTextures->envMap->getSampler(),
-                imageInfos[samplersInfo.size() - 5]
-            );
-
             createDescriptorImageInfo(
                 additionalTextures->irradianceMap->getImageView(),
                 additionalTextures->irradianceMap->getSampler(),
@@ -83,8 +77,8 @@ DescriptorSets::DescriptorSets(
             );
 
             createDescriptorImageInfo(
-                additionalTextures->BRDFlut->getImageView(),
-                additionalTextures->BRDFlut->getSampler(),
+                additionalTextures->BRDFlutInfo->imageView,
+                additionalTextures->BRDFlutInfo->sampler,
                 imageInfos[samplersInfo.size() - 3]
             );
 
@@ -94,13 +88,13 @@ DescriptorSets::DescriptorSets(
                 imageInfos[samplersInfo.size() - 2]
             );
 
-           createDescriptorImageInfo(
+            createDescriptorImageInfo(
                 *(additionalTextures->shadowMapView),
                 *(additionalTextures->shadowMapSampler),
                 imageInfos[samplersInfo.size() - 1]
             );
 
-           createDescriptorImageInfo(*(additionalTextures->shadowMapView), *(additionalTextures->shadowMapSampler), imageInfos[samplersInfo.size() - 1]);
+            createDescriptorImageInfo(*(additionalTextures->shadowMapView), *(additionalTextures->shadowMapSampler), imageInfos[samplersInfo.size() - 1]);
         }
 
 
@@ -122,6 +116,7 @@ DescriptorSets::DescriptorSets(
         vkUpdateDescriptorSets(logicalDevice, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 }
+
 
 /*
  * Used for Compute Pipelines.

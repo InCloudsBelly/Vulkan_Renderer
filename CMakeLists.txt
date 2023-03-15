@@ -89,6 +89,9 @@ find_package(Threads REQUIRED)
 set(GLI_DIR "${PROJECT_LIBRARIES_DIR}/gli")
 add_subdirectory(${GLI_DIR} EXCLUDE_FROM_ALL)
 
+# - VMA
+set(VMA_DIR "${PROJECT_LIBRARIES_DIR}/VMA")
+add_subdirectory(${VMA_DIR} EXCLUDE_FROM_ALL)
 
 # - Tracy
 option(TRACY_ENABLE "" ON)
@@ -134,6 +137,7 @@ target_link_libraries(${PROJECT_NAME}
    imgui
    Tracy::TracyClient
    gli
+   VulkanMemoryAllocator 
 
    PRIVATE
    ${CMAKE_DL_LIBS}

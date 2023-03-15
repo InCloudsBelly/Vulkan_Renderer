@@ -22,7 +22,6 @@
 
 enum class ModelType
 {
-	NONE = 0,
 	NORMAL_PBR = 1,
 	LIGHT = 2,
 	SKYBOX = 3
@@ -116,7 +115,9 @@ protected:
 
 	// We need these to not reload the textures again if they are used multiple
 	// times in different(or in the same) meshes.
-	std::vector<std::shared_ptr<Texture>> m_texturesLoaded;
+
+	std::vector<std::shared_ptr<TextureBase>> m_texturesLoaded;
+
 	std::unordered_map<std::string, size_t> m_texturesID;
 private:
 	void processNode(aiNode* node, const aiScene* scene);

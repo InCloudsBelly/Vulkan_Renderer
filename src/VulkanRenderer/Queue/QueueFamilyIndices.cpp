@@ -25,6 +25,14 @@ void QueueFamilyIndices::getIndicesOfRequiredQueueFamilies(
         if (QueueFamilyUtils::isGraphicsQueueSupported(qf))
             graphicsFamily = i;
 
+        VkBool32 presentSupport = false;
+        if (vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentSupport) != VK_SUCCESS)
+        {
+            graphicsFamily = -1;
+            presentFamily = -1;
+            break;
+        }
+
         if (QueueFamilyUtils::isPresentQueueSupported(i, surface, physicalDevice))
             presentFamily = i;
 

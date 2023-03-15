@@ -1,52 +1,130 @@
 #include "VulkanRenderer/Texture/Texture.h"
 
+#include <vulkan/vulkan.h>
+#include <stdexcept>
 #include <iostream>
 
-#include <vulkan/vulkan.h>
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-#include <stb_image_write.h>
+#include <VMA/vk_mem_alloc.h>
 
-
+#include "VulkanRenderer/Renderer.h"
+#include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Texture/MipmapUtils.h"
-#include "VulkanRenderer/Texture/Bitmap.h"
 
-#include "VulkanRenderer/Command/CommandManager.h"
-#include "VulkanRenderer/Command/CommandPool.h"
-#include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
+#define CHECKRESULT(x) { \
+        VkResult retval = (x); \
+        assert (retval == VK_SUCCESS); \
+    }
 
-Texture::Texture(
-    const VkDevice& logicalDevice,
-    const TextureType& type,
-    const VkSampleCountFlagBits& samplesCount,
-    const int& desiredChannels,
-    const UsageType& usage
-): m_logicalDevice(logicalDevice), 
-    m_type(type), 
-    m_usage(usage), 
-    m_desiredChannels(desiredChannels), 
-    m_samplesCount(samplesCount)
-{}
-
-const VkImageView& Texture::getImageView() const
+void TextureBase::destroy()
 {
-    return m_image.getImageView();
+    if (m_imageInfo.sampler != VK_NULL_HANDLE)
+        vkDestroySampler(getRendererPointer()->getDevice(), m_imageInfo.sampler, nullptr);
+    if (m_imageInfo.imageView != VK_NULL_HANDLE)
+        vkDestroyImageView(getRendererPointer()->getDevice(), m_imageInfo.imageView, nullptr);
+    if (m_image != VK_NULL_HANDLE)
+        vmaDestroyImage(getRendererPointer()->getVmaAllocator(), m_image, m_deviceAllocation);
 }
 
-const VkSampler& Texture::getSampler() const
+
+NormalTexture::NormalTexture(
+    const std::string name,
+    const std::string& basedir,
+    const VkFormat& format,
+    const VkImageCreateFlags flags,
+    const VkImageViewType viewType
+) : TextureBase(name, format, flags, viewType)
 {
-    return m_image.getSampler();
+
+    CHECKRESULT(
+        BufferManager::bufferCreateTextureImage(
+            getRendererPointer()->getDevice(),
+            getRendererPointer()->getVmaAllocator(),
+            getRendererPointer()->getGraphicsQueue(),
+            getRendererPointer()->getCommandPool(),
+            basedir,
+            name,
+            m_format, 
+            flags, 
+            &m_image,
+            &m_deviceAllocation, 
+            &m_extent,
+            &m_mipmapLevel)
+    );
+
+    CHECKRESULT(
+        BufferManager::bufferCreateImageView(
+            getRendererPointer()->getDevice(),
+            m_image,
+            m_format,
+            m_viewType,
+            m_mipmapLevel,
+            1,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            &m_imageInfo.imageView
+        )
+    );
+
+    CHECKRESULT(
+        BufferManager::bufferCreateTextureSampler(
+            getRendererPointer()->getDevice(),
+            m_mipmapLevel,
+            &m_imageInfo.sampler
+        )
+    );
+
+    MipmapUtils::generateMipmaps(
+        getRendererPointer()->getPhysicalDevice(),
+        getRendererPointer()->getCommandPool(),
+        getRendererPointer()->getGraphicsQueue(),
+        m_image,
+        m_extent.width,
+        m_extent.height,
+        m_format,
+        m_mipmapLevel
+    );
+
+   
 }
 
-const UsageType& Texture::getUsage() const
+
+CubeMapTexture::CubeMapTexture(
+    const std::string name,
+    const std::string& basedir,
+    const VkFormat& format,
+    VkImageCreateFlags flags,
+    VkImageViewType viewType
+) : TextureBase(name, format, flags, viewType)
 {
-    return m_usage;
+
+    CHECKRESULT(
+        BufferManager::bufferCreateTextureCubeMap(
+            getRendererPointer()->getDevice(),
+            getRendererPointer()->getVmaAllocator(),
+            getRendererPointer()->getGraphicsQueue(),
+            getRendererPointer()->getCommandPool(),
+            basedir,
+            name,
+            m_format,
+            flags,
+            &m_image,
+            &m_deviceAllocation,
+            &m_extent)
+    );
+
+    CHECKRESULT(
+        BufferManager::bufferCreateImageView(
+            getRendererPointer()->getDevice(),
+            m_image,
+            m_format,
+            viewType,
+            1,
+            6,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            &m_imageInfo.imageView
+        )
+    );
+
+    CHECKRESULT(
+        BufferManager::bufferCreateTextureSampler(getRendererPointer()->getDevice(), 1 ,&m_imageInfo.sampler)
+    );
 }
-
-void Texture::destroy()
-{
-    m_image.destroy();
-}
-
-Texture::~Texture() {}
-

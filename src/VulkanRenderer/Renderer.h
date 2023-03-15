@@ -6,6 +6,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include <VMA/vk_mem_alloc.h>
+
 #include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/GUI/GUI.h"
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
@@ -30,6 +32,15 @@
 #include "VulkanRenderer/VKinstance/VKinstance.h"
 #include "VulkanRenderer/Scene/Scene.h"
 
+
+#ifndef getRendererPointer
+#define getRendererPointer() g_RendererSingleton
+#endif
+
+class Renderer;
+
+extern Renderer* g_RendererSingleton ;
+
 class Renderer
 {
 public:
@@ -41,7 +52,7 @@ public:
 	void addObjectPBR(const std::string& name, 
 		const std::string& folderName,
 		const std::string& fileName,
-		const glm::fvec3& pos = glm::fvec4(0.0f),
+		const glm::fvec3& pos = glm::fvec3(0.0f),
 		const glm::fvec3& rot = glm::fvec3(0.0f),
 		const glm::fvec3& size = glm::fvec3(1.0f)
 	);
@@ -76,6 +87,32 @@ public:
 		const glm::fvec3& size
 	);
 
+	virtual VkDevice getDevice()
+	{
+		return m_device->getLogicalDevice();
+	};
+
+	virtual VkPhysicalDevice getPhysicalDevice()
+	{
+		return m_device->getPhysicalDevice();
+	};
+
+	virtual VmaAllocator& getVmaAllocator()
+	{
+		return m_vmaAllocator;
+	};
+
+	virtual VkQueue& getGraphicsQueue()
+	{
+		return m_qfHandles.graphicsQueue;
+	};
+
+	///returns the thread command pool
+	virtual VkCommandPool getCommandPool()
+	{
+		return m_commandPoolForGraphics->get();
+	};
+
 private:
 	void createCommandPools();
 	void initWindow();
@@ -106,6 +143,8 @@ private:
 	void createSyncObjects();
 	void destroySyncObjects();
 
+	VkResult vhMemCreateVMAAllocator(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VmaAllocator& allocator);
+	
 	std::shared_ptr<Window>             m_window;
 	std::unique_ptr<GUI>                m_GUI;
 	std::shared_ptr<Camera>             m_camera;
@@ -115,6 +154,8 @@ private:
 	VkDebugUtilsMessengerEXT            m_debugMessenger;
 	QueueFamilyIndices                  m_qfIndices;
 	QueueFamilyHandles                  m_qfHandles;
+
+	VmaAllocator						m_vmaAllocator;
 
 	std::shared_ptr<Swapchain>          m_swapchain;
 	

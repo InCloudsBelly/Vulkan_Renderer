@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <optional>
+#include <VMA/vk_mem_alloc.h>
 
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 

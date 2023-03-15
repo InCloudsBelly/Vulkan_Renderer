@@ -14,16 +14,19 @@
 Device::Device(
     const VkInstance& vkInstance,
     QueueFamilyIndices& requiredQueueFamilyIndices,
-    const VkSurfaceKHR& windowSurface ) 
+    const VkSurfaceKHR& windowSurface,
+    void* pNextChain
+)
 {
     pickPhysicalDevice(vkInstance, requiredQueueFamilyIndices, windowSurface);
-    createLogicalDevice(requiredQueueFamilyIndices);
+    createLogicalDevice(requiredQueueFamilyIndices,  pNextChain);
 }
 
 Device::~Device() {}
 
 void Device::createLogicalDevice(
-    QueueFamilyIndices& requiredQueueFamilyIndices
+    QueueFamilyIndices& requiredQueueFamilyIndices,
+    void* pNextChain
 ) {
     // - Specifies which QUEUES we want to create.
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -50,16 +53,38 @@ void Device::createLogicalDevice(
 
     // - Specifices which device FEATURES we want to use.
     // For now, this will be empty.
-    VkPhysicalDeviceFeatures deviceFeatures{};
+    VkPhysicalDeviceFeatures deviceFeatures = {};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
-    deviceFeatures.sampleRateShading = VK_TRUE;
+    deviceFeatures.textureCompressionBC = VK_TRUE;
+    deviceFeatures.shaderSampledImageArrayDynamicIndexing = VK_TRUE;
+    deviceFeatures.shaderUniformBufferArrayDynamicIndexing = VK_TRUE;
+    deviceFeatures.shaderStorageBufferArrayDynamicIndexing = VK_TRUE;
+    deviceFeatures.shaderStorageImageArrayDynamicIndexing = VK_TRUE;
+
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT ext = {};
+    ext.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
 
     // Now we can create the logical device.
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.pNext = &ext;
+
     createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos = queueCreateInfos.data();
-    createInfo.pEnabledFeatures = &deviceFeatures;
+
+    VkPhysicalDeviceFeatures2 physicalDeviceFeatures2{};
+    if (pNextChain)
+    {
+        physicalDeviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        physicalDeviceFeatures2.features = deviceFeatures;
+        physicalDeviceFeatures2.pNext = pNextChain;
+        createInfo.pEnabledFeatures = nullptr;
+        createInfo.pNext = &physicalDeviceFeatures2;
+    }
+    else
+    {
+        createInfo.pEnabledFeatures = &deviceFeatures;
+    }
 
     // - Specifies which device EXTENSIONS we want to use.
     createInfo.enabledExtensionCount = static_cast<uint32_t>(m_requiredExtensions.size());

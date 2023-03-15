@@ -51,7 +51,7 @@
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 
 #include "VulkanRenderer/Texture/Texture.h"
-#include "VulkanRenderer/Texture/Type/NormalTexture.h"
+#include "VulkanRenderer/Texture/Texture.h"
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
@@ -67,12 +67,15 @@
 
 glm::fvec3 cameraPos = glm::fvec3(2.0f, 2.0f, 2.0f);
 
+Renderer* g_RendererSingleton = nullptr;
 
 void Renderer::run()
 {
 #ifdef RELEASE_MODE_ON
     ZoneScoped;
 #endif
+
+    g_RendererSingleton = this;
 
     // TODO: Improve this!
     // NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
@@ -228,9 +231,21 @@ void Renderer::initVulkan()
 
     m_window->createSurface(m_vkInstance->get());
 
-    m_device = std::make_unique<Device>(m_vkInstance->get(), m_qfIndices, m_window->getSurface());
+
+    VkPhysicalDeviceBufferDeviceAddressFeatures enabledBufferDeviceAddresFeatures{};
+    enabledBufferDeviceAddresFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+    enabledBufferDeviceAddresFeatures.bufferDeviceAddress = VK_TRUE;
+
+    m_device = std::make_unique<Device>(m_vkInstance->get(), m_qfIndices, m_window->getSurface(), &enabledBufferDeviceAddresFeatures);
 
     m_qfHandles.setQueueHandles(m_device->getLogicalDevice(), m_qfIndices);
+
+    
+    
+    vhMemCreateVMAAllocator(m_vkInstance->get(), m_device->getPhysicalDevice(), m_device->getLogicalDevice(), m_vmaAllocator);
+
+
+
 
     m_swapchain = std::make_unique<Swapchain>(m_device->getPhysicalDevice(), m_device->getLogicalDevice(), m_window, m_device->getSupportedProperties());
 
@@ -240,8 +255,8 @@ void Renderer::initVulkan()
         m_device->getLogicalDevice(),
         {
             // framesInFlight * #allmeshes
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,(uint32_t)m_modelsToLoadInfo.size()* Config::MAX_FRAMES_IN_FLIGHT * 100},
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, (uint32_t)m_modelsToLoadInfo.size() * Config::MAX_FRAMES_IN_FLIGHT * 100}
+            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 },
+            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 }
         },
         m_modelsToLoadInfo.size()* Config::MAX_FRAMES_IN_FLIGHT * 100
     );
@@ -271,7 +286,8 @@ void Renderer::initVulkan()
         // Parameters needed by the computations.
         m_device->getPhysicalDevice(),
         m_qfIndices,
-        m_descriptorPoolForComputations
+        m_descriptorPoolForComputations,
+        m_vmaAllocator
     );
 
 
@@ -285,7 +301,7 @@ void Renderer::initVulkan()
             shadowExtent,
             m_swapchain->getImageCount(),
             m_depthBuffer.getFormat(),
-            Config::MAX_FRAMES_IN_FLIGHT * m_scene.getObjectModelIndices().size(),
+            Config::MAX_FRAMES_IN_FLIGHT,
             &(std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel())->getMeshes()),
             m_scene.getObjectModelIndices()
         );
@@ -662,6 +678,9 @@ void Renderer::cleanup()
     if (m_commandPoolForGraphics) m_commandPoolForGraphics->destroy();
     if (m_commandPoolForCompute)  m_commandPoolForCompute->destroy();
 
+    //VM Allocator
+    vmaDestroyAllocator(m_vmaAllocator);
+
     // Logical Device
     vkDestroyDevice(m_device->getLogicalDevice(), nullptr);
 
@@ -775,4 +794,16 @@ void Renderer::addSpotLight(
           LightType::SPOT_LIGHT,
           endPos
         });
+}
+
+
+VkResult Renderer::vhMemCreateVMAAllocator(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VmaAllocator& allocator)
+{
+    VmaAllocatorCreateInfo allocatorInfo = {};
+    allocatorInfo.physicalDevice = physicalDevice;
+    allocatorInfo.device = device;
+    allocatorInfo.instance = instance;
+    allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+
+    return vmaCreateAllocator(&allocatorInfo, &allocator);
 }

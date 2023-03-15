@@ -8,7 +8,7 @@ namespace MipmapUtils
 {
     void generateMipmaps(
         const VkPhysicalDevice&     physicalDevice,
-        const std::shared_ptr<CommandPool>& commandPool,
+        const VkCommandPool&        commandPool,
         const VkQueue&              graphicsQueue,
         const VkImage&              image,
         const int32_t               width,
@@ -22,8 +22,8 @@ namespace MipmapUtils
         const VkFormat&             format
     );
 
-    const int32_t getAmountOfSupportedMipLevels(
-        const int32_t               width,
-        const int32_t               height
+    const uint32_t getAmountOfSupportedMipLevels(
+        const uint32_t               width,
+        const uint32_t               height
     );
 }

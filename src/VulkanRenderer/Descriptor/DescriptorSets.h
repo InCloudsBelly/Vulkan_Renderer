@@ -7,13 +7,14 @@
 #include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
+#include "VulkanRenderer/Image/Image.h"
 #include "VulkanRenderer/Texture/Texture.h"
+
 
 struct DescriptorSetInfo
 {
-	const Texture*			envMap;
-	const Texture*			irradianceMap;
-	const Texture*			BRDFlut;
+	const Image*			irradianceMap;
+	const VkDescriptorImageInfo* BRDFlutInfo;
 	const VkImageView*		shadowMapView;
 	const VkSampler*		shadowMapSampler;
 	const Image*			prefilteredEnvMap;
@@ -24,15 +25,16 @@ class DescriptorSets
 {
 public:
 	DescriptorSets();
+
 	DescriptorSets(
-		const VkDevice								logicalDevice,
-		const std::vector<DescriptorInfo>&			uboInfo,
-		const std::vector<DescriptorInfo>&			samplersInfo,
-		const std::vector<std::shared_ptr<Texture>>& textures,
-		const VkDescriptorSetLayout&				descriptorSetLayout,
-		DescriptorPool&								descriptorPool,
-		DescriptorSetInfo*							additionalTextures = nullptr,
-		const std::vector<UBO*>&					UBOs = {}
+		const VkDevice logicalDevice,
+		const std::vector<DescriptorInfo>& uboInfo,
+		const std::vector<DescriptorInfo>& samplersInfo,
+		const std::vector<std::shared_ptr<TextureBase>>& textures,
+		const VkDescriptorSetLayout& descriptorSetLayout,
+		DescriptorPool& descriptorPool,
+		DescriptorSetInfo* additionalTextures = nullptr,
+		const std::vector<UBO*>& UBOs = {}
 	);
 
 	DescriptorSets(

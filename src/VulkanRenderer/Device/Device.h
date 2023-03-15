@@ -14,7 +14,8 @@ public:
     Device(
         const VkInstance&   m_vkInstance,
         QueueFamilyIndices& requiredQueueFamilyIndices,
-        const VkSurfaceKHR& windowSurface
+        const VkSurfaceKHR& windowSurface,
+        void* pNextChain
     );
     ~Device();
 
@@ -27,7 +28,7 @@ public:
 
 private:
 
-    void createLogicalDevice(QueueFamilyIndices& requiredQueueFamilyIndices);
+    void createLogicalDevice(QueueFamilyIndices& requiredQueueFamilyIndices, void* pNextChain);
 
     void pickPhysicalDevice(
         const VkInstance& m_vkInstance,
@@ -61,5 +62,5 @@ private:
     uint32_t                       m_apiVersion;
     SwapchainSupportedProperties   m_supportedProperties;
 
-    const std::vector<const char*> m_requiredExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    const std::vector<const char*> m_requiredExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME ,VK_KHR_DEVICE_GROUP_EXTENSION_NAME };
 };

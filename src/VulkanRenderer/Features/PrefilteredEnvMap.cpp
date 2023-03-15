@@ -1,6 +1,7 @@
 #include "VulkanRenderer/Features/PrefilteredEnvMap.h"
 
 #include <iostream>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Model/ModelInfo.h"
@@ -21,7 +22,7 @@ PrefilteredEnvMap<T>::PrefilteredEnvMap(
     const std::shared_ptr<CommandPool>& commandPool,
     const uint32_t dim,
     const std::vector<Mesh<T>>& meshes,
-    const std::shared_ptr<Texture>& envMap
+    const std::shared_ptr<TextureBase>& envMap
 ) : m_logicalDevice(logicalDevice), m_dim(dim), m_format(VK_FORMAT_R16G16B16A16_SFLOAT)
 {
     m_mipLevels = MipmapUtils::getAmountOfSupportedMipLevels(dim, dim);
@@ -48,13 +49,13 @@ void PrefilteredEnvMap<T>::createDescriptorPool()
 }
 
 template<typename T>
-void PrefilteredEnvMap<T>::createDescriptorSet(const std::shared_ptr<Texture>& envMap) 
+void PrefilteredEnvMap<T>::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
 {
     m_descriptorSets = DescriptorSets(
         m_logicalDevice,
         {},
         GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::SAMPLERS_INFO,
-        { envMap },
+        {envMap},
         m_graphicsPipeline.getDescriptorSetLayout(),
         m_descriptorPool
     );
@@ -70,12 +71,12 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
     clearValues.color = { {0.0f, 0.0f, 0.2f, 0.0f} };
 
     std::vector<glm::mat4> matrices = { 
-        glm::rotate(glm::rotate(glm::mat4(1.0f),glm::radians(90.0f),glm::vec3(0.0f, 1.0f, 0.0f)),glm::radians(180.0f),glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::rotate(glm::rotate(glm::mat4(1.0f),glm::radians(-90.0f),glm::vec3(0.0f, 1.0f, 0.0f)),glm::radians(180.0f),glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::rotate(glm::mat4(1.0f),glm::radians(-90.0f),glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::rotate(glm::mat4(1.0f),glm::radians(90.0f),glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::rotate(glm::mat4(1.0f),glm::radians(180.0f),glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::rotate(glm::mat4(1.0f),glm::radians(180.0f),glm::vec3(0.0f, 0.0f, 1.0f)) 
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,   0.0f,  0.0f), glm::vec3(0.0f,  1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f,  1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  -1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,   1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,   0.0f,  1.0f), glm::vec3(0.0f,  1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,   0.0f, -1.0f), glm::vec3(0.0f,  1.0f,  0.0f))
     };
 
 
@@ -116,7 +117,7 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
 
             //---------------------------------CMDs----------------------------
                 // Set Dynamic States
-            CommandManager::STATE::setViewport(0.0f, 0.0f, { viewportDim, viewportDim }, 0.0f, 1.0f, 0, 1, commandBuffer);
+            CommandManager::STATE::setViewport(0.0f, 0.0f, { static_cast<uint32_t>(viewportDim), static_cast<uint32_t>(viewportDim), }, 0.0f, 1.0f, 0, 1, commandBuffer);
             CommandManager::STATE::setScissor({ 0, 0 }, { m_dim,m_dim }, 0, 1, commandBuffer);
 
             //--------------------------RenderPass--------------------------

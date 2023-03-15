@@ -16,6 +16,10 @@
 #include "VulkanRenderer/Settings/ComputePipelineConfig.h"
 #include "VulkanRenderer/Computation/Computation.h"
 #include "VulkanRenderer/Features/PrefilteredEnvMap.h"
+#include "VulkanRenderer/Features/PreIrradiance.h"
+
+#include "VulkanRenderer/Texture/Texture.h"
+
 
 class Scene
 {
@@ -31,7 +35,8 @@ public:
 		// Parameters needed by the computations.
 		const VkPhysicalDevice& physicalDevice,
 		const QueueFamilyIndices& queueFamilyIndices,
-		DescriptorPool& descriptorPoolForComputations
+		DescriptorPool& descriptorPoolForComputations,
+		VmaAllocator& vmaAllocator
 	);
 
 	~Scene();
@@ -80,7 +85,8 @@ private:
 	void loadBRDFlut(
 		const VkPhysicalDevice& physicalDevice,
 		const VkQueue& graphicsQueue,
-		const std::shared_ptr<CommandPool>& commandPool
+		const std::shared_ptr<CommandPool>& commandPool,
+		const VmaAllocator& vmaAllocator
 	);
 	void createPipelines(const VkFormat& format, const VkExtent2D& extent, const VkSampleCountFlagBits& msaaSamplesCount);
 	void createRenderPass(const VkFormat& format, const VkSampleCountFlagBits& msaaSamplesCount, const VkFormat& depthBufferFormat);
@@ -92,6 +98,8 @@ private:
 	Graphics				m_graphicsPipelinePBR;
 	Graphics				m_graphicsPipelineSkybox;
 	Graphics				m_graphicsPipelineLight;
+
+	VmaAllocator			m_vmaAllocator;
 
 	std::vector<std::shared_ptr<Model>> m_models;
 	
@@ -107,6 +115,9 @@ private:
 
 	// IBL
 	Computation                         m_BRDFcomp;
-	std::shared_ptr<Texture>            m_BRDFlut;
+	NormalTexture*						m_BRDFlut;
+
+
 	std::shared_ptr<PrefilteredEnvMap<Attributes::SKYBOX::Vertex>> m_prefilteredEnvMap;
+	std::shared_ptr<PrefilteredIrradiance<Attributes::SKYBOX::Vertex>> m_prefilteredIrradiance;
 };

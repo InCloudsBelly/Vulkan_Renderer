@@ -7,10 +7,11 @@
 
 #include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Command/CommandManager.h"
+#include "VulkanRenderer/Renderer.h"
 
 void MipmapUtils::generateMipmaps(
     const VkPhysicalDevice&     physicalDevice,
-    const std::shared_ptr<CommandPool>& commandPool,
+    const VkCommandPool&        commandPool,
     const VkQueue&              graphicsQueue,
     const VkImage&              image,
     const int32_t               width,
@@ -21,11 +22,7 @@ void MipmapUtils::generateMipmaps(
     if (!isLinearBlittingSupported(physicalDevice, format))
         throw std::runtime_error("Texture image format does not support linear blitting.\n");
 
-    VkCommandBuffer commandBuffer;
-
-    commandPool->allocCommandBuffer(commandBuffer, true);
-
-    commandPool->beginCommandBuffer(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, commandBuffer);
+    VkCommandBuffer commandBuffer = CommandManager::cmdBeginSingleTimeCommands(getRendererPointer()->getDevice(), commandPool);
 
     VkImageMemoryBarrier imgMemoryBarrier{};
     imgMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -115,9 +112,7 @@ void MipmapUtils::generateMipmaps(
         { imgMemoryBarrier }
     );
 
-    commandPool->endCommandBuffer(commandBuffer);
-
-    commandPool->submitCommandBuffer(graphicsQueue, { commandBuffer }, true);
+    CommandManager::cmdEndSingleTimeCommands(getRendererPointer()->getDevice(), graphicsQueue, commandPool, commandBuffer);
 }
 
 bool MipmapUtils::isLinearBlittingSupported(const VkPhysicalDevice& physicalDevice,const VkFormat& format) 
@@ -133,7 +128,7 @@ bool MipmapUtils::isLinearBlittingSupported(const VkPhysicalDevice& physicalDevi
 }
 
 
-const int32_t MipmapUtils::getAmountOfSupportedMipLevels(const int32_t width,const int32_t height) 
+const uint32_t MipmapUtils::getAmountOfSupportedMipLevels(const uint32_t width,const uint32_t height) 
 {
     return std::floor(std::log2(std::max(width, height))) + 1;
 }

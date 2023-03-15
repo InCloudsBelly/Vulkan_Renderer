@@ -154,7 +154,7 @@ void ShadowMap<T>::createDescriptorSets()
     for (auto i : m_modelIndices)
     {
         const std::vector<UBO*>& ubo = { m_shadowModelInfo[i].modelUBO.get()};
-        
+
         m_shadowModelInfo[i].modelDescriptorSets = DescriptorSets(
             m_logicalDevice,
             GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,

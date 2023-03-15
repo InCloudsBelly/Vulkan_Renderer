@@ -39,12 +39,11 @@ layout(binding = 5) uniform sampler2D   AOsampler;
 layout(binding = 6) uniform sampler2D   normalSampler;
 
 // IBL Samplers
-layout(binding = 7) uniform samplerCube envMapSampler;
-layout(binding = 8) uniform samplerCube irradianceMapSampler;
-layout(binding = 9) uniform sampler2D   BRDFlutSampler;
-layout(binding = 10) uniform samplerCube prefilteredEnvMapSampler;
+layout(binding = 7) uniform samplerCube irradianceMapSampler;
+layout(binding = 8) uniform sampler2D   BRDFlutSampler;
+layout(binding = 9) uniform samplerCube prefilteredEnvMapSampler;
 
-layout(binding = 11) uniform sampler2D   shadowMapSampler;
+layout(binding = 10) uniform sampler2D   shadowMapSampler;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTexCoord;
@@ -126,6 +125,7 @@ float ambient = 0.3;
 void main()
 {
     vec3 normal = calculateNormal();
+
     vec3 view = normalize(vec3(ubo.cameraPos) - inPosition);
     vec3 reflection = - normalize(reflect(view, normal));
 
@@ -153,7 +153,7 @@ void main()
     {
         float F0 = 0.04;
 
-        pbrInfo.NdotV = max(dot(normal, view), 0.001);
+        pbrInfo.NdotV = clamp(dot(normal, view), 0.001, 1.0);
         
         pbrInfo.diffuseColor = material.albedo.rgb * (vec3(1.0) - vec3(F0));
         pbrInfo.diffuseColor *= 1.0 - material.metallicFactor;
@@ -177,18 +177,16 @@ void main()
     IBLinfo iblInfo;
     {
         // HDR textures are already linear
-        iblInfo.diffuseLight = texture(prefilteredEnvMapSampler, normal).rgb;
-
-        vec2 brdfSamplePoint = clamp(vec2(pbrInfo.NdotV,1.0 - pbrInfo.perceptualRoughness),vec2(0.0),vec2(1.0));
+        iblInfo.diffuseLight = texture(irradianceMapSampler, normal).rgb;
 
         float mipCount = float(textureQueryLevels(prefilteredEnvMapSampler));
         float lod = pbrInfo.perceptualRoughness * mipCount;
 
-        iblInfo.brdf = texture(BRDFlutSampler, vec2( pbrInfo.NdotV, material.roughnessFactor)).rg;
+        iblInfo.brdf = texture(BRDFlutSampler, vec2( pbrInfo.NdotV, pbrInfo.perceptualRoughness)).rg;
         iblInfo.specularLight = textureLod(prefilteredEnvMapSampler,reflection.xyz,lod).rgb;
    }
 
-    vec3 color = getIBLcontribution(pbrInfo, iblInfo, material);
+    vec3 color = getIBLcontribution(pbrInfo, iblInfo, material);;
 
     for(int i = 0 ; i < ubo.lightsCount; ++i)
     {
@@ -217,10 +215,11 @@ void main()
     // Emissive
     color = material.emissiveColor + color;
 
-    color = pow(color,vec3(1.0/2.2));
+    color = pow(color,vec3(1.0 / 2.2));
 
     outColor = ambient * vec4(color, 1.0);
-//    outColor = vec4(vec3(texture(shadowMapSampler, inShadowCoords.xy / inShadowCoords.w * 0.5 + 0.5).r), 1.0);
+//    outColor = ambient * vec4((iblInfo.specularLight *(pbrInfo.specularColor * iblInfo.brdf.x + iblInfo.brdf.y)) , 1.0);
+
 }
 
 vec3 getIBLcontribution(PBRinfo pbrInfo, IBLinfo iblInfo, Material material)
@@ -235,12 +234,19 @@ vec3 getIBLcontribution(PBRinfo pbrInfo, IBLinfo iblInfo, Material material)
 
 vec3 calculateNormal()
 {
-    mat3 TBN = mat3(inTangent, inBitangent, inNormal);
+    vec3 tangentNormal = texture(normalSampler,inTexCoord).xyz ;
 
-    if (ubo.hasNormalMap == 1)
-        return normalize(TBN * texture(normalSampler, inTexCoord).rgb * 2.0 -1.0 );
-    else
-        return inNormal; 
+	vec3 q1 = dFdx(inPosition);
+	vec3 q2 = dFdy(inPosition);
+	vec2 st1 = dFdx(inTexCoord);
+	vec2 st2 = dFdy(inTexCoord);
+
+    vec3 N = normalize(inNormal);
+	vec3 T = normalize(q1 * st2.t - q2 * st1.t);
+	vec3 B = -normalize(cross(N, T));
+	mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * tangentNormal);
 }
 
 float filterPCF(vec3 shadowCoords)
@@ -307,7 +313,8 @@ vec3 calculateDirLight(int i, vec3 normal, vec3 view, Material material, PBRinfo
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - material.metallicFactor;
 
-    vec3 numerator = D * G * F;
+//    vec3 numerator = D * G * F;
+    vec3 numerator = D*G*F;
     float denominator = (4.0 *pbrInfo.NdotV * pbrInfo.NdotL);
     
     vec3 diffuse = kD * (pbrInfo.diffuseColor / PI);
@@ -462,5 +469,5 @@ float geometricOcclusion(PBRinfo pbrInfo)
  */
 vec3 fresnelSchlick(PBRinfo pbrInfo)
 {
-    return (pbrInfo.reflectance0 + (pbrInfo.reflectance90 - pbrInfo.reflectance0) *pow(1.0 - pbrInfo.VdotH, 5.0));
+    return (pbrInfo.reflectance0 + (pbrInfo.reflectance90 - pbrInfo.reflectance0) *pow(clamp(1.0 - pbrInfo.VdotH, 0.0, 1.0), 5.0));
 }

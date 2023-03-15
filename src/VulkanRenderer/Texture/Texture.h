@@ -1,34 +1,11 @@
 #pragma once
 
 #include <string>
-
 #include <vulkan/vulkan.h>
-#include <stb_image.h>
-#include <stb_image_write.h>
-#include <gli/gli.hpp>
-#include <gli/texture2d.hpp>
-#include <gli/texture.hpp>
-#include <gli/load_ktx.hpp>
 
+
+#include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Command/CommandPool.h"
-#include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
-#include "VulkanRenderer/Image/Image.h"
-
-
-enum TextureType
-{
-    NORMAL_TEXTURE = 0,
-    CUBEMAP = 1
-};
-
-enum UsageType
-{
-    // It's just used to color meshes.
-    // (this is the most common one).
-    TO_COLOR = 0,
-    ENVIRONMENTAL_MAP = 1,
-    IRRADIANCE_MAP = 2,
-};
 
 struct TextureToLoadInfo
 {
@@ -38,39 +15,97 @@ struct TextureToLoadInfo
     int         desiredChannels;
 };
 
-class Texture
+
+class TextureBase
 {
-
 public:
+    TextureBase(const std::string name) { m_name = name; }
 
-    Texture();
-    Texture(
-        const VkDevice& logicalDevice,
-        const TextureType& type,
-        const VkSampleCountFlagBits& samplesCount,
-        const int& desiredChannels = 4,
-        const UsageType& usage = UsageType::TO_COLOR
-    );
-    virtual ~Texture() = 0;
+    TextureBase(
+        const std::string name,
+        const VkFormat& format,
+        const VkImageCreateFlags flags,
+        const VkImageViewType viewType
+    ) :m_name(name), m_format(format), m_imageFlag(flags), m_viewType(viewType) 
+    {}
 
-    const VkImageView& getImageView() const;
-    const VkSampler& getSampler() const;
-    const UsageType& getUsage() const;
+    const std::string&              getName() const                 { return m_name; }
+    const VkImage&                  getImage() const                { return m_image; }
+    const VkDescriptorImageInfo&    getDescriptorImageInfo() const  { return m_imageInfo; }
+    const VkImageView&              getImageView() const            { return m_imageInfo.imageView; }
+    const VkSampler&                getSampler() const              { return m_imageInfo.sampler; }
+    const VmaAllocation&            getAllocation() const           { return m_deviceAllocation; }
+    const VkExtent2D&               getExtent() const               { return m_extent; }
+    const VkFormat&                 getFormat() const               { return m_format; }
 
-    void destroy();
+
+    std::string&            getName()               { return m_name; }
+    VkImage&                getImage()              { return m_image; }
+    VkDescriptorImageInfo&  getDescriptorImageInfo(){ return m_imageInfo; }
+    VkImageView&            getImageView()          { return m_imageInfo.imageView; }
+    VkSampler&              getSampler()            { return m_imageInfo.sampler; }
+    VmaAllocation&          getAllocation()         { return m_deviceAllocation; }
+    VkExtent2D&             getExtent()             { return m_extent; }
+    VkFormat&               getFormat()             { return m_format; }
+
+
+    void destroy() ;
 
 protected:
 
-    VkDevice              m_logicalDevice;
+    VkImage m_image = VK_NULL_HANDLE; ///<image handle
 
-    Image                 m_image;
+    VkDescriptorImageInfo m_imageInfo = {
+        VK_NULL_HANDLE, ///<sampler
+        VK_NULL_HANDLE, ///<image view
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL ///<layout
+    };
+    VmaAllocation m_deviceAllocation; ///<VMA allocation info
+    VkExtent2D m_extent = { 0, 0 }; ///<map extent
 
-    TextureType           m_type;
-    UsageType             m_usage;
-    int                   m_width;
-    int                   m_height;
-    int                   m_channels;
-    int                   m_desiredChannels;
-    uint32_t              m_mipLevels;
-    VkSampleCountFlagBits m_samplesCount;
+    uint32_t            m_mipmapLevel;
+    VkFormat            m_format; ///<texture format
+    VkImageCreateFlags  m_imageFlag;
+    VkImageViewType     m_viewType;
+
+    std::string         m_name;
+};
+
+
+class NormalTexture : public TextureBase
+{
+public:
+    NormalTexture(
+        const std::string name,
+        const std::string& basedir,
+        const VkFormat& format,
+        const VkImageCreateFlags flags = 0,
+        const VkImageViewType viewtype = VK_IMAGE_VIEW_TYPE_2D
+    );
+
+    ///Empty constructor
+    NormalTexture(std::string name);
+
+    ~NormalTexture() {}
+ 
+private:
+};
+
+
+class CubeMapTexture : public TextureBase
+{
+public:
+    CubeMapTexture(
+        const std::string name,
+        const std::string& basedir,
+        const VkFormat& format,
+        VkImageCreateFlags flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
+        VkImageViewType viewtype = VK_IMAGE_VIEW_TYPE_CUBE
+    );
+
+    ~CubeMapTexture() {}
+
+    void destroy();
+
+private:
 };

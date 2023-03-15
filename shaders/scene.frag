@@ -125,9 +125,9 @@ float ambient = 0.3;
 void main()
 {
     vec3 normal = calculateNormal();
-
     vec3 view = normalize(vec3(ubo.cameraPos) - inPosition);
     vec3 reflection = - normalize(reflect(view, normal));
+    reflection.y = - reflection.y;
 
     Material material;
     {
@@ -177,7 +177,7 @@ void main()
     IBLinfo iblInfo;
     {
         // HDR textures are already linear
-        iblInfo.diffuseLight = texture(irradianceMapSampler, normal).rgb;
+        iblInfo.diffuseLight = texture(irradianceMapSampler, vec3(normal.x, -normal.y, normal.z)).rgb;
 
         float mipCount = float(textureQueryLevels(prefilteredEnvMapSampler));
         float lod = pbrInfo.perceptualRoughness * mipCount;
@@ -218,7 +218,7 @@ void main()
     color = pow(color,vec3(1.0 / 2.2));
 
     outColor = ambient * vec4(color, 1.0);
-//    outColor = ambient * vec4((iblInfo.specularLight *(pbrInfo.specularColor * iblInfo.brdf.x + iblInfo.brdf.y)) , 1.0);
+//    outColor =  vec4((iblInfo.diffuseLight) , 1.0);
 
 }
 

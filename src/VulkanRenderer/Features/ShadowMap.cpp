@@ -15,45 +15,54 @@
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptor/Types/UBO/UBOutils.h"
-#include "VulkanRenderer/Image/ImageManager.h"
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 
+#include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Renderer.h" 
+
 template<typename T>
 ShadowMap<T>::ShadowMap(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
     const VkExtent2D& extent,
     const uint32_t imagesCount,
     const VkFormat& format,
     const uint32_t& uboCount,
     const std::vector<Mesh<T>>* meshes,
     const std::vector<size_t>& modelIndices
-) : m_logicalDevice(logicalDevice), m_width(extent.width), m_height(extent.height), m_modelIndices(modelIndices) {
+) :  m_width(extent.width), m_height(extent.height), m_modelIndices(modelIndices) {
 
-    m_image = Image(
-        physicalDevice, logicalDevice,
-        m_width, m_height,
+ 
+    m_texture = std::make_shared<NormalTexture>("ShadowMap");
+    m_texture->getFormat() = format;
+    m_texture->getExtent() = VkExtent2D({m_width,m_height});
+
+
+    BufferManager::bufferCreateDepthResources(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getVmaAllocator(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_texture->getExtent(),
         format,
-        VK_IMAGE_TILING_OPTIMAL,
-        (VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        false,
-        1,
         VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_ASPECT_DEPTH_BIT,
-        VK_COMPONENT_SWIZZLE_R,
-        VK_COMPONENT_SWIZZLE_G,
-        VK_COMPONENT_SWIZZLE_B,
-        VK_COMPONENT_SWIZZLE_A,
-        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        VK_FILTER_LINEAR
+        &m_texture->getImage(),
+        &m_texture->getAllocation(),
+        &m_texture->getImageView()
     );
 
-    createUBO(physicalDevice, uboCount);
+
+    BufferManager::bufferCreateTextureSampler(
+        getRendererPointer()->getDevice(),
+        1,
+        VK_FILTER_LINEAR,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        &m_texture->getSampler()
+    );
+
+    createUBO( uboCount);
     createRenderPass(format);
     createFramebuffer(imagesCount);
     createGraphicsPipeline(extent);
@@ -65,7 +74,7 @@ template<typename T>
 void ShadowMap<T>::createGraphicsPipeline(const VkExtent2D& extent)
 {
     m_graphicsPipeline = Graphics(
-        m_logicalDevice,
+        getRendererPointer()->getDevice(),
         GraphicsPipelineType::SHADOWMAP,
         extent,
         m_renderPass,
@@ -86,7 +95,7 @@ ShadowMap<T>::~ShadowMap() {}
 template<typename T>
 void ShadowMap<T>::createCommandPool(const VkCommandPoolCreateFlags& flags, const uint32_t& graphicsFamilyIndex)
 {
-    m_commandPool = std::make_shared<CommandPool>(m_logicalDevice, flags, graphicsFamilyIndex);
+    m_commandPool = std::make_shared<CommandPool>(getRendererPointer()->getDevice(), flags, graphicsFamilyIndex);
 }
 
 template<typename T>
@@ -116,7 +125,7 @@ void ShadowMap<T>::updateUBO(
     m_basicInfo.lightSpace = proj * view;
 
     size_t size = sizeof(m_basicInfo);
-    UBOutils::updateUBO(m_logicalDevice, m_shadowModelInfo[index].modelUBO, size, &m_basicInfo, currentFrame);
+    UBOutils::updateUBO(getRendererPointer()->getDevice(), m_shadowModelInfo[index].modelUBO, size, &m_basicInfo, currentFrame);
 }
 
 template<typename T>
@@ -135,17 +144,22 @@ template<typename T>
 void ShadowMap<T>::createDescriptorPool()
 {
     m_descriptorPool = DescriptorPool(
-        m_logicalDevice,
-        { {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, (uint32_t)m_modelIndices.size()*Config::MAX_FRAMES_IN_FLIGHT * GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT}},
-        m_modelIndices.size()* Config::MAX_FRAMES_IN_FLIGHT* GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT
+        getRendererPointer()->getDevice(),
+        { {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, (uint32_t)m_modelIndices.size() * Config::MAX_FRAMES_IN_FLIGHT * GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT} },
+        m_modelIndices.size() * Config::MAX_FRAMES_IN_FLIGHT * GRAPHICS_PIPELINE::SHADOWMAP::UBOS_COUNT
     );
 }
 
 template<typename T>
-void ShadowMap<T>::createUBO(const VkPhysicalDevice& physicalDevice, const uint32_t& uboCount)
+void ShadowMap<T>::createUBO(const uint32_t& uboCount)
 {
-    for(auto i : m_modelIndices)
-        m_shadowModelInfo[i].modelUBO = std::make_shared<UBO>(physicalDevice, m_logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::ShadowMap));
+    for (auto i : m_modelIndices)
+        m_shadowModelInfo[i].modelUBO = std::make_shared<UBO>(
+            getRendererPointer()->getPhysicalDevice(),
+            getRendererPointer()->getDevice(), 
+            uboCount, 
+            sizeof(DescriptorTypes::UniformBufferObject::ShadowMap)
+            );
 }
 
 template<typename T>
@@ -153,10 +167,10 @@ void ShadowMap<T>::createDescriptorSets()
 {
     for (auto i : m_modelIndices)
     {
-        const std::vector<UBO*>& ubo = { m_shadowModelInfo[i].modelUBO.get()};
+        const std::vector<UBO*>& ubo = { m_shadowModelInfo[i].modelUBO.get() };
 
         m_shadowModelInfo[i].modelDescriptorSets = DescriptorSets(
-            m_logicalDevice,
+            getRendererPointer()->getDevice(),
             GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
             {},
             {},
@@ -168,17 +182,22 @@ void ShadowMap<T>::createDescriptorSets()
     }
 }
 
+template<typename T>
+const std::shared_ptr<TextureBase> ShadowMap<T>::get() const
+{
+    return m_texture;
+}
 
 template<typename T>
 const VkImageView& ShadowMap<T>::getShadowMapView() const
 {
-    return m_image.getImageView();
+    return m_texture->getImageView();
 }
 
 template<typename T>
 const VkSampler& ShadowMap<T>::getSampler() const
 {
-    return m_image.getSampler();
+    return m_texture->getSampler();
 }
 
 template<typename T>
@@ -276,11 +295,11 @@ void ShadowMap<T>::createFramebuffer(const uint32_t& imagesCount)
     m_framebuffers.resize(imagesCount);
 
     // We'll write in the sampler to later use it in the scene fragment shader.
-    std::vector<VkImageView> attachments = { m_image.getImageView() };
+    std::vector<VkImageView> attachments = { m_texture->getImageView() };
 
     for (uint32_t i = 0; i < imagesCount; i++)
     {
-        FramebufferManager::createFramebuffer(m_logicalDevice, m_renderPass.get(), attachments, m_width, m_height, 1, m_framebuffers[i]);
+        FramebufferManager::createFramebuffer(getRendererPointer()->getDevice(), m_renderPass.get(), attachments, m_width, m_height, 1, m_framebuffers[i]);
     }
 }
 
@@ -289,8 +308,8 @@ void ShadowMap<T>::destroy()
 {
     m_graphicsPipeline.destroy();
     m_descriptorPool.destroy();
-    m_image.destroy();
-    
+    m_texture->destroy();
+
     for (auto info : m_shadowModelInfo)
         info.second.modelUBO->destroy();
 
@@ -299,7 +318,7 @@ void ShadowMap<T>::destroy()
     m_renderPass.destroy();
 
     for (auto& framebuffer : m_framebuffers)
-        vkDestroyFramebuffer(m_logicalDevice, framebuffer, nullptr);
+        vkDestroyFramebuffer(getRendererPointer()->getDevice(), framebuffer, nullptr);
 }
 
 template<typename T>
@@ -335,7 +354,7 @@ void ShadowMap<T>::createRenderPass(const VkFormat& depthBufferFormat)
     subpass.pDepthStencilAttachment = &shadowMapAttachmentRef;
 
     m_renderPass = RenderPass(
-        m_logicalDevice,
+        getRendererPointer()->getDevice(),
         { shadowMapAttachment },
         { subpass },
         {}

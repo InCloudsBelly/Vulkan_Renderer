@@ -48,7 +48,6 @@ public:
     VkExtent2D&             getExtent()             { return m_extent; }
     VkFormat&               getFormat()             { return m_format; }
 
-
     void destroy() ;
 
 protected:
@@ -84,7 +83,7 @@ public:
     );
 
     ///Empty constructor
-    NormalTexture(std::string name);
+    NormalTexture(const std::string name);
 
     ~NormalTexture() {}
  
@@ -105,7 +104,9 @@ public:
 
     ~CubeMapTexture() {}
 
-    void destroy();
+    ///Empty constructor
+    CubeMapTexture(const std::string name) : TextureBase(name) {}
+
 
 private:
 };

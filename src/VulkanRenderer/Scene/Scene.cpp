@@ -383,18 +383,14 @@ void Scene::upload(
 
 
         m_prefilteredIrradiance = std::make_shared<PrefilteredIrradiance<Attributes::SKYBOX::Vertex>>(
-            physicalDevice,
-            m_logicalDevice,
-            graphicsQueue,
-            commandPool,
-            Config::PREF_IRRADIANCE_DIM,
-            m_skybox->getMeshes(),
-            m_skybox->getEnvMap()
+                graphicsQueue,
+                commandPool,
+                Config::PREF_IRRADIANCE_DIM,
+                m_skybox->getMeshes(),
+                m_skybox->getEnvMap()
             );
 
         m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap<Attributes::SKYBOX::Vertex>>(
-                physicalDevice,
-                m_logicalDevice,
                 graphicsQueue,
                 commandPool,
                 Config::PREF_ENV_MAP_DIM,
@@ -405,11 +401,10 @@ void Scene::upload(
 
     VkDescriptorSetLayout descriptorSetLayout;
     DescriptorSetInfo descriptorSetInfo = {
-       &(m_prefilteredIrradiance->get()),
+       &(m_prefilteredIrradiance->get()->getDescriptorImageInfo()),
        &(m_BRDFlut->getDescriptorImageInfo()),
-       &(shadowMap->getShadowMapView()),
-       &(shadowMap->getSampler()),
-       &(m_prefilteredEnvMap->get())
+       &(shadowMap->get()->getDescriptorImageInfo()),
+       &(m_prefilteredEnvMap->get()->getDescriptorImageInfo())
     };
 
     for (auto& model : m_models)
@@ -465,7 +460,7 @@ void Scene::loadBRDFlut(
     std::string TextureName = "BRDF_LUT.tga";
     TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4};
 
-    m_BRDFlut = new NormalTexture(
+    m_BRDFlut = std::make_shared<NormalTexture>(
             TextureName,
             std::string(MODEL_DIR) + info.folderName ,
             info.format

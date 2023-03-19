@@ -7,29 +7,28 @@
 #include "VulkanRenderer/Model/ModelInfo.h"
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
-#include "VulkanRenderer/Image/ImageManager.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
 #include "VulkanRenderer/Texture/MipmapUtils.h"
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Command/CommandManager.h"
+#include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Renderer.h"
 
 template<typename T>
 PrefilteredEnvMap<T>::PrefilteredEnvMap(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
     const VkQueue& graphicsQueue,
     const std::shared_ptr<CommandPool>& commandPool,
     const uint32_t dim,
     const std::vector<Mesh<T>>& meshes,
     const std::shared_ptr<TextureBase>& envMap
-) : m_logicalDevice(logicalDevice), m_dim(dim), m_format(VK_FORMAT_R16G16B16A16_SFLOAT)
+) :  m_dim(dim), m_format(VK_FORMAT_R16G16B16A16_SFLOAT)
 {
     m_mipLevels = MipmapUtils::getAmountOfSupportedMipLevels(dim, dim);
 
-    createTargetImage(physicalDevice);
+    createTargetImage();
     createRenderPass();
-    createOffscreenFramebuffer(physicalDevice, graphicsQueue, commandPool);
+    createOffscreenFramebuffer( graphicsQueue, commandPool);
     createPipeline();
     createDescriptorPool();
     createDescriptorSet(envMap);
@@ -40,7 +39,7 @@ template<typename T>
 void PrefilteredEnvMap<T>::createDescriptorPool()
 {
     m_descriptorPool = DescriptorPool(
-        m_logicalDevice,
+         getRendererPointer()->getDevice(),
         {
            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,2 } 
         },
@@ -52,7 +51,7 @@ template<typename T>
 void PrefilteredEnvMap<T>::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
 {
     m_descriptorSets = DescriptorSets(
-        m_logicalDevice,
+         getRendererPointer()->getDevice(),
         {},
         GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::SAMPLERS_INFO,
         {envMap},
@@ -82,29 +81,18 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
 
     const VkCommandBuffer& commandBuffer = commandPool->getCommandBuffer(0);
 
-    // Change image layout for all cubemap faces to transfer destination
-    {
-        commandPool->resetCommandBuffer(0);
-        commandPool->beginCommandBuffer(0, commandBuffer);
-
-        VkImageMemoryBarrier imgMemoryBarrier{};
-        VkPipelineStageFlags sourceStage, destinationStage;
-        ImageManager::createImageMemoryBarrier(
-            m_mipLevels,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            true,
-            m_targetImage.get(),
-            imgMemoryBarrier,
-            sourceStage,
-            destinationStage
-        );
-
-        CommandManager::SYNCHRONIZATION::recordPipelineBarrier(sourceStage, destinationStage, 0, commandBuffer, {}, {}, { imgMemoryBarrier });
-
-        commandPool->endCommandBuffer(commandBuffer);
-        commandPool->submitCommandBuffer(graphicsQueue, { commandBuffer }, true, {}, std::nullopt, {}, std::nullopt);
-    }
+    BufferManager::bufferTransitionImageLayout(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_targetImage->getImage(),
+        m_targetImage->getFormat(),
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        m_mipLevels,
+        6,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    );
 
     for (uint32_t m = 0; m < m_mipLevels; m++)
     {
@@ -188,54 +176,34 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
             m_renderPass.end(commandBuffer);
 
             {
-                VkImageMemoryBarrier imgMemoryBarrier{};
-                VkPipelineStageFlags sourceStage, destinationStage;
-                ImageManager::createImageMemoryBarrier(
+                BufferManager::bufferTransitionImageLayout(
+                    getRendererPointer()->getDevice(),
+                    getRendererPointer()->getGraphicsQueue(),
+                    commandBuffer,
+                    m_offscreenImage->getImage(),
+                    m_offscreenImage->getFormat(),
+                    VK_IMAGE_ASPECT_COLOR_BIT,
+                    1,
                     1,
                     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    false,
-                    m_offscreenImage.get(),
-                    imgMemoryBarrier,
-                    sourceStage,
-                    destinationStage
-                );
-
-                CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
-                    sourceStage,
-                    destinationStage,
-                    0,
-                    commandBuffer,
-                    {},
-                    {},
-                    { imgMemoryBarrier }
+                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
                 );
             }
 
             copyRegionOfImage(face, m, viewportDim, commandBuffer);
 
             {
-                VkImageMemoryBarrier imgMemoryBarrier{};
-                VkPipelineStageFlags sourceStage, destinationStage;
-                ImageManager::createImageMemoryBarrier(
+                BufferManager::bufferTransitionImageLayout(
+                    getRendererPointer()->getDevice(),
+                    getRendererPointer()->getGraphicsQueue(),
+                    commandBuffer,
+                    m_offscreenImage->getImage(),
+                    m_offscreenImage->getFormat(),
+                    VK_IMAGE_ASPECT_COLOR_BIT,
+                    1,
                     1,
                     VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                    false,
-                    m_offscreenImage.get(),
-                    imgMemoryBarrier,
-                    sourceStage,
-                    destinationStage
-                );
-
-                CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
-                    sourceStage,
-                    destinationStage,
-                    0,
-                    commandBuffer,
-                    {},
-                    {},
-                    { imgMemoryBarrier }
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
                 );
             }
 
@@ -244,36 +212,18 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
         }
     }
 
-    {
-        commandPool->resetCommandBuffer(0);
-        commandPool->beginCommandBuffer(0, commandBuffer);
-
-        VkImageMemoryBarrier imgMemoryBarrier{};
-        VkPipelineStageFlags sourceStage, destinationStage;
-        ImageManager::createImageMemoryBarrier(
-            m_mipLevels,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            true,
-            m_targetImage.get(),
-            imgMemoryBarrier,
-            sourceStage,
-            destinationStage
-        );
-
-        CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
-            sourceStage,
-            destinationStage,
-            0,
-            commandBuffer,
-            {},
-            {},
-            { imgMemoryBarrier }
-        );
-
-        commandPool->endCommandBuffer(commandBuffer);
-        commandPool->submitCommandBuffer(graphicsQueue, { commandBuffer }, true, {}, std::nullopt, {}, std::nullopt);
-    }
+       BufferManager::bufferTransitionImageLayout(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_targetImage->getImage(),
+        m_targetImage->getFormat(),
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        m_mipLevels,
+        6,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    );
 }
 
 
@@ -304,9 +254,9 @@ void PrefilteredEnvMap<T>::copyRegionOfImage(
 
     vkCmdCopyImage(
         commandBuffer,
-        m_offscreenImage.get(),
+        m_offscreenImage->getImage(),
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        m_targetImage.get(),
+        m_targetImage->getImage(),
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1,
         &copyRegion
@@ -318,7 +268,7 @@ template<typename T>
 void PrefilteredEnvMap<T>::createPipeline()
 {
     m_graphicsPipeline = Graphics(
-        m_logicalDevice,
+         getRendererPointer()->getDevice(),
         GraphicsPipelineType::PREFILTER_ENV_MAP,
         { m_dim,m_dim },
         m_renderPass,
@@ -337,34 +287,50 @@ void PrefilteredEnvMap<T>::createPipeline()
 
 template<typename T>
 void PrefilteredEnvMap<T>::createOffscreenFramebuffer(
-    const VkPhysicalDevice& physicalDevice,
     const VkQueue& graphicsQueue,
     const std::shared_ptr<CommandPool>& commandPool
 ) {
 
-    m_offscreenImage = Image(
-        physicalDevice,
-        m_logicalDevice,
-        m_dim,
-        m_dim,
-        m_format,
-        VK_IMAGE_TILING_OPTIMAL,
+    m_offscreenImage = std::make_shared<NormalTexture>("Offscreen");
+    m_offscreenImage->getExtent() = VkExtent2D({ m_dim ,m_dim });
+    m_offscreenImage->getFormat() = m_format;
+
+    BufferManager::bufferCreateOffscreenResources(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getVmaAllocator(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_offscreenImage->getExtent(),
+        m_offscreenImage->getFormat(),
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        false,
         1,
+        1,
+        0,
         VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY
+        VK_IMAGE_VIEW_TYPE_2D,
+        &m_offscreenImage->getAllocation(),
+        m_offscreenImage
     );
 
-    std::vector<VkImageView> attachments = { m_offscreenImage.getImageView() };
+    BufferManager::bufferTransitionImageLayout(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_offscreenImage->getImage(),
+        m_offscreenImage->getFormat(),
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        1,
+        1,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+    );
+
+
+
+    std::vector<VkImageView> attachments = { m_offscreenImage->getImageView() };
 
     FramebufferManager::createFramebuffer(
-        m_logicalDevice,
+         getRendererPointer()->getDevice(),
         m_renderPass.get(),
         attachments,
         m_dim,
@@ -373,15 +339,17 @@ void PrefilteredEnvMap<T>::createOffscreenFramebuffer(
         m_framebuffer
     );
 
-    ImageManager::transitionImageLayout(
-        m_format,
+    BufferManager::bufferTransitionImageLayout(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_offscreenImage->getImage(),
+        m_offscreenImage->getFormat(),
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        1,
         1,
         VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        false,
-        commandPool,
-        graphicsQueue,
-        m_offscreenImage.get()
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
     );
 }
 
@@ -459,7 +427,7 @@ void PrefilteredEnvMap<T>::createRenderPass()
     );
 
     m_renderPass = RenderPass(
-        m_logicalDevice,
+         getRendererPointer()->getDevice(),
         { colorAttachment },
         { subPassDescript },
         dependencies
@@ -468,28 +436,27 @@ void PrefilteredEnvMap<T>::createRenderPass()
 
 
 template<typename T>
-void PrefilteredEnvMap<T>::createTargetImage(const VkPhysicalDevice& physicalDevice) 
+void PrefilteredEnvMap<T>::createTargetImage() 
 {
+    m_targetImage = std::make_shared<CubeMapTexture>("PreEnv");
+    m_targetImage->getExtent() = VkExtent2D({ m_dim, m_dim });
+    m_targetImage->getFormat() = m_format;
 
-    m_targetImage = Image(
-        physicalDevice,
-        m_logicalDevice,
-        m_dim,
-        m_dim,
-        m_format,
-        VK_IMAGE_TILING_OPTIMAL,
+    BufferManager::bufferCreateOffscreenResources(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getVmaAllocator(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_targetImage->getExtent(),
+        m_targetImage->getFormat(),
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        true,
         floor(log2(m_dim)) + 1,
+        6,
+        VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
         VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        VK_FILTER_LINEAR
+        VK_IMAGE_VIEW_TYPE_CUBE,
+        &m_targetImage->getAllocation(),
+        m_targetImage
     );
 
 }
@@ -502,15 +469,15 @@ void PrefilteredEnvMap<T>::destroy()
 {
     m_graphicsPipeline.destroy();
     m_descriptorPool.destroy();
-    m_targetImage.destroy();
-    m_offscreenImage.destroy();
+    m_targetImage->destroy();
+    m_offscreenImage->destroy();
     m_renderPass.destroy();
 
-    vkDestroyFramebuffer(m_logicalDevice, m_framebuffer, nullptr);
+    vkDestroyFramebuffer( getRendererPointer()->getDevice(), m_framebuffer, nullptr);
 }
 
 template<typename T>
-const Image& PrefilteredEnvMap<T>::get() const
+const std::shared_ptr<TextureBase> PrefilteredEnvMap<T>::get() const
 {
     return m_targetImage;
 }

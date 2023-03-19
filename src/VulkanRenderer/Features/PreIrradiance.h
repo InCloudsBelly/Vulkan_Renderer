@@ -8,7 +8,6 @@
 
 #include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/Command/CommandPool.h"
-#include "VulkanRenderer/Image/Image.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
@@ -30,8 +29,6 @@ class PrefilteredIrradiance
 public:
 
     PrefilteredIrradiance(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const VkQueue& graphicsQueue,
         const std::shared_ptr<CommandPool>& commandPool,
         const uint32_t dim,
@@ -39,19 +36,20 @@ public:
         const std::shared_ptr<TextureBase>& envMap
     );
     ~PrefilteredIrradiance();
+
     void destroy();
-    const Image& get() const;
+
+    const std::shared_ptr<TextureBase> get() const;
 
 private:
 
     void createPipeline();
     void createOffscreenFramebuffer(
-        const VkPhysicalDevice& physicalDevice,
         const VkQueue& graphicsQueue,
         const std::shared_ptr<CommandPool>& commandPool
     );
     void createRenderPass();
-    void createTargetImage(const VkPhysicalDevice& physicalDevice);
+    void createTargetImage();
     void createDescriptorPool();
     void createDescriptorSet(const std::shared_ptr<TextureBase>& envMap);
     void copyRegionOfImage(
@@ -66,14 +64,13 @@ private:
         const std::vector<Mesh<T>>& meshes
     );
 
-    VkDevice                         m_logicalDevice;
 
     uint32_t                         m_dim;
     VkFormat                         m_format;
     uint32_t                         m_mipLevels;
 
-    Image                            m_targetImage;
-    Image                            m_offscreenImage;
+    std::shared_ptr<TextureBase>    m_targetImage;
+    std::shared_ptr<TextureBase>    m_offscreenImage;
 
     RenderPass                       m_renderPass;
 

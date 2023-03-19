@@ -115,7 +115,7 @@ private:
 
 	// IBL
 	Computation                         m_BRDFcomp;
-	NormalTexture*						m_BRDFlut;
+	std::shared_ptr<NormalTexture>		m_BRDFlut;
 
 
 	std::shared_ptr<PrefilteredEnvMap<Attributes::SKYBOX::Vertex>> m_prefilteredEnvMap;

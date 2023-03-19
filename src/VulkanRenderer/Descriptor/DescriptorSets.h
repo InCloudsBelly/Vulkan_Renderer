@@ -7,17 +7,15 @@
 #include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
-#include "VulkanRenderer/Image/Image.h"
 #include "VulkanRenderer/Texture/Texture.h"
 
 
 struct DescriptorSetInfo
 {
-	const Image*			irradianceMap;
-	const VkDescriptorImageInfo* BRDFlutInfo;
-	const VkImageView*		shadowMapView;
-	const VkSampler*		shadowMapSampler;
-	const Image*			prefilteredEnvMap;
+	const VkDescriptorImageInfo*				irradianceMap;
+	const VkDescriptorImageInfo*				BRDFlutInfo;
+	const VkDescriptorImageInfo*				shadowMap;
+	const VkDescriptorImageInfo*				prefilteredEnvMap;
 
 };
 

@@ -63,7 +63,6 @@
 #include "VulkanRenderer/GUI/GUI.h"
 
 #include "VulkanRenderer/Features/ShadowMap.h"
-#include "VulkanRenderer/Image/ImageManager.h"
 
 glm::fvec3 cameraPos = glm::fvec3(2.0f, 2.0f, 2.0f);
 
@@ -188,27 +187,7 @@ void Renderer::createSyncObjects()
 
 void Renderer::createCommandPools()
 {
-    // Graphics Command Pool
-    {
-        m_commandPoolForGraphics = std::make_shared<CommandPool>(
-                m_device->getLogicalDevice(),
-                VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                m_qfIndices.graphicsFamily.value()
-            );
-
-        m_commandPoolForGraphics->allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
-    }
-
-    // Compute Command Pool
-    {
-        m_commandPoolForCompute = std::make_shared<CommandPool>(
-                m_device->getLogicalDevice(),
-                VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                m_qfIndices.computeFamily.value()
-            );
-
-        m_commandPoolForCompute->allocCommandBuffers(1);
-    }
+    
 
     // Features Command Pool
     {
@@ -269,11 +248,34 @@ void Renderer::initVulkan()
         1 // just for the BRDF(for now..)
     );
 
+    //------------------------------Graphics Pools----------------------------
+    // Graphics Command Pool
+    {
+        m_commandPoolForGraphics = std::make_shared<CommandPool>(
+            m_device->getLogicalDevice(),
+            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            m_qfIndices.graphicsFamily.value()
+            );
+
+        m_commandPoolForGraphics->allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+    }
+
+    // Compute Command Pool
+    {
+        m_commandPoolForCompute = std::make_shared<CommandPool>(
+            m_device->getLogicalDevice(),
+            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            m_qfIndices.computeFamily.value()
+            );
+
+        m_commandPoolForCompute->allocCommandBuffers(1);
+    }
+
 
     // -------------------------------Main Features------------------------------
-    m_msaa = MSAA(m_device->getPhysicalDevice(), m_device->getLogicalDevice(), m_swapchain->getExtent(), m_swapchain->getImageFormat());
+    m_msaa = MSAA(m_swapchain->getExtent(), m_swapchain->getImageFormat());
 
-    m_depthBuffer = DepthBuffer(m_device->getPhysicalDevice(),m_device->getLogicalDevice(),m_swapchain->getExtent(), m_msaa.getSamplesCount());
+    m_depthBuffer = DepthBuffer(m_swapchain->getExtent(), m_msaa.getSamplesCount());
 
  
     m_scene = Scene(
@@ -296,8 +298,6 @@ void Renderer::initVulkan()
 
     const VkExtent2D shadowExtent = { 2 * m_swapchain->getExtent().height, 2 * m_swapchain->getExtent().width };
     m_shadowMap = std::make_shared<ShadowMap<Attributes::PBR::Vertex>>(
-            m_device->getPhysicalDevice(),
-            m_device->getLogicalDevice(),
             shadowExtent,
             m_swapchain->getImageCount(),
             m_depthBuffer.getFormat(),

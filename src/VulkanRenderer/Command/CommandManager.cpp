@@ -326,7 +326,7 @@ VkResult CommandManager::cmdSubmitCommandBuffer(VkDevice device, VkQueue queue, 
 	* \returns a new VkCommandBuffer to record commands into
 	*
 	*/
-VkCommandBuffer CommandManager::cmdBeginSingleTimeCommands(VkDevice device, VkCommandPool commandPool)
+VkCommandBuffer CommandManager::cmdBeginSingleTimeCommands(VkDevice device,  VkCommandPool commandPool)
 {
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;

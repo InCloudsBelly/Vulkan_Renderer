@@ -68,6 +68,8 @@ NormalTexture::NormalTexture(
         BufferManager::bufferCreateTextureSampler(
             getRendererPointer()->getDevice(),
             m_mipmapLevel,
+            VK_FILTER_LINEAR,
+            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             &m_imageInfo.sampler
         )
     );
@@ -82,9 +84,11 @@ NormalTexture::NormalTexture(
         m_format,
         m_mipmapLevel
     );
-
-   
 }
+
+NormalTexture::NormalTexture(const std::string name)
+    :TextureBase(name)
+{}
 
 
 CubeMapTexture::CubeMapTexture(
@@ -125,6 +129,11 @@ CubeMapTexture::CubeMapTexture(
     );
 
     CHECKRESULT(
-        BufferManager::bufferCreateTextureSampler(getRendererPointer()->getDevice(), 1 ,&m_imageInfo.sampler)
+        BufferManager::bufferCreateTextureSampler(
+            getRendererPointer()->getDevice(),
+            1 ,
+            VK_FILTER_LINEAR,
+            VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            &m_imageInfo.sampler)
     );
 }

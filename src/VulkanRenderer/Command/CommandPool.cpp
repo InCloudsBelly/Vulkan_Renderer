@@ -32,6 +32,11 @@ const VkCommandPool& CommandPool::get() const
 	return m_commandPool;
 }
 
+VkCommandPool CommandPool::get()
+{
+	return m_commandPool;
+}
+
 
 void CommandPool::destroy()
 {

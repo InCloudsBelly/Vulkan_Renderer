@@ -71,8 +71,8 @@ DescriptorSets::DescriptorSets(
         if (additionalTextures != nullptr)
         {
             createDescriptorImageInfo(
-                additionalTextures->irradianceMap->getImageView(),
-                additionalTextures->irradianceMap->getSampler(),
+                additionalTextures->irradianceMap->imageView,
+                additionalTextures->irradianceMap->sampler,
                 imageInfos[samplersInfo.size() - 4]
             );
 
@@ -83,18 +83,17 @@ DescriptorSets::DescriptorSets(
             );
 
             createDescriptorImageInfo(
-                additionalTextures->prefilteredEnvMap->getImageView(),
-                additionalTextures->prefilteredEnvMap->getSampler(),
+                additionalTextures->prefilteredEnvMap->imageView,
+                additionalTextures->prefilteredEnvMap->sampler,
                 imageInfos[samplersInfo.size() - 2]
             );
 
             createDescriptorImageInfo(
-                *(additionalTextures->shadowMapView),
-                *(additionalTextures->shadowMapSampler),
+                additionalTextures->shadowMap->imageView,
+                additionalTextures->shadowMap->sampler,
                 imageInfos[samplersInfo.size() - 1]
             );
 
-            createDescriptorImageInfo(*(additionalTextures->shadowMapView), *(additionalTextures->shadowMapSampler), imageInfos[samplersInfo.size() - 1]);
         }
 
 

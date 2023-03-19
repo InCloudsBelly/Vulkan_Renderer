@@ -4,8 +4,6 @@
 #include <string>
 #include <memory>
 
-#include "VulkanRenderer/Image/Image.h"
-#include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Texture/Texture.h"
 
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"

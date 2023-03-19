@@ -7,11 +7,13 @@
 #include <stdexcept>
 
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
-#include "VulkanRenderer/Image/ImageManager.h"
+#include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/Features/MSAA.h"
 #include "VulkanRenderer/Features/DepthBuffer.h"
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
+
+#include "VulkanRenderer/Renderer.h"
 
 Swapchain::Swapchain() {}
 Swapchain::~Swapchain() {}
@@ -126,18 +128,15 @@ void Swapchain::createAllImageViews()
 
 	for (size_t i = 0; i < m_images.size(); i++)
 	{
-		ImageManager::createImageView(
-			m_logicalDevice,
-			m_imageFormat,
+		BufferManager::bufferCreateImageView(
+			getRendererPointer()->getDevice(),
 			m_images[i],
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			false,
+			m_imageFormat,
+			VK_IMAGE_VIEW_TYPE_2D,
 			1,
-			VK_COMPONENT_SWIZZLE_IDENTITY,
-			VK_COMPONENT_SWIZZLE_IDENTITY,
-			VK_COMPONENT_SWIZZLE_IDENTITY,
-			VK_COMPONENT_SWIZZLE_IDENTITY,
-			m_imageViews[i]
+			1,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			&m_imageViews[i]
 		);
 	}
 }

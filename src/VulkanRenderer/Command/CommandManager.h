@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include <vector>
+#include <memory>
 #include <VMA/vk_mem_alloc.h>
 
 #include "VulkanRenderer/Pipeline/Pipeline.h"

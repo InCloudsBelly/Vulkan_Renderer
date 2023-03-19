@@ -8,6 +8,7 @@
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 #include "VulkanRenderer/Model/Attributes.h"
 
+#include "VulkanRenderer/Texture/Texture.h"
 
 
 namespace BufferManager
@@ -108,9 +109,9 @@ namespace BufferManager
 
     VkResult bufferCreateImageView(VkDevice device, VkImage image, VkFormat format, VkImageViewType viewtype,uint32_t mipmapLevel , uint32_t layerCount, VkImageAspectFlags aspectFlags, VkImageView* imageView);
 
-    VkResult bufferCreateDepthResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D swapChainExtent, VkFormat depthFormat, VkImage* depthImage, VmaAllocation* depthImageAllocation, VkImageView* depthImageView);
+    VkResult bufferCreateDepthResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D swapChainExtent, VkFormat depthFormat, VkSampleCountFlagBits sampleFlages, VkImage* depthImage, VmaAllocation* depthImageAllocation, VkImageView* depthImageView);
 
-    VkResult bufferCreateOffscreenResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D extent, VkFormat format, VkImage* image, VmaAllocation* colorImageAllocation, VkImageView* colorImageView);
+    VkResult bufferCreateOffscreenResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, uint32_t miplevels,uint32_t arrayLayers, VkImageCreateFlags flags, VkSampleCountFlagBits sampleCounts, VkImageViewType viewType,  VmaAllocation* colorImageAllocation, std::shared_ptr<TextureBase> texture);
 
     VkResult bufferCreateImage(
         VmaAllocator allocator,
@@ -122,6 +123,7 @@ namespace BufferManager
         VkImageTiling tiling,
         VkImageUsageFlags usage,
         VkImageCreateFlags flags,
+        VkSampleCountFlagBits sampleCounts,
         VkImage* image,
         VmaAllocation* allocation
     );
@@ -145,7 +147,7 @@ namespace BufferManager
         bufferCreateTextureCubeMap(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::string basedir,std::string name, VkFormat& format, VkImageCreateFlags flags, VkImage* textureImage, VmaAllocation* textureImageAllocation, VkExtent2D* extent);
 
     //VkResult bufferCreateTexturecubeImage(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, gli::texture_cube &cube, VkImage *textureImage, VmaAllocation *textureImageAllocation, VkFormat *pformat);
-    VkResult bufferCreateTextureSampler(VkDevice device,uint32_t mipmapLevel, VkSampler* textureSampler);
+    VkResult bufferCreateTextureSampler(VkDevice device,uint32_t mipmapLevel, VkFilter filter, VkSamplerAddressMode addressMode, VkSampler* textureSampler);
 
     VkResult bufferCreateFramebuffers(VkDevice device, std::vector<VkImageView> imageViews, std::vector<VkImageView> depthImageViews, VkRenderPass renderPass, VkExtent2D extent, std::vector<VkFramebuffer>& frameBuffers);
 

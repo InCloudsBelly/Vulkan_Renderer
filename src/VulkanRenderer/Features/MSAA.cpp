@@ -2,40 +2,40 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Image/imageManager.h"
-#include "VulkanRenderer/Image/Image.h"
 
 #include "VulkanRenderer/Features/FeaturesUtils.h"
+
+#include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Renderer.h"
+
 
 MSAA::MSAA() {}
 
 MSAA::MSAA(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
     const VkExtent2D& swapchainExtent,
     const VkFormat& swapchainFormat
 ) {
-    m_samplesCount = FeaturesUtils::getMaxUsableSampleCount(
-        physicalDevice
-    );
+    m_samplesCount = FeaturesUtils::getMaxUsableSampleCount(getRendererPointer()->getPhysicalDevice());
 
-    m_image = Image(
-        physicalDevice,
-        logicalDevice,
-        swapchainExtent.width,
-        swapchainExtent.height,
-        swapchainFormat,
-        VK_IMAGE_TILING_OPTIMAL,
-        (VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT),
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        false,
+    m_image = std::make_shared<NormalTexture>("MSAA");
+    m_image->getFormat() = swapchainFormat;
+    m_image->getExtent() = VkExtent2D({ swapchainExtent.width,swapchainExtent.height });
+
+    BufferManager::bufferCreateOffscreenResources(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getVmaAllocator(),
+        getRendererPointer()->getGraphicsQueue(),
+        getRendererPointer()->getCommandPool(),
+        m_image->getExtent(),
+        m_image->getFormat(),
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         1,
+        1,
+        0,
         m_samplesCount,
-        VK_IMAGE_ASPECT_COLOR_BIT,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY,
-        VK_COMPONENT_SWIZZLE_IDENTITY
+        VK_IMAGE_VIEW_TYPE_2D,
+        &m_image->getAllocation(),
+        m_image
     );
 }
 
@@ -49,10 +49,10 @@ const VkSampleCountFlagBits& MSAA::getSamplesCount() const
 
 void MSAA::destroy()
 {
-    m_image.destroy();
+    m_image->destroy();
 }
 
 const VkImageView& MSAA::getImageView() const
 {
-    return m_image.getImageView();
+    return m_image->getImageView();
 }

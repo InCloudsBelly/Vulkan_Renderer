@@ -17,6 +17,7 @@ public:
 	~CommandPool();
 
 	const VkCommandPool& get() const;
+	VkCommandPool get();
 
 	void beginCommandBuffer(const VkCommandBufferUsageFlags& flags, const VkCommandBuffer& commandBuffer);
 	void beginCommandBuffer(const VkCommandBufferUsageFlags& flags, const uint32_t& cmdBufferIndex);

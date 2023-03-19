@@ -15,6 +15,7 @@
 #include "VulkanRenderer/Model/Mesh.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 
+#include "VulkanRenderer/Texture/Texture.h"
 
 template<typename T>
 class ShadowMap
@@ -29,8 +30,6 @@ public:
 
 
 	ShadowMap(
-		const VkPhysicalDevice& physicalDevice,
-		const VkDevice& logicalDevice,
 		const VkExtent2D& extent,
 		const uint32_t imagesCount,
 		const VkFormat& format,
@@ -64,7 +63,7 @@ public:
 
 	void allocCommandBuffers(const uint32_t& commandBuffersCount);
 
-
+	const std::shared_ptr<TextureBase> get() const;
 	const VkImageView& getShadowMapView() const;
 	const VkSampler& getSampler() const;
 	const glm::mat4& getLightSpace() const;
@@ -78,7 +77,7 @@ public:
 
 private:
 
-	void createUBO(const VkPhysicalDevice& physicalDevice, const uint32_t& uboCount);
+	void createUBO( const uint32_t& uboCount);
 
 	void createDescriptorPool();
 	void createDescriptorSets();
@@ -86,12 +85,11 @@ private:
 	void createRenderPass(const VkFormat& depthBufferFormat);
 	void createFramebuffer(const uint32_t& imagesCount);
 
-	VkDevice                         m_logicalDevice;
 
 	uint32_t                         m_width;
 	uint32_t                         m_height;
 
-	Image                            m_image;
+	std::shared_ptr<TextureBase>	 m_texture;
 
 	RenderPass                       m_renderPass;
 
@@ -105,7 +103,7 @@ private:
 	Graphics                         m_graphicsPipeline;
 
 	DescriptorTypes::UniformBufferObject::ShadowMap m_basicInfo;
-	
+
 	mutable std::unordered_map<size_t, ShadowModelInfo>	m_shadowModelInfo;
 	const std::vector<size_t>			m_modelIndices;
 

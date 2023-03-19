@@ -105,26 +105,27 @@ int main()
 
         // SCENE 2
 
-       /* {
-            app.addSkybox("countryClub.hdr", "CountryClub");
-            app.addObjectPBR(
-                "DamagedHelmet",
-                "damagedHelmet",
-                "DamagedHelmet.gltf",
-                glm::fvec3(0.0f),
-                glm::fvec3(0.0f),
-                glm::fvec3(1.0f)
-            );
-            app.addDirectionalLight(
-                "Sun",
-                "lightSphereDefault",
-                "lightSphere.obj",
-                glm::fvec3(1.0f),
-                glm::fvec3(1.0f, 32.18f, -49.0f),
-                glm::fvec3(1.461f, 2.619f, 57.457f),
-                glm::fvec3(0.125f)
-            );
-        }*/
+        //{
+        //    //app.addSkybox("countryClub.hdr", "CountryClub");
+        //    app.addSkybox("neonStudio.hdr", "NeonStudio");
+        //    app.addObjectPBR(
+        //        "DamagedHelmet",
+        //        "damagedHelmet",
+        //        "DamagedHelmet.gltf",
+        //        glm::fvec3(0.0f),
+        //        glm::fvec3(0.0f),
+        //        glm::fvec3(1.0f)
+        //    );
+        //    app.addDirectionalLight(
+        //        "Sun",
+        //        "lightSphereDefault",
+        //        "lightSphere.obj",
+        //        glm::fvec3(1.0f),
+        //        glm::fvec3(1.0f, 32.18f, -49.0f),
+        //        glm::fvec3(1.461f, 2.619f, 57.457f),
+        //        glm::fvec3(0.125f)
+        //    );
+        //}
  
 
         app.run();

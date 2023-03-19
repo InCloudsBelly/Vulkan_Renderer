@@ -471,13 +471,13 @@ VkResult BufferManager::bufferCreateImageView(VkDevice device, VkImage image, Vk
 * \returns VK_SUCCESS or a Vulkan error code
 *
 */
-VkResult BufferManager::bufferCreateDepthResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D extent, VkFormat depthFormat, VkImage* depthImage, VmaAllocation* depthImageAllocation, VkImageView* depthImageView)
+VkResult BufferManager::bufferCreateDepthResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D extent, VkFormat depthFormat,VkSampleCountFlagBits sampleFlags, VkImage* depthImage, VmaAllocation* depthImageAllocation, VkImageView* depthImageView)
 {
 	CHECKRESULT(BufferManager::bufferCreateImage(allocator, extent.width, extent.height, 1, 1,
 		depthFormat, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-		VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		0,
+		sampleFlags,
 		depthImage, depthImageAllocation));
 
 	CHECKRESULT(BufferManager::bufferCreateImageView(device, *depthImage, depthFormat, VK_IMAGE_VIEW_TYPE_2D, 1, 1,
@@ -503,19 +503,67 @@ VkResult BufferManager::bufferCreateDepthResources(VkDevice device, VmaAllocator
 * \param[out] depthImageAllocation VMA allocation info
 * \param[out] depthImageView View of the depth image
 */
-VkResult BufferManager::bufferCreateOffscreenResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D extent, VkFormat format, VkImage* image, VmaAllocation* colorImageAllocation, VkImageView* colorImageView)
+VkResult BufferManager::bufferCreateOffscreenResources(
+	VkDevice device,
+	VmaAllocator allocator,
+	VkQueue graphicsQueue,
+	VkCommandPool commandPool,
+	VkExtent2D extent,
+	VkFormat format,
+	VkImageUsageFlags usage,
+	uint32_t miplevels,
+	uint32_t arrayLayers,
+	VkImageCreateFlags flags,
+	VkSampleCountFlagBits sampleCounts,
+	VkImageViewType viewType,
+	VmaAllocation* colorImageAllocation,
+	std::shared_ptr<TextureBase> texture
+)
 {
-	CHECKRESULT(BufferManager::bufferCreateImage(allocator, extent.width, extent.height, 1, 1,
-		format, VK_IMAGE_TILING_OPTIMAL,
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 0,
-		image, colorImageAllocation));
+	CHECKRESULT(
+		BufferManager::bufferCreateImage(
+			allocator,
+			extent.width,
+			extent.height,
+			miplevels,
+			arrayLayers,
+			format,
+			VK_IMAGE_TILING_OPTIMAL,
+			usage,
+			flags,
+			sampleCounts,
+			&texture->getImage(),
+			colorImageAllocation
+		)
+	);
 
-	CHECKRESULT(BufferManager::bufferCreateImageView(device, *image, format, VK_IMAGE_VIEW_TYPE_2D,1 , 1, VK_IMAGE_ASPECT_COLOR_BIT,
-		colorImageView));
+	CHECKRESULT(
+		BufferManager::bufferCreateImageView(
+			device,
+			texture->getImage(),
+			format,
+			viewType,
+			miplevels,
+			arrayLayers,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			&texture->getImageView()
+		)
+	);
 
-	return BufferManager::bufferTransitionImageLayout(device, graphicsQueue, commandPool,
-		*image, format, VK_IMAGE_ASPECT_COLOR_BIT, 1, 1,
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+	{
+		CHECKRESULT(
+			BufferManager::bufferCreateTextureSampler(
+				device,
+				miplevels,
+				VK_FILTER_LINEAR,
+				VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+				&texture->getSampler()
+			)
+		);
+	}
+
+	return VK_SUCCESS;
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -545,6 +593,7 @@ VkResult BufferManager::bufferCreateImage(VmaAllocator allocator,
 	VkImageTiling tiling,
 	VkImageUsageFlags usage,
 	VkImageCreateFlags flags,
+	VkSampleCountFlagBits sampleCounts,
 	VkImage* image,
 	VmaAllocation* allocation)
 {
@@ -561,7 +610,7 @@ VkResult BufferManager::bufferCreateImage(VmaAllocator allocator,
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageInfo.usage = usage;
 	imageInfo.flags = flags;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.samples = sampleCounts;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	VmaAllocationCreateInfo allocInfo = {};
@@ -748,7 +797,18 @@ VkResult BufferManager::bufferTransitionImageLayout(VkDevice device, VkQueue gra
 * \returns VK_SUCCESS or a Vulkan error code
 *
 */
-VkResult BufferManager::bufferTransitionImageLayout(VkDevice device, VkQueue graphicsQueue, VkCommandBuffer commandBuffer, VkImage image, VkFormat format, VkImageAspectFlagBits aspect, uint32_t miplevels, uint32_t layerCount, VkImageLayout oldLayout, VkImageLayout newLayout)
+VkResult BufferManager::bufferTransitionImageLayout(
+	VkDevice device, 
+	VkQueue graphicsQueue, 
+	VkCommandBuffer commandBuffer, 
+	VkImage image, 
+	VkFormat format, 
+	VkImageAspectFlagBits aspect,
+	uint32_t miplevels, 
+	uint32_t layerCount,
+	VkImageLayout oldLayout,
+	VkImageLayout newLayout
+)
 {
 	VkImageMemoryBarrier barrier = {};
 	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -822,6 +882,32 @@ VkResult BufferManager::bufferTransitionImageLayout(VkDevice device, VkQueue gra
 		sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 		destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR && newLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = 0;
+
+		sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = 0;
+
+		sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		destinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+		newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask =
+			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	}
 	else
 		throw std::invalid_argument("Unsupported layout transition!");
 
@@ -860,7 +946,7 @@ BufferManager::bufferCreateTextureImage(
 	VkDevice device, 
 	VmaAllocator allocator, 
 	VkQueue graphicsQueue, 
-	VkCommandPool commandPool, 
+	VkCommandPool commandPool,
 	std::string basedir, 
 	std::string texName, 
 	VkFormat& format,
@@ -936,6 +1022,7 @@ BufferManager::bufferCreateTextureImage(
 			VK_IMAGE_TILING_OPTIMAL,
 			(VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT),
 			flags,
+			VK_SAMPLE_COUNT_1_BIT,
 			textureImage,
 			textureImageAllocation
 		)
@@ -1087,11 +1174,13 @@ BufferManager::bufferCreateTextureCubeMap(
 		bufferCopyRegions.push_back(bufferCopyRegion);
 	}
 
-	CHECKRESULT(BufferManager::bufferCreateImage(
-			allocator, cubemap.w_, cubemap.h_, 1, 6,format, 
+	CHECKRESULT(
+		BufferManager::bufferCreateImage(
+			allocator, cubemap.w_, cubemap.h_, 1, 6, format,
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
+			VK_SAMPLE_COUNT_1_BIT,
 			textureImage,
 			textureImageAllocation
 		)
@@ -1258,7 +1347,7 @@ BufferManager::bufferCreateTextureCubeMap(
 * \returns VK_SUCCESS or a Vulkan error code
 *
 */
-VkResult BufferManager::bufferCreateTextureSampler(VkDevice device, uint32_t mimapLevel, VkSampler* textureSampler)
+VkResult BufferManager::bufferCreateTextureSampler(VkDevice device,uint32_t mimapLevel, VkFilter filter, VkSamplerAddressMode addressMode, VkSampler* textureSampler)
 {
 	VkSamplerCreateInfo samplerInfo = {};
 	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Image/Image.h"
+#include "VulkanRenderer/Texture/Texture.h"
 
 class MSAA
 {
@@ -11,8 +11,6 @@ public:
 
     MSAA();
     MSAA(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const VkExtent2D& swapchainExtent,
         const VkFormat& swapchainFormat
     );
@@ -25,9 +23,7 @@ public:
 
 private:
 
-    VkDevice              m_logicalDevice;
-
-    Image                 m_image;
-    VkSampleCountFlagBits m_samplesCount;
+    std::shared_ptr<TextureBase>    m_image;
+    VkSampleCountFlagBits           m_samplesCount;
 
 };

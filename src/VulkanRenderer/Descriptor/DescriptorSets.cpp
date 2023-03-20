@@ -30,7 +30,6 @@ inline static void createDescriptorImageInfo(const VkImageView& imageView,const 
 
 DescriptorSets::DescriptorSets() {}
 
-
 DescriptorSets::DescriptorSets(
     const VkDevice                     logicalDevice,
     const std::vector<DescriptorInfo>& uboInfo,
@@ -39,7 +38,8 @@ DescriptorSets::DescriptorSets(
     const VkDescriptorSetLayout& descriptorSetLayout,
     DescriptorPool& descriptorPool,
     DescriptorSetInfo* additionalTextures,
-    const std::vector<UBO*>& UBOs)
+    const std::vector<VkBuffer>& UBOs
+)
 {
     std::vector<VkDescriptorImageInfo> imageInfos;
     imageInfos.resize(samplersInfo.size());
@@ -57,7 +57,7 @@ DescriptorSets::DescriptorSets(
         std::vector<VkDescriptorBufferInfo> bufferInfos(UBOs.size());
         for (size_t j = 0; j < UBOs.size(); ++j)
         {
-            createDescriptorBufferInfo(UBOs[j]->get(i), bufferInfos[j]);
+            createDescriptorBufferInfo(UBOs[j], bufferInfos[j]);
         }
 
         // TODO: Improve this.

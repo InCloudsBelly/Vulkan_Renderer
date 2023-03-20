@@ -4,6 +4,7 @@
 #include <vulkan/vulkan.h>
 #include <stb_image.h>
 
+#include "VulkanRenderer/Buffer/BufferUtils.h"
 #include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 #include "VulkanRenderer/Model/Attributes.h"
@@ -34,18 +35,6 @@ namespace BufferManager
         VkBuffer& buffer
     );
 
-    template<typename T>
-    void createAndFillStagingBuffer(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
-        const VkDeviceSize size,
-        const uint32_t offset,
-        const VkBufferUsageFlags usage,
-        const VkMemoryPropertyFlags memoryProperties,
-        VkDeviceMemory& memory,
-        VkBuffer& buffer,
-        T* data
-    );
 
     template<typename T>
     void createBufferAndTransferToDevice(

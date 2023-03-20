@@ -18,7 +18,6 @@
 
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 
 class Skybox : public Model

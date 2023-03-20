@@ -21,6 +21,8 @@
 #include "VulkanRenderer/Texture/CubemapUtils.h"
 #include "VulkanRenderer/Texture/MipmapUtils.h"
 
+#include "VulkanRenderer/Renderer.h"
+
 #define CHECKRESULT(x)          \
     {                             \
         VkResult retval = (x);    \
@@ -320,37 +322,6 @@ template void BufferManager::fillBuffer<float>(
         VkDeviceMemory&             memory
     );
 
-///////////////////////////////////////////////////////////////////////////////
-template<typename T>
-void BufferManager::createAndFillStagingBuffer(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
-    const VkDeviceSize size,
-    const uint32_t offset,
-    const VkBufferUsageFlags usage,
-    const VkMemoryPropertyFlags memoryProperties,
-    VkDeviceMemory& memory,
-    VkBuffer& buffer,
-    T* data
-) {
-    BufferManager::createBuffer(physicalDevice, logicalDevice, size, usage, memoryProperties, memory, buffer);
-
-    BufferManager::fillBuffer(logicalDevice, data, offset, size, memory);
-}
-////////////////////////////////////Instances//////////////////////////////////
-template void BufferManager::createAndFillStagingBuffer<uint8_t>(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
-    const VkDeviceSize size,
-    const uint32_t offset,
-    const VkBufferUsageFlags usage,
-    const VkMemoryPropertyFlags memoryProperties,
-    VkDeviceMemory& memory,
-    VkBuffer& buffer,
-    uint8_t* data
-    );
-
-///////////////////////////////////////////////////////////////////////////////
 
 void BufferManager::downloadDataFromBuffer(
     const VkDevice& logicalDevice,
@@ -1686,11 +1657,10 @@ BufferManager::bufferCreateIndexBuffer(VkDevice device, VmaAllocator allocator, 
 * \returns VK_SUCCESS or a Vulkan error code
 *
 */
-VkResult BufferManager::bufferCreateUniformBuffers(VmaAllocator
-	allocator,
+VkResult BufferManager::bufferCreateUniformBuffers(
+	VmaAllocator allocator,
 	uint32_t numberBuffers,
-	VkDeviceSize
-	bufferSize,
+	VkDeviceSize bufferSize,
 	std::vector<VkBuffer>& uniformBuffers,
 	std::vector<VmaAllocation>& uniformBuffersAllocation)
 {
@@ -1699,11 +1669,16 @@ VkResult BufferManager::bufferCreateUniformBuffers(VmaAllocator
 
 	for (size_t i = 0; i < numberBuffers; i++)
 	{
-		CHECKRESULT(BufferManager::bufferCreateBuffer(allocator, bufferSize,
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-			VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-			VMA_MEMORY_USAGE_CPU_TO_GPU,
-			&uniformBuffers[i], &uniformBuffersAllocation[i]));
+		CHECKRESULT(
+			BufferManager::bufferCreateBuffer(
+				allocator,
+				bufferSize,
+				VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+				VMA_MEMORY_USAGE_CPU_TO_GPU,
+				&uniformBuffers[i],
+				&uniformBuffersAllocation[i]
+			)
+		);
 	}
 	return VK_SUCCESS;
 }

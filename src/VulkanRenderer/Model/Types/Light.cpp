@@ -1,25 +1,26 @@
 #include "VulkanRenderer/Model/Types/Light.h"
 
 #include "VulkanRenderer/Settings/graphicsPipelineConfig.h"
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBOutils.h"
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
+#include "VulkanRenderer/Renderer.h"
+
 Light::Light(const ModelInfo& modelInfo)
     : Model(modelInfo.name, modelInfo.folderName, ModelType::LIGHT, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size),
     m_targetPos(glm::fvec4(modelInfo.endPos, 1.0f)),
     m_color(glm::fvec4(modelInfo.color, 1.0f)),
-    m_lightType(modelInfo.lType) 
+    m_lightType(modelInfo.lType)
 {
     if (modelInfo.lType == LightType::DIRECTIONAL_LIGHT)
         m_intensity = 15.0f;
     else
         m_intensity = 70.0f;
 
-    loadModel((std::string(MODEL_DIR) +modelInfo.folderName + "/" +modelInfo.fileName).c_str());
+    loadModel((std::string(MODEL_DIR) + modelInfo.folderName + "/" + modelInfo.fileName).c_str());
     m_rot = glm::fvec3(0.0f);
 }
 
@@ -27,18 +28,18 @@ Light::~Light() {}
 
 void Light::destroy(const VkDevice& logicalDevice)
 {
-    m_ubo->destroy();
+    vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubo, m_uboAllocation);
 
     for (auto& texture : m_texturesLoaded)
         texture->destroy();
 
     for (auto& mesh : m_meshes)
     {
-        BufferManager::destroyBuffer(logicalDevice,mesh.vertexBuffer);
-        BufferManager::destroyBuffer(logicalDevice,mesh.indexBuffer);
+        BufferManager::destroyBuffer(logicalDevice, mesh.vertexBuffer);
+        BufferManager::destroyBuffer(logicalDevice, mesh.indexBuffer);
 
-        BufferManager::freeMemory(logicalDevice,mesh.vertexMemory);
-        BufferManager::freeMemory(logicalDevice,mesh.indexMemory);
+        BufferManager::freeMemory(logicalDevice, mesh.vertexMemory);
+        BufferManager::freeMemory(logicalDevice, mesh.indexMemory);
     }
 }
 
@@ -75,26 +76,31 @@ void Light::processMesh(aiMesh* mesh, const aiScene* scene)
     m_meshes.emplace_back(newMesh);
 }
 
-void Light::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
+void Light::createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount)
 {
-    m_ubo = std::make_shared<UBO>(physicalDevice, logicalDevice, uboCount, sizeof(DescriptorTypes::UniformBufferObject::Light));
+    BufferManager::bufferCreateBuffer(
+        getRendererPointer()->getVmaAllocator(),
+        sizeof(DescriptorTypes::UniformBufferObject::Light),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU,
+        &m_ubo,
+        &m_uboAllocation
+    );
 }
 
-void Light::createDescriptorSets(const VkDevice& logicalDevice,const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)
+void Light::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)
 {
-    std::vector<UBO*> opUBOs = { m_ubo.get()};
-
     for (auto& mesh : m_meshes)
     {
         mesh.descriptorSets = DescriptorSets(
             logicalDevice,
-            GRAPHICS_PIPELINE::LIGHT::UBOS_INFO,
-            GRAPHICS_PIPELINE::LIGHT::SAMPLERS_INFO,
+            GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
+            GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
             mesh.textures,
             descriptorSetLayout,
             descriptorPool,
             nullptr,
-            opUBOs
+            { m_ubo }
         );
     }
 }
@@ -115,7 +121,7 @@ void Light::bindData(
     }
 }
 
-void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
 {
 
     for (auto& mesh : m_meshes)
@@ -148,10 +154,10 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevi
     }
 }
 
-void Light::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
+void Light::uploadTextures(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::LIGHT::TEXTURES_PER_MESH_COUNT;
-    const TextureToLoadInfo info = {"DefaultTexture.png", "defaultTextures",VK_FORMAT_R8G8B8A8_SRGB , 4};
+    const TextureToLoadInfo info = { "DefaultTexture.png", "defaultTextures",VK_FORMAT_R8G8B8A8_SRGB , 4 };
 
     for (auto& mesh : m_meshes)
     {
@@ -182,8 +188,10 @@ void Light::updateUBO(const VkDevice& logicalDevice, const uint32_t& currentFram
     m_dataInShader.proj = uboInfo.proj;
     m_dataInShader.lightColor = m_color;
 
-    size_t size = sizeof(m_dataInShader);
-    UBOutils::updateUBO(logicalDevice, m_ubo, size, &m_dataInShader, currentFrame);
+    void* data;
+    vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocation, &data);
+        memcpy(data, &m_dataInShader, sizeof(m_dataInShader));
+    vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocation);
 
 }
 

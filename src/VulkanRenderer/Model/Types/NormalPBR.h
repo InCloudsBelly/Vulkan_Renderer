@@ -3,7 +3,7 @@
 #include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/Model/ModelInfo.h"
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 
 
@@ -12,7 +12,7 @@ class NormalPBR : public Model
 public:
     NormalPBR(const ModelInfo& modelInfo);
 
-	~NormalPBR() override;
+    ~NormalPBR() override;
 
     void destroy(const VkDevice& logicalDevice) override;
 
@@ -47,39 +47,40 @@ public:
 
 private:
 
-   void processMesh(aiMesh* mesh, const aiScene* scene) override;
-   void getMaterialTextureInfo(
+    void processMesh(aiMesh* mesh, const aiScene* scene) override;
+    void getMaterialTextureInfo(
         aiMaterial* material,
         const aiTextureType& type,
         const std::string& typeName,
         const std::string& defaultTextureFile,
-       TextureToLoadInfo& info
-   );
+        TextureToLoadInfo& info
+    );
 
-   void uploadVertexData(
-       const VkPhysicalDevice& physicalDevice,
-       const VkDevice& logicalDevice,
-       const VkQueue& graphicsQueue,
-       const std::shared_ptr<CommandPool>& commandPool
-   ) override;
+    void uploadVertexData(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        const VkQueue& graphicsQueue,
+        const std::shared_ptr<CommandPool>& commandPool
+    ) override;
 
-   void uploadTextures(
-       const VkPhysicalDevice& physicalDevice,
-       const VkDevice& logicalDevice,
-       const VkSampleCountFlagBits& samplesCount,
-       const std::shared_ptr<CommandPool>& commandPool,
-       const VkQueue& graphicsQueue
-   ) override;
+    void uploadTextures(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        const VkSampleCountFlagBits& samplesCount,
+        const std::shared_ptr<CommandPool>& commandPool,
+        const VkQueue& graphicsQueue
+    ) override;
 
-   void createUniformBuffers(
-       const VkPhysicalDevice& physicalDevice,
-       const VkDevice& logicalDevice,
-       const uint32_t& uboCount
-   ) override;
+    void createUniformBuffers(
+        const VkPhysicalDevice& physicalDevice,
+        const VkDevice& logicalDevice,
+        const uint32_t& uboCount
+    ) override;
 
-   std::shared_ptr<UBO> m_uboLights;
+    VkBuffer                m_uboLight;
+    VmaAllocation           m_uboLightAllocation;
 
-   DescriptorTypes::UniformBufferObject::NormalPBR m_dataInShader;
-   DescriptorTypes::UniformBufferObject::LightInfo m_lightsInfo[Config::LIGHTS_COUNT];
-   std::vector<Mesh<Attributes::PBR::Vertex>> m_meshes;
+    DescriptorTypes::UniformBufferObject::NormalPBR m_dataInShader;
+    DescriptorTypes::UniformBufferObject::LightInfo m_lightsInfo[Config::LIGHTS_COUNT];
+    std::vector<Mesh<Attributes::PBR::Vertex>> m_meshes;
 };

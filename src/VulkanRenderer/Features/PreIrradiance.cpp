@@ -59,7 +59,9 @@ void PrefilteredIrradiance<T>::createDescriptorSet(const std::shared_ptr<Texture
         GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::SAMPLERS_INFO,
         { envMap },
         m_graphicsPipeline.getDescriptorSetLayout(),
-        m_descriptorPool
+        m_descriptorPool,
+        nullptr,
+        {}
     );
 }
 

@@ -45,9 +45,8 @@
 
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBOutils.h"
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
+
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 
 #include "VulkanRenderer/Texture/Texture.h"
@@ -346,9 +345,9 @@ void Renderer::recordCommandBuffer(
 
             if (graphicsPipeline->getGraphicsPipelineType() ==GraphicsPipelineType::SHADOWMAP) 
             {
-                for (auto i : m_scene.getObjectModelIndices())
+                for (uint32_t i = 0; i < m_scene.getObjectModelIndices().size(); i++)
                 {
-                    auto& model = m_scene.getModel(i);
+                    auto& model = m_scene.getModel(m_scene.getObjectModelIndices()[i]);
                     if (model->isHidden() == false)
                     {
                         m_shadowMap->bindData(&(std::dynamic_pointer_cast<NormalPBR>(model)->getMeshes()),i, commandBuffer, currentFrame);
@@ -399,11 +398,11 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
       /*  auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel());*/
 
-        for (auto i : m_scene.getObjectModelIndices())
+        for (uint32_t i = 0;  i < m_scene.getObjectModelIndices().size(); i++)
         {
             m_shadowMap->updateUBO(
                 // TODO: make it for more than 1 model
-                (std::dynamic_pointer_cast<NormalPBR>(m_scene.getModel(i)))->getModelM(),
+                (std::dynamic_pointer_cast<NormalPBR>(m_scene.getModel(m_scene.getObjectModelIndices()[i])))->getModelM(),
                 pLight->getPos(),
                 pLight->getTargetPos(),
                 1.0,

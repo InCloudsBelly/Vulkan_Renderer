@@ -11,12 +11,11 @@
 #include <assimp/postprocess.h>
 
 
+#include "VulkanRenderer/Buffer/BufferUtils.h"
 #include "VulkanRenderer/Model/Mesh.h"
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Descriptor/DescriptorInfo.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBOinfo.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 
@@ -32,40 +31,40 @@ class Model
 {
 public:
 	Model(
-		const std::string& name, const std::string& folderName, 
+		const std::string& name, const std::string& folderName,
 		const ModelType& type,
 		const glm::fvec4& pos = glm::fvec4(0.0f),
 		const glm::fvec3& rot = glm::fvec3(0.0f),
-		const glm::fvec3& size = glm::fvec3(1.0f) );
+		const glm::fvec3& size = glm::fvec3(1.0f));
 
 	virtual ~Model() = 0;
 	virtual void destroy(const VkDevice& logicalDevice) = 0;
 
 	void upload(
-		const VkPhysicalDevice&				physicalDevice,
-		const VkDevice&						logicalDevice,
-		const VkQueue&							graphicsQueue,
+		const VkPhysicalDevice& physicalDevice,
+		const VkDevice& logicalDevice,
+		const VkQueue& graphicsQueue,
 		const std::shared_ptr<CommandPool>& commandPool,
 		const uint32_t						uboCount
 	);
 
 	virtual void bindData(
-		const Graphics*				graphicsPipeline,
-		const VkCommandBuffer&		commandBUffer,
+		const Graphics* graphicsPipeline,
+		const VkCommandBuffer& commandBUffer,
 		const uint32_t				currentFrame
 	) = 0;
 
 	virtual void createDescriptorSets(
-		const VkDevice&					logicalDevice, 
-		const VkDescriptorSetLayout&	descriptorSetLayout,
-		DescriptorSetInfo*				info,
-		DescriptorPool&					descriptorPool
+		const VkDevice& logicalDevice,
+		const VkDescriptorSetLayout& descriptorSetLayout,
+		DescriptorSetInfo* info,
+		DescriptorPool& descriptorPool
 	) = 0;
 
 	virtual void updateUBO(
-		const VkDevice&		logicalDevice,
-		const uint32_t&		currentFrame,
-		const UBOinfo&		uboInfo
+		const VkDevice& logicalDevice,
+		const uint32_t& currentFrame,
+		const UBOinfo& uboInfo
 	) = 0;
 
 	const std::string& getName() const;
@@ -105,7 +104,9 @@ protected:
 	ModelType            m_type;
 	std::string          m_name;
 	std::string          m_folderName;
-	std::shared_ptr<UBO> m_ubo;
+
+	VkBuffer			 m_ubo;
+	VmaAllocation		 m_uboAllocation;
 
 	glm::fvec4           m_pos;
 	glm::fvec3           m_rot;

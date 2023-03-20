@@ -15,7 +15,7 @@
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 
 
 Model::Model(

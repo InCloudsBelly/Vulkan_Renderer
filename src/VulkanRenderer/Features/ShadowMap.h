@@ -6,10 +6,9 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 
-#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
+//#include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Model/Mesh.h"
@@ -21,13 +20,6 @@ template<typename T>
 class ShadowMap
 {
 public:
-
-	struct ShadowModelInfo
-	{
-		DescriptorSets			modelDescriptorSets;
-		std::shared_ptr<UBO>	modelUBO;
-	};
-
 
 	ShadowMap(
 		const VkExtent2D& extent,
@@ -94,7 +86,6 @@ private:
 	RenderPass                       m_renderPass;
 
 	DescriptorPool                   m_descriptorPool;
-	//DescriptorSets                   m_descriptorSets;
 
 	std::shared_ptr<CommandPool>     m_commandPool;
 
@@ -104,7 +95,11 @@ private:
 
 	DescriptorTypes::UniformBufferObject::ShadowMap m_basicInfo;
 
-	mutable std::unordered_map<size_t, ShadowModelInfo>	m_shadowModelInfo;
+	std::vector<DescriptorSets>			m_descriptorSets;
+
+	std::vector<VkBuffer>				m_ubos;
+	std::vector<VmaAllocation>			m_uboAllocations;
+
 	const std::vector<size_t>			m_modelIndices;
 
 };

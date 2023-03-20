@@ -16,9 +16,7 @@
 #include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Model/Attributes.h"
 
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBOutils.h"
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
 
@@ -27,6 +25,8 @@
 
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
+
+#include "VulkanRenderer/Renderer.h"
 
 Skybox::Skybox(const ModelInfo& modelInfo)
     : Model(modelInfo.name, modelInfo.folderName, ModelType::SKYBOX)
@@ -37,15 +37,15 @@ Skybox::Skybox(const ModelInfo& modelInfo)
 
 void Skybox::destroy(const VkDevice& logicalDevice)
 {
-	m_ubo->destroy();
+    vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubo, m_uboAllocation);
 
     for (auto& texture : m_texturesLoaded)
         texture->destroy();
 
     for (auto& mesh : m_meshes)
     {
-        BufferManager::destroyBuffer(logicalDevice,mesh.vertexBuffer);
-        BufferManager::destroyBuffer(logicalDevice,mesh.indexBuffer);
+        BufferManager::destroyBuffer(logicalDevice, mesh.vertexBuffer);
+        BufferManager::destroyBuffer(logicalDevice, mesh.indexBuffer);
 
         BufferManager::freeMemory(logicalDevice, mesh.vertexMemory);
         BufferManager::freeMemory(logicalDevice, mesh.indexMemory);
@@ -60,7 +60,7 @@ void Skybox::processMesh(aiMesh* mesh, const aiScene* scene)
     for (size_t i = 0; i < mesh->mNumVertices; i++)
     {
         Attributes::SKYBOX::Vertex vertex{};
-        vertex.pos = {mesh->mVertices[i].x,mesh->mVertices[i].y,mesh->mVertices[i].z};
+        vertex.pos = { mesh->mVertices[i].x,mesh->mVertices[i].y,mesh->mVertices[i].z };
         newMesh.vertices.emplace_back(vertex);
     }
 
@@ -78,8 +78,6 @@ Skybox::~Skybox() {}
 
 void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)
 {
-    std::vector<UBO*> opUBOs = { m_ubo.get()};
-
     for (auto& mesh : m_meshes)
     {
         mesh.descriptorSets = DescriptorSets(
@@ -90,22 +88,24 @@ void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescrip
             descriptorSetLayout,
             descriptorPool,
             nullptr,
-            opUBOs
+            { m_ubo }
         );
     }
 }
 
-void Skybox::createUniformBuffers(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice,const uint32_t& uboCount) 
+void Skybox::createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount)
 {
-    m_ubo = std::make_shared<UBO>(
-        physicalDevice,
-        logicalDevice,
-        uboCount,
-        sizeof(DescriptorTypes::UniformBufferObject::Skybox)
+    BufferManager::bufferCreateBuffer(
+        getRendererPointer()->getVmaAllocator(),
+        sizeof(DescriptorTypes::UniformBufferObject::Skybox),
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU,
+        &m_ubo,
+        &m_uboAllocation
     );
 }
 
-void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
 {
     for (auto& mesh : m_meshes)
     {
@@ -137,10 +137,10 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice,const VkDev
     }
 }
 
-void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
+void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::SKYBOX::TEXTURES_PER_MESH_COUNT;
-    TextureToLoadInfo info = {m_name, m_folderName, VK_FORMAT_R32G32B32A32_SFLOAT, 4 };
+    TextureToLoadInfo info = { m_name, m_folderName, VK_FORMAT_R32G32B32A32_SFLOAT, 4 };
 
     for (auto& mesh : m_meshes)
     {
@@ -152,7 +152,7 @@ void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice,const VkDevic
             {
                 //mesh.texturesCube.push_back(std::make_shared<Cubemap>(physicalDevice,logicalDevice, info, samplesCount,commandPool,graphicsQueue, UsageType::ENVIRONMENTAL_MAP));
                 mesh.textures.push_back(std::make_shared<CubeMapTexture>(info.name, info.folderName, info.format));
-                
+
                 m_texturesLoaded.push_back(mesh.textures[i]);
                 m_texturesID[info.name] = (m_texturesLoaded.size() - 1);
 
@@ -173,12 +173,14 @@ void Skybox::updateUBO(
 ) {
     DescriptorTypes::UniformBufferObject::Skybox newUBO;
 
-    newUBO.model = glm::translate(glm::mat4(1.0f),glm::vec3(uboInfo.cameraPos));
+    newUBO.model = glm::translate(glm::mat4(1.0f), glm::vec3(uboInfo.cameraPos));
     newUBO.view = uboInfo.view;
-    newUBO.proj = MathUtils::getUpdatedProjMatrix(glm::radians(75.0f), uboInfo.extent.width / (float)uboInfo.extent.height,0.01f,40.0f);
+    newUBO.proj = MathUtils::getUpdatedProjMatrix(glm::radians(75.0f), uboInfo.extent.width / (float)uboInfo.extent.height, 0.01f, 40.0f);
 
-    const size_t size = sizeof(newUBO);
-    UBOutils::updateUBO(logicalDevice, m_ubo, size, &newUBO, currentFrame);
+    void* data;
+    vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocation, &data);
+        memcpy(data, &newUBO, sizeof(newUBO));
+    vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocation);
 }
 
 void Skybox::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& commandBuffer, const uint32_t currentFrame)
@@ -199,7 +201,7 @@ const std::string& Skybox::getTextureFolderName() const
 }
 
 
-const std::shared_ptr<TextureBase>& Skybox::getEnvMap() const 
+const std::shared_ptr<TextureBase>& Skybox::getEnvMap() const
 {
     return m_envMap;
 }

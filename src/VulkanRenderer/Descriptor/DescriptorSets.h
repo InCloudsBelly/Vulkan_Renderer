@@ -6,7 +6,6 @@
 
 #include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
 #include "VulkanRenderer/Texture/Texture.h"
 
 
@@ -24,6 +23,7 @@ class DescriptorSets
 public:
 	DescriptorSets();
 
+
 	DescriptorSets(
 		const VkDevice logicalDevice,
 		const std::vector<DescriptorInfo>& uboInfo,
@@ -32,7 +32,7 @@ public:
 		const VkDescriptorSetLayout& descriptorSetLayout,
 		DescriptorPool& descriptorPool,
 		DescriptorSetInfo* additionalTextures = nullptr,
-		const std::vector<UBO*>& UBOs = {}
+		const std::vector<VkBuffer>& UBOs = {}
 	);
 
 	DescriptorSets(

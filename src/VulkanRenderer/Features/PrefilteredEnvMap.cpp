@@ -56,7 +56,9 @@ void PrefilteredEnvMap<T>::createDescriptorSet(const std::shared_ptr<TextureBase
         GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::SAMPLERS_INFO,
         {envMap},
         m_graphicsPipeline.getDescriptorSetLayout(),
-        m_descriptorPool
+        m_descriptorPool,
+        nullptr,
+        {}
     );
 }
 

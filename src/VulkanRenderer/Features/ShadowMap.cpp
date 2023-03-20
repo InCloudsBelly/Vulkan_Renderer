@@ -9,12 +9,9 @@
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Settings/Config.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBO.h"
-#include "VulkanRenderer/Descriptor/Types/Sampler/Sampler.h"
 #include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Descriptor/Types/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptor/Types/UBO/UBOutils.h"
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 #include "VulkanRenderer/Command/CommandManager.h"
@@ -124,8 +121,12 @@ void ShadowMap<T>::updateUBO(
 
     m_basicInfo.lightSpace = proj * view;
 
-    size_t size = sizeof(m_basicInfo);
-    UBOutils::updateUBO(getRendererPointer()->getDevice(), m_shadowModelInfo[index].modelUBO, size, &m_basicInfo, currentFrame);
+
+    void* data;
+    vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocations[index], &data);
+        memcpy(data, &m_basicInfo, sizeof(m_basicInfo));
+    vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocations[index]);
+
 }
 
 template<typename T>
@@ -153,23 +154,23 @@ void ShadowMap<T>::createDescriptorPool()
 template<typename T>
 void ShadowMap<T>::createUBO(const uint32_t& uboCount)
 {
-    for (auto i : m_modelIndices)
-        m_shadowModelInfo[i].modelUBO = std::make_shared<UBO>(
-            getRendererPointer()->getPhysicalDevice(),
-            getRendererPointer()->getDevice(), 
-            uboCount, 
-            sizeof(DescriptorTypes::UniformBufferObject::ShadowMap)
-            );
+    BufferManager::bufferCreateUniformBuffers(
+        getRendererPointer()->getVmaAllocator(),
+        m_modelIndices.size(),
+        sizeof(DescriptorTypes::UniformBufferObject::ShadowMap),
+        m_ubos,
+        m_uboAllocations
+    );
 }
 
 template<typename T>
 void ShadowMap<T>::createDescriptorSets()
 {
-    for (auto i : m_modelIndices)
-    {
-        const std::vector<UBO*>& ubo = { m_shadowModelInfo[i].modelUBO.get() };
+    m_descriptorSets.resize(m_modelIndices.size());
 
-        m_shadowModelInfo[i].modelDescriptorSets = DescriptorSets(
+    for (uint32_t i = 0; i < m_modelIndices.size(); i++ )
+    {
+        m_descriptorSets[i] = DescriptorSets(
             getRendererPointer()->getDevice(),
             GRAPHICS_PIPELINE::SHADOWMAP::UBOS_INFO,
             {},
@@ -177,7 +178,7 @@ void ShadowMap<T>::createDescriptorSets()
             m_graphicsPipeline.getDescriptorSetLayout(),
             m_descriptorPool,
             nullptr,
-            ubo
+            { m_ubos[i] }
         );
     }
 }
@@ -254,7 +255,7 @@ void ShadowMap<T>::bindData(const std::vector<Mesh<T>>* meshes, const size_t ind
 template<typename T>
 const VkDescriptorSet& ShadowMap<T>::getDescriptorSet(const size_t index, const uint32_t currentFrame) const
 {
-    VkDescriptorSet ret = m_shadowModelInfo[index].modelDescriptorSets.get(currentFrame);
+    VkDescriptorSet ret = m_descriptorSets[index].get(currentFrame);
     return ret;
 }
 
@@ -310,8 +311,10 @@ void ShadowMap<T>::destroy()
     m_descriptorPool.destroy();
     m_texture->destroy();
 
-    for (auto info : m_shadowModelInfo)
-        info.second.modelUBO->destroy();
+    for (size_t i = 0; i < m_ubos.size(); i++)
+    {
+        vmaDestroyBuffer(getRendererPointer() ->getVmaAllocator(), m_ubos[i], m_uboAllocations[i]);
+    }
 
     m_commandPool->destroy();
 

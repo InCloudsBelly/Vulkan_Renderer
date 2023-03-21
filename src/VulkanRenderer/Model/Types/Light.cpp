@@ -35,11 +35,8 @@ void Light::destroy(const VkDevice& logicalDevice)
 
     for (auto& mesh : m_meshes)
     {
-        BufferManager::destroyBuffer(logicalDevice, mesh.vertexBuffer);
-        BufferManager::destroyBuffer(logicalDevice, mesh.indexBuffer);
-
-        BufferManager::freeMemory(logicalDevice, mesh.vertexMemory);
-        BufferManager::freeMemory(logicalDevice, mesh.indexMemory);
+  vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), mesh.vertexBuffer, mesh.vertexAllocation);
+        vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), mesh.indexBuffer, mesh.indexAllocation);
     }
 }
 
@@ -112,12 +109,23 @@ void Light::bindData(
 ) {
     for (auto& mesh : m_meshes)
     {
-        CommandManager::STATE::bindVertexBuffers({ mesh.vertexBuffer }, { 0 }, 0, 1, commandBuffer);
-        CommandManager::STATE::bindIndexBuffer(mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32, commandBuffer);
+        std::vector<VkBuffer> vertexBuffers = { mesh.vertexBuffer };
+        std::vector<VkDeviceSize> offsets = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
+        vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        CommandManager::STATE::bindDescriptorSets(graphicsPipeline->getPipelineLayout(), PipelineType::GRAPHICS, 0, { mesh.descriptorSets.get(currentFrame) }, {}, commandBuffer);
+        const std::vector<VkDescriptorSet> sets = { mesh.descriptorSets.get(currentFrame) };
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            graphicsPipeline->getPipelineLayout(),
+            // Index of the first descriptor set.
+            0,
+            sets.size(), sets.data(),
+            0, {}
+        );
 
-        CommandManager::ACTION::drawIndexed(mesh.indices.size(), 1, 0, 0, 0, commandBuffer);
+        vkCmdDrawIndexed(commandBuffer, mesh.indices.size(), 1, 0, 0, 0);
     }
 }
 
@@ -126,30 +134,28 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDev
 
     for (auto& mesh : m_meshes)
     {
-        // Vertex Buffer(with staging buffer)
         BufferManager::createBufferAndTransferToDevice(
-            commandPool,
-            physicalDevice,
-            logicalDevice,
+            getRendererPointer()->getDevice(),
+            getRendererPointer()->getVmaAllocator(),
+            graphicsQueue,
+            commandPool->get(),
             mesh.vertices.data(),
             sizeof(mesh.vertices[0]) * mesh.vertices.size(),
-            graphicsQueue,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            mesh.vertexMemory,
-            mesh.vertexBuffer
+            &mesh.vertexBuffer,
+            &mesh.vertexAllocation
         );
 
-        // Index Buffer(with staging buffer)
         BufferManager::createBufferAndTransferToDevice(
-            commandPool,
-            physicalDevice,
-            logicalDevice,
+            getRendererPointer()->getDevice(),
+            getRendererPointer()->getVmaAllocator(),
+            graphicsQueue,
+            commandPool->get(),
             mesh.indices.data(),
             sizeof(mesh.indices[0]) * mesh.indices.size(),
-            graphicsQueue,
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            mesh.indexMemory,
-            mesh.indexBuffer
+            &mesh.indexBuffer,
+            &mesh.indexAllocation
         );
     }
 }

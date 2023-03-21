@@ -338,10 +338,14 @@ void Renderer::recordCommandBuffer(
         //---------------------------------CMDs-------------------------------
         for (auto graphicsPipeline : graphicsPipelines)
         {
-            CommandManager::STATE::bindPipeline(graphicsPipeline->get(), PipelineType::GRAPHICS, commandBuffer);
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline->get());
+
             // Set Dynamic States
-            CommandManager::STATE::setViewport(0.0f, 0.0f, extent, 0.0f, 1.0f, 0, 1, commandBuffer);
-            CommandManager::STATE::setScissor({ 0, 0 }, extent, 0, 1, commandBuffer);
+            VkViewport viewport{ 0.0f, 0.0f, extent.width,extent.height, 0.0f, 1.0f};
+            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+            
+            VkRect2D scissor{ {0,0}, {extent.width,extent.height} };
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
             if (graphicsPipeline->getGraphicsPipelineType() ==GraphicsPipelineType::SHADOWMAP) 
             {
@@ -606,16 +610,21 @@ void Renderer::doComputations()
            VK_ACCESS_HOST_READ_BIT
         };
 
-        CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
-            // Specifies that we'll wait for the Compute Queue to finish the
-            // execution of the tasks.
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_HOST_BIT,
-            0,
+
+        vkCmdPipelineBarrier(
             commandBuffer,
-            { readBarrier },
-            {},
-            {}
+            // Pipeline stage in which operations occur that should happen before the barrier.
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            // Pipeline stage in which operations will wait on the barrier.
+            VK_PIPELINE_STAGE_HOST_BIT,
+            // 0 or VK_DEPENDENCY_BY_REGION_BIT(per-region condition)
+            0,
+            // References arrays of pipeline barries of the three available
+            // types: memory barriers, buffer memory barriers, and image memory
+            // barriers.
+            1,  &readBarrier,
+            0, {},
+            0, {}
         );
 
         m_commandPoolForCompute->endCommandBuffer(commandBuffer);

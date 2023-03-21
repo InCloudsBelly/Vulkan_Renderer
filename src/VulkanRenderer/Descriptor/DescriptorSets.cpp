@@ -96,8 +96,6 @@ DescriptorSets::DescriptorSets(
 
         }
 
-
-
         std::vector<VkWriteDescriptorSet> descriptorWrites(uboInfo.size() + samplersInfo.size());
 
         // UBOs

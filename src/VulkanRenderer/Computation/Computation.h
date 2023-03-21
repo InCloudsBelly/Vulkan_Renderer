@@ -35,13 +35,11 @@ public:
     void destroy();
 
 private:
-
-    VkDevice                m_logicalDevice;
     Compute                 m_pipeline;
     DescriptorSets          m_descriptorSet;
 
     VkBuffer       m_inBuffer;
     VkBuffer       m_outBuffer;
-    VkDeviceMemory m_inMemory;
-    VkDeviceMemory m_outMemory;
+    VmaAllocation  m_inAllocation;
+    VmaAllocation  m_outAllocation;
 };

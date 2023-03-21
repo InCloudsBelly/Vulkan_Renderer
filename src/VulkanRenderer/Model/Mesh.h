@@ -18,8 +18,8 @@ struct Mesh
 
 	VkBuffer                               vertexBuffer;
 	VkBuffer                               indexBuffer;
-	VkDeviceMemory                         vertexMemory;
-	VkDeviceMemory                         indexMemory;
+	VmaAllocation						   vertexAllocation;
+	VmaAllocation                          indexAllocation;
 
 	std::vector<std::shared_ptr<TextureBase>>  textures;
 

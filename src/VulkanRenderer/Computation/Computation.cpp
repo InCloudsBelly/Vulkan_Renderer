@@ -8,6 +8,7 @@
 #include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Renderer.h"
 
 Computation::Computation() {}
 
@@ -20,33 +21,33 @@ Computation::Computation(
     const QueueFamilyIndices& queueFamilyIndices,
     DescriptorPool& descriptorPool,
     const std::vector<DescriptorInfo>& bufferInfos
-) : m_logicalDevice(logicalDevice)
+) 
 {
     BufferManager::createSharedConcurrentBuffer(
-        physicalDevice,
-        logicalDevice,
+        getRendererPointer()->getVmaAllocator(),
         inSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
         queueFamilyIndices,
-        m_inMemory,
-        m_inBuffer
+        VMA_MEMORY_USAGE_CPU_ONLY,
+        &m_inBuffer,
+        &m_inAllocation
     );
+
+
     BufferManager::createSharedConcurrentBuffer(
-        physicalDevice,
-        logicalDevice,
+        getRendererPointer()->getVmaAllocator(),
         outSize,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
         queueFamilyIndices,
-        m_outMemory,
-        m_outBuffer
+        VMA_MEMORY_USAGE_CPU_ONLY,
+        &m_outBuffer,
+        &m_outAllocation
     );
 
     // TODO: Make it custom.
-    m_pipeline = Compute(m_logicalDevice, ShaderInfo(shaderType::COMPUTE, "BRDF"), bufferInfos, {});
+    m_pipeline = Compute(logicalDevice, ShaderInfo(shaderType::COMPUTE, "BRDF"), bufferInfos, {});
 
-    m_descriptorSet = DescriptorSets(m_logicalDevice, COMPUTE_PIPELINE::BRDF::BUFFERS_INFO, { m_inBuffer, m_outBuffer }, m_pipeline.getDescriptorSetLayout(), descriptorPool);
+    m_descriptorSet = DescriptorSets(logicalDevice, COMPUTE_PIPELINE::BRDF::BUFFERS_INFO, { m_inBuffer, m_outBuffer }, m_pipeline.getDescriptorSetLayout(), descriptorPool);
 
 }
 
@@ -54,15 +55,30 @@ Computation::~Computation() {}
 
 void Computation::execute(const VkCommandBuffer& commandBuffer)
 {
-    CommandManager::STATE::bindPipeline(m_pipeline.get(),PipelineType::COMPUTE,commandBuffer);
-    CommandManager::STATE::bindDescriptorSets(m_pipeline.getPipelineLayout(), PipelineType::COMPUTE, 0, { m_descriptorSet.get(0) }, {}, commandBuffer);
 
-    CommandManager::ACTION::dispatch(Config::BRDF_WIDTH, Config::BRDF_HEIGHT, 1, commandBuffer);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline.get());
+
+    const std::vector<VkDescriptorSet> sets = { m_descriptorSet.get(0) };
+    vkCmdBindDescriptorSets(
+        commandBuffer,
+        VK_PIPELINE_BIND_POINT_COMPUTE,
+        m_pipeline.getPipelineLayout(),
+        0,
+        sets.size(), sets.data(),
+        0, {}
+    );
+
+    vkCmdDispatch(commandBuffer, Config::BRDF_WIDTH, Config::BRDF_HEIGHT, 1);
 }
 
 void Computation::downloadData(const uint32_t offset,void* data,const uint32_t size) 
 {
-    BufferManager::downloadDataFromBuffer(m_logicalDevice, offset, size, m_outMemory, data);
+    //BufferManager::downloadDataFromBuffer(logical, offset, size, m_outMemory, data);
+
+    void* memoryMap = nullptr;
+    vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_outAllocation, &memoryMap);
+    memcpy(data, memoryMap, size);
+    vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_outAllocation);
 }
 
 const VkBuffer& Computation::getOutBuffer() const
@@ -72,10 +88,8 @@ const VkBuffer& Computation::getOutBuffer() const
 
 void Computation::destroy()
 {
-    vkDestroyBuffer(m_logicalDevice, m_inBuffer, nullptr);
-    vkDestroyBuffer(m_logicalDevice, m_outBuffer, nullptr);
-    vkFreeMemory(m_logicalDevice, m_inMemory, nullptr);
-    vkFreeMemory(m_logicalDevice, m_outMemory, nullptr);
+    vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_inBuffer, m_inAllocation);
+    vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_outBuffer, m_outAllocation);
 
     m_pipeline.destroy();
 }

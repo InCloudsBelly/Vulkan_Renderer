@@ -107,8 +107,11 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
 
             //---------------------------------CMDs----------------------------
                 // Set Dynamic States
-            CommandManager::STATE::setViewport(0.0f, 0.0f, { static_cast<uint32_t>(viewportDim), static_cast<uint32_t>(viewportDim), }, 0.0f, 1.0f, 0, 1, commandBuffer);
-            CommandManager::STATE::setScissor({ 0, 0 }, { m_dim,m_dim }, 0, 1, commandBuffer);
+            VkViewport viewport{ 0.0f, 0.0f, viewportDim,viewportDim, 0.0f, 1.0f };
+            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+            VkRect2D scissor{ {0,0}, {m_dim,m_dim} };
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
             //--------------------------RenderPass--------------------------
 
@@ -127,52 +130,27 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
                 &m_pushBlock
             );
 
-            CommandManager::STATE::bindPipeline(m_graphicsPipeline.get(),PipelineType::GRAPHICS,commandBuffer);
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline.get());
 
-            CommandManager::STATE::bindDescriptorSets(
+            const std::vector<VkDescriptorSet> sets = { m_descriptorSets.get(0) };
+            vkCmdBindDescriptorSets(
+                commandBuffer,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
                 m_graphicsPipeline.getPipelineLayout(),
-                PipelineType::GRAPHICS,
-                // Index of first descriptor set.
+                // Index of the first descriptor set.
                 0,
-                { m_descriptorSets.get(0) },
-                // Dynamic offsets.
-                {},
-                commandBuffer
+                sets.size(), sets.data(),
+                0, {}
             );
 
             for (auto& mesh : meshes)
             {
-                CommandManager::STATE::bindVertexBuffers(
-                    { mesh.vertexBuffer },
-                    // Offsets.
-                    { 0 },
-                    // Index of first binding.
-                    0,
-                    // Bindings count.
-                    1,
-                    commandBuffer
-                );
-                CommandManager::STATE::bindIndexBuffer(
-                    mesh.indexBuffer,
-                    // Offset.
-                    0,
-                    VK_INDEX_TYPE_UINT32,
-                    commandBuffer
-                );
+                std::vector<VkBuffer> vertexBuffers = { mesh.vertexBuffer };
+                std::vector<VkDeviceSize> offsets = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
+                vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-                CommandManager::ACTION::drawIndexed(
-                    // Index Count
-                    mesh.indices.size(),
-                    // Instance Count
-                    1,
-                    // First index.
-                    0,
-                    // Vertex Offset.
-                    0,
-                    // First Intance.
-                    0,
-                    commandBuffer
-                );
+                vkCmdDrawIndexed(commandBuffer, mesh.indices.size(), 1, 0, 0, 0);
             }
 
             m_renderPass.end(commandBuffer);

@@ -206,48 +206,24 @@ void ShadowMap<T>::bindData(const std::vector<Mesh<T>>* meshes, const size_t ind
 {
     for (auto mesh = meshes->begin(); mesh != meshes->end(); mesh++)
     {
-        CommandManager::STATE::bindVertexBuffers(
-            { mesh->vertexBuffer },
-            // Offsets.
-            { 0 },
-            // Index of first binding.
-            0,
-            // Bindings count.
-            1,
-            commandBuffer
-        );
-        CommandManager::STATE::bindIndexBuffer(
-            mesh->indexBuffer,
-            // Offset.
-            0,
-            VK_INDEX_TYPE_UINT32,
-            commandBuffer
-        );
+        std::vector<VkBuffer> vertexBuffers = { mesh->vertexBuffer };
+        std::vector<VkDeviceSize> offsets = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
+        vkCmdBindIndexBuffer(commandBuffer, mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        CommandManager::STATE::bindDescriptorSets(
+        const std::vector<VkDescriptorSet> sets = { getDescriptorSet(index, currentFrame) };
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
             m_graphicsPipeline.getPipelineLayout(),
-            PipelineType::GRAPHICS,
-            // Index of first descriptor set.
+            // Index of the first descriptor set.
             0,
-            { getDescriptorSet(index,currentFrame) },
-            // Dynamic offsets.
-            {},
-            commandBuffer
+            sets.size(), sets.data(),
+            0, {}
         );
 
-        CommandManager::ACTION::drawIndexed(
-            // Index Count
-            mesh->indices.size(),
-            // Instance Count
-            1,
-            // First index.
-            0,
-            // Vertex Offset.
-            0,
-            // First Intance.
-            0,
-            commandBuffer
-        );
+
+        vkCmdDrawIndexed(commandBuffer, mesh->indices.size(), 1, 0, 0, 0);
     }
 }
 

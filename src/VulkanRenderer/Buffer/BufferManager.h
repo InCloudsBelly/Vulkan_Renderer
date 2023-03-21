@@ -14,74 +14,6 @@
 
 namespace BufferManager
 {
-    void createBuffer(
-        const VkPhysicalDevice&         physicalDevice,
-        const VkDevice&                 logicalDevice,
-        const VkDeviceSize              size,
-        const VkBufferUsageFlags        usage,
-        const VkMemoryPropertyFlags     memoryProperties,
-        VkDeviceMemory&                 memory,
-        VkBuffer&                       buffer
-    );
-
-    void createSharedConcurrentBuffer(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
-        const VkDeviceSize size,
-        const VkBufferUsageFlags usage,
-        const VkMemoryPropertyFlags memoryProperties,
-        const QueueFamilyIndices& queueFamilyIndices,
-        VkDeviceMemory& memory,
-        VkBuffer& buffer
-    );
-
-
-    template<typename T>
-    void createBufferAndTransferToDevice(
-        const std::shared_ptr<CommandPool>&     commandPool,
-        const VkPhysicalDevice&                 physicalDevice,
-        const VkDevice&                         logicalDevice,
-        T*                                      data,
-        size_t                                  size,
-        const VkQueue&                          graphicsQueue,
-        const VkBufferUsageFlags                usageDstBuffer,
-        VkDeviceMemory&                         memory,
-        VkBuffer&                               buffer
-    );
-
-    void freeMemory(const VkDevice& logicalDevice, VkDeviceMemory& memory);
-    void destroyBuffer(const VkDevice& logicalDevice, VkBuffer& buffer);
-
-    void copyBuffer(const std::shared_ptr<CommandPool>& commandPool, const VkDeviceSize size,
-        VkBuffer& srcBuffer, VkBuffer& dstBuffer, const VkQueue& graphicsQueue);
-
-    template<typename T>
-    void fillBuffer(const VkDevice& logicalDevice, T* data,const VkDeviceSize offset,const VkDeviceSize size, VkDeviceMemory& memory);
-
-    void downloadDataFromBuffer(
-        const VkDevice& logicalDevice,
-        const VkDeviceSize& offset,
-        const VkDeviceSize& size,
-        const VkDeviceMemory& memory,
-        void* outData
-    );
-
-    void allocBuffer(
-        const VkDevice&             logicalDevice,
-        const VkPhysicalDevice&     physicalDevice,
-        const VkMemoryPropertyFlags memoryProperties,
-        VkBuffer&                   buffer,
-        VkDeviceMemory&             memory
-    );
-
-
-    void bindBufferWithMemory(
-        const VkDevice&     logicalDevice,
-        VkBuffer&           buffer,
-        VkDeviceMemory&     memory
-    );
-
-
     //***********************************************************
 
 
@@ -101,6 +33,16 @@ namespace BufferManager
     VkResult bufferCreateDepthResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D swapChainExtent, VkFormat depthFormat, VkSampleCountFlagBits sampleFlages, VkImage* depthImage, VmaAllocation* depthImageAllocation, VkImageView* depthImageView);
 
     VkResult bufferCreateOffscreenResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, uint32_t miplevels,uint32_t arrayLayers, VkImageCreateFlags flags, VkSampleCountFlagBits sampleCounts, VkImageViewType viewType,  VmaAllocation* colorImageAllocation, std::shared_ptr<TextureBase> texture);
+
+    VkResult createSharedConcurrentBuffer(
+        VmaAllocator allocator,
+        VkDeviceSize size,
+        VkBufferUsageFlags usage,
+        QueueFamilyIndices queueFamilyIndices,
+        VmaMemoryUsage vmaUsage,
+        VkBuffer* buffer,
+        VmaAllocation* allocation
+    );
 
     VkResult bufferCreateImage(
         VmaAllocator allocator,
@@ -155,6 +97,7 @@ namespace BufferManager
         uint32_t imageSize);
 
     VkResult bufferCreateVertexBuffer(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::vector<Attributes::PBR::Vertex>& vertices, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation);
+    VkResult createBufferAndTransferToDevice(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, void* vertices, size_t size, VkBufferUsageFlags usageDstBuffer, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation);
 
     VkResult
         bufferCreateIndexBuffer(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::vector<uint32_t>& indices, VkBuffer* indexBuffer, VmaAllocation* indexBufferAllocation);

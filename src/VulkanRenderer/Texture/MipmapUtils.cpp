@@ -44,15 +44,15 @@ void MipmapUtils::generateMipmaps(
         imgMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         imgMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         imgMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-    
-        CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             0,
-            commandBuffer,
-            {},
-            {},
-            { imgMemoryBarrier }
+            0, {},
+            0, {},
+            1, &imgMemoryBarrier
         );
 
         VkImageBlit blit{};
@@ -82,14 +82,15 @@ void MipmapUtils::generateMipmaps(
         imgMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         imgMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
+
+        vkCmdPipelineBarrier(
+            commandBuffer,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
             0,
-            commandBuffer,
-            {},
-            {},
-            { imgMemoryBarrier }
+            0, {},
+            0, {},
+            1, &imgMemoryBarrier
         );
 
         if (mipWidth > 1)   mipWidth /= 2;
@@ -102,14 +103,15 @@ void MipmapUtils::generateMipmaps(
     imgMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     imgMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    CommandManager::SYNCHRONIZATION::recordPipelineBarrier(
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
         0,
-        commandBuffer,
-        {},
-        {},
-        { imgMemoryBarrier }
+        0, {},
+        0, {},
+        1, &imgMemoryBarrier
     );
 
     CommandManager::cmdEndSingleTimeCommands(getRendererPointer()->getDevice(), graphicsQueue, commandPool, commandBuffer);

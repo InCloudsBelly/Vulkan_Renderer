@@ -11,7 +11,6 @@ public:
     ~RenderPass();
 
     RenderPass(
-        const VkDevice& logicalDevice,
         const std::vector<VkAttachmentDescription>& attachments,
         const std::vector<VkSubpassDescription>& subpasses,
         const std::vector<VkSubpassDependency>& dependencies

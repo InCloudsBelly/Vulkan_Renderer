@@ -3,9 +3,11 @@
 #include <string>
 
 #include <vulkan/vulkan.h>
+#include <VMA/vk_mem_alloc.h>
+
 #include "VulkanRenderer/Pipeline/Compute.h"
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Descriptor/DescriptorSets.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
+
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 
 class Computation
@@ -15,13 +17,11 @@ public:
 
     Computation();
     Computation(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const std::string& shaderName,
         const uint32_t& inSize,
         const uint32_t& outSize,
         const QueueFamilyIndices& queueFamilyIndices,
-        DescriptorPool& descriptorPool,
+        VkDescriptorPool& descriptorPool,
         const std::vector<DescriptorInfo>& bufferInfos
     );
     
@@ -36,7 +36,7 @@ public:
 
 private:
     Compute                 m_pipeline;
-    DescriptorSets          m_descriptorSet;
+    VkDescriptorSet         m_descriptorSet;
 
     VkBuffer       m_inBuffer;
     VkBuffer       m_outBuffer;

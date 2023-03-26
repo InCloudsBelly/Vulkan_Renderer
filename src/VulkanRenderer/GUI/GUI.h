@@ -5,8 +5,6 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/SwapChain/Swapchain.h"
 #include "VulkanRenderer/Camera/Camera.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
@@ -16,8 +14,6 @@ class GUI
 {
 public:
     GUI(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const VkInstance& vkInstance,
         const std::shared_ptr<Swapchain>& swapchain,
         const uint32_t& graphicsFamilyIndex,
@@ -30,10 +26,7 @@ public:
     void recordCommandBuffer(const uint8_t currentFrame, const uint8_t imageIndex, const std::vector<VkClearValue>& clearValues);
 
     void draw(
-        const std::vector<std::shared_ptr<Model>>& models, 
         const std::shared_ptr<Camera>& camera, 
-        const std::vector<size_t>& normalModelIndices,
-        const std::vector<size_t>& lightModelIndices, 
         const std::string& deviceName,
         const double mpf,
         const VkSampleCountFlagBits samplesCount,
@@ -74,11 +67,12 @@ private:
     void uploadFonts(const VkQueue& graphicsQueue);
     void applyStyle();
 
-    VkDevice                        m_logicalDevice;
-
     std::vector<VkFramebuffer>      m_framebuffers;
-    std::shared_ptr<CommandPool>    m_commandPool;
-    DescriptorPool                  m_descriptorPool;
+
+    VkCommandPool                   m_commandPool;
+    std::vector<VkCommandBuffer>    m_commandBuffers;
+
+    VkDescriptorPool                m_descriptorPool;
     RenderPass                      m_renderPass;
 
     // Observer pointers

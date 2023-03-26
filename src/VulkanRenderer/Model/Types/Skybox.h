@@ -16,8 +16,6 @@
 
 #include "VulkanRenderer/Texture/Texture.h"
 
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 
 class Skybox : public Model
@@ -28,23 +26,20 @@ public:
 
 	~Skybox() override;
 
-	void destroy(const VkDevice& logicalDevice) override;
+	void destroy() override;
 
     void createDescriptorSets(
-        const VkDevice& logicalDevice,
         const VkDescriptorSetLayout& descriptorSetLayout,
-        DescriptorSetInfo* info,
-        DescriptorPool& descriptorPool
+        std::vector<VkDescriptorImageInfo*> info,
+        VkDescriptorPool& descriptorPool
     )override;
 
     void bindData(
         const Graphics* graphicsPipeline,
-        const VkCommandBuffer& commandBuffer,
-        const uint32_t currentFrame
+        const VkCommandBuffer& commandBuffer
     )override;
 
     void updateUBO(
-        const VkDevice& logicalDevice,
         const uint32_t& currentFrame,
         const UBOinfo& uboInfo
     ) override;
@@ -60,21 +55,15 @@ private:
     void processMesh(aiMesh* mesh, const aiScene* scene) override;
 
     void uploadVertexData(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const VkQueue& graphicsQueue,
-        const std::shared_ptr<CommandPool>& commandPool
+        const VkCommandPool& commandPool
     )override;
     void uploadTextures(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const VkSampleCountFlagBits& samplesCount,
-        const std::shared_ptr<CommandPool>& commandPool,
+        const VkCommandPool& commandPool,
         const VkQueue& graphicsQueue
     ) override;
     void createUniformBuffers(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const uint32_t& uboCount
     ) override;
 

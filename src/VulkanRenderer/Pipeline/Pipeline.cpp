@@ -5,14 +5,13 @@
 #include <stdexcept>
 
 #include "VulkanRenderer/Shader/shaderManager.h"
-#include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
+#include "VulkanRenderer/Renderer.h"
 
 Pipeline::Pipeline() {}
 
 Pipeline::Pipeline(
-    const VkDevice& logicalDevice,
     const PipelineType& type
-) : m_logicalDevice(logicalDevice),m_type(type)
+) :m_type(type)
 {}
 
 Pipeline::~Pipeline() {}
@@ -38,7 +37,7 @@ void Pipeline::createShaderModule(const ShaderInfo& shaderInfo,VkShaderModule& s
         throw std::runtime_error("Shader type doesn't exist.");
     }
 
-    shaderModule = ShaderManager::createShaderModule(shaderCode,m_logicalDevice);
+    shaderModule = ShaderManager::createShaderModule(shaderCode);
 }
 
 /*
@@ -47,6 +46,8 @@ void Pipeline::createShaderModule(const ShaderInfo& shaderInfo,VkShaderModule& s
 */
 void Pipeline::createPipelineLayout(const VkDescriptorSetLayout& descriptorSetLayout, const std::vector<VkPushConstantRange>& pushConstantRanges)
 {
+    m_descriptorSetLayout = descriptorSetLayout; 
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     // In this case we gonna bind the descriptor layout.
@@ -56,7 +57,7 @@ void Pipeline::createPipelineLayout(const VkDescriptorSetLayout& descriptorSetLa
     pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.size();
     pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 
-    auto status = vkCreatePipelineLayout(m_logicalDevice,&pipelineLayoutInfo,nullptr,&m_pipelineLayout);
+    auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(),&pipelineLayoutInfo,nullptr,&m_pipelineLayout);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create pipeline layout!");
@@ -75,10 +76,10 @@ const VkPipelineLayout& Pipeline::getPipelineLayout() const
 
 void Pipeline::destroy()
 {
-    DescriptorSetLayoutManager::destroyDescriptorSetLayout(m_logicalDevice, m_descriptorSetLayout);
+    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout, nullptr);
 
-    vkDestroyPipeline(m_logicalDevice, m_pipeline, nullptr);
-    vkDestroyPipelineLayout(m_logicalDevice, m_pipelineLayout, nullptr);
+    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);
+    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout, nullptr);
 }
 
 const PipelineType& Pipeline::getType() const

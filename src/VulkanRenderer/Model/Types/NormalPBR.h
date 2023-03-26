@@ -14,31 +14,25 @@ public:
 
     ~NormalPBR() override;
 
-    void destroy(const VkDevice& logicalDevice) override;
+    void destroy() override;
 
     void createDescriptorSets(
-        const VkDevice& logicalDevice,
         const VkDescriptorSetLayout& descriptorSetLayout,
-        DescriptorSetInfo* info,
-        DescriptorPool& descriptorPool
+        std::vector<VkDescriptorImageInfo*> info,
+        VkDescriptorPool& descriptorPool
     )override;
 
     void bindData(
         const Graphics* graphicsPipeline,
-        const VkCommandBuffer& commandBuffer,
-        const uint32_t currentFrame
+        const VkCommandBuffer& commandBuffer
     )override;
 
     void updateUBO(
-        const VkDevice& logicalDevice,
         const uint32_t& currentFrame,
         const UBOinfo& uboInfo
     ) override;
 
     void updateUBOlights(
-        const VkDevice& logicalDevice,
-        const std::vector<size_t> lightModelIndices,
-        const std::vector<std::shared_ptr<Model>>& models,
         const uint32_t& currentFrame
     );
 
@@ -57,23 +51,17 @@ private:
     );
 
     void uploadVertexData(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const VkQueue& graphicsQueue,
-        const std::shared_ptr<CommandPool>& commandPool
+        const VkCommandPool& commandPool
     ) override;
 
     void uploadTextures(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const VkSampleCountFlagBits& samplesCount,
-        const std::shared_ptr<CommandPool>& commandPool,
+        const VkCommandPool& commandPool,
         const VkQueue& graphicsQueue
     ) override;
 
     void createUniformBuffers(
-        const VkPhysicalDevice& physicalDevice,
-        const VkDevice& logicalDevice,
         const uint32_t& uboCount
     ) override;
 

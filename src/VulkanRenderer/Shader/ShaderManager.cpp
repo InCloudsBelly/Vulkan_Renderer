@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include <vulkan/vulkan.h>
+#include "VulkanRenderer/Renderer.h"
 
 std::vector<char> ShaderManager::getBinaryDataFromFile(const std::string& filename)
 {
@@ -30,8 +31,7 @@ std::vector<char> ShaderManager::getBinaryDataFromFile(const std::string& filena
 }
 
 VkShaderModule ShaderManager::createShaderModule(
-    const std::vector<char>& code,
-    const VkDevice& logicalDevice
+    const std::vector<char>& code
 ) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -40,7 +40,7 @@ VkShaderModule ShaderManager::createShaderModule(
 
     VkShaderModule shaderModule;
     auto status = vkCreateShaderModule(
-        logicalDevice,
+        getRendererPointer()->getDevice(),
         &createInfo,
         nullptr,
         &shaderModule
@@ -53,8 +53,7 @@ VkShaderModule ShaderManager::createShaderModule(
 }
 
 void ShaderManager::destroyShaderModule(
-    VkShaderModule& shaderModule,
-    const VkDevice& logicalDevice
+    VkShaderModule& shaderModule
 ) {
-    vkDestroyShaderModule(logicalDevice, shaderModule, nullptr);
+    vkDestroyShaderModule(getRendererPointer()->getDevice(), shaderModule, nullptr);
 }

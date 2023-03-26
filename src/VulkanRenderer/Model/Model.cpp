@@ -83,17 +83,15 @@ void Model::loadModel(const char* pathToModel)
 
 
 void Model::upload(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
     const VkQueue& graphicsQueue,
-    const std::shared_ptr<CommandPool>& commandPool,
+    const VkCommandPool& commandPool,
     const uint32_t uboCount
 ) {
-    uploadVertexData(physicalDevice,logicalDevice,graphicsQueue,commandPool);
+    uploadVertexData(graphicsQueue,commandPool);
     
-    uploadTextures(physicalDevice,logicalDevice,VK_SAMPLE_COUNT_1_BIT,commandPool,graphicsQueue);
+    uploadTextures(VK_SAMPLE_COUNT_1_BIT,commandPool,graphicsQueue);
     
-    createUniformBuffers(physicalDevice,logicalDevice,uboCount);
+    createUniformBuffers(uboCount);
 }
 
 

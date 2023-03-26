@@ -10,15 +10,15 @@
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
 #include "VulkanRenderer/Texture/MipmapUtils.h"
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
 #include "VulkanRenderer/Renderer.h"
 
 template<typename T>
 PrefilteredEnvMap<T>::PrefilteredEnvMap(
     const VkQueue& graphicsQueue,
-    const std::shared_ptr<CommandPool>& commandPool,
+    const VkCommandPool& commandPool,
     const uint32_t dim,
     const std::vector<Mesh<T>>& meshes,
     const std::shared_ptr<TextureBase>& envMap
@@ -28,7 +28,7 @@ PrefilteredEnvMap<T>::PrefilteredEnvMap(
 
     createTargetImage();
     createRenderPass();
-    createOffscreenFramebuffer( graphicsQueue, commandPool);
+    createOffscreenFramebuffer( graphicsQueue);
     createPipeline();
     createDescriptorPool();
     createDescriptorSet(envMap);
@@ -38,33 +38,30 @@ PrefilteredEnvMap<T>::PrefilteredEnvMap(
 template<typename T>
 void PrefilteredEnvMap<T>::createDescriptorPool()
 {
-    m_descriptorPool = DescriptorPool(
-         getRendererPointer()->getDevice(),
-        {
-           {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,2 } 
-        },
-        2
-    );
+    std::vector<VkDescriptorPoolSize> poolSizes = {
+       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1}
+    };
+
+    DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPool);
 }
 
 template<typename T>
 void PrefilteredEnvMap<T>::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
 {
-    m_descriptorSets = DescriptorSets(
-         getRendererPointer()->getDevice(),
+    DescriptorManager::allocDescriptorSet(m_descriptorPool, m_graphicsPipeline.getDescriptorSetLayout(), &m_descriptorSet);
+
+    DescriptorManager::createDescriptorSet(
+        GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::DESCRIPTORS_INFO,
+        { envMap },
         {},
-        GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::SAMPLERS_INFO,
-        {envMap},
-        m_graphicsPipeline.getDescriptorSetLayout(),
-        m_descriptorPool,
-        nullptr,
-        {}
+        {},
+        &m_descriptorSet
     );
 }
 
 template<typename T>
 void PrefilteredEnvMap<T>::recordCommandBuffer(
-    const std::shared_ptr<CommandPool>& commandPool,
+    const VkCommandPool& commandPool,
     const VkQueue& graphicsQueue,
     const std::vector<Mesh<T>>& meshes
 ) {
@@ -80,8 +77,6 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,   0.0f, -1.0f), glm::vec3(0.0f,  -1.0f,  0.0f))
     };
 
-
-    const VkCommandBuffer& commandBuffer = commandPool->getCommandBuffer(0);
 
     BufferManager::bufferTransitionImageLayout(
         getRendererPointer()->getDevice(),
@@ -102,8 +97,8 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
         {
             //float viewportDim = static_cast<float>(m_dim * std::pow(0.5f, m));
             uint32_t viewportDim = static_cast<uint32_t>(m_dim * std::pow(0.5f, m));
-            commandPool->resetCommandBuffer(0);
-            commandPool->beginCommandBuffer(0, commandBuffer);
+
+            VkCommandBuffer commandBuffer = CommandManager::cmdBeginSingleTimeCommands(getRendererPointer()->getDevice(), commandPool);
 
             //---------------------------------CMDs----------------------------
                 // Set Dynamic States
@@ -132,7 +127,7 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
 
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline.get());
 
-            const std::vector<VkDescriptorSet> sets = { m_descriptorSets.get(0) };
+            const std::vector<VkDescriptorSet> sets = { m_descriptorSet };
             vkCmdBindDescriptorSets(
                 commandBuffer,
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -187,8 +182,7 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
                 );
             }
 
-            commandPool->endCommandBuffer(commandBuffer);
-            commandPool->submitCommandBuffer(graphicsQueue, { commandBuffer }, true, {}, std::nullopt, {}, std::nullopt);
+            CommandManager::cmdEndSingleTimeCommands(getRendererPointer()->getDevice(), graphicsQueue, commandPool, commandBuffer);
         }
     }
 
@@ -248,7 +242,6 @@ template<typename T>
 void PrefilteredEnvMap<T>::createPipeline()
 {
     m_graphicsPipeline = Graphics(
-         getRendererPointer()->getDevice(),
         GraphicsPipelineType::PREFILTER_ENV_MAP,
         { m_dim,m_dim },
         m_renderPass,
@@ -258,8 +251,7 @@ void PrefilteredEnvMap<T>::createPipeline()
         Attributes::SKYBOX::getBindingDescription(),
         Attributes::SKYBOX::getAttributeDescriptions(),
         {},
-        {},
-        GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::SAMPLERS_INFO,
+        GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::DESCRIPTORS_INFO,
         { {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(PushBlockPrefilterEnv)} }
     );
 }
@@ -267,8 +259,7 @@ void PrefilteredEnvMap<T>::createPipeline()
 
 template<typename T>
 void PrefilteredEnvMap<T>::createOffscreenFramebuffer(
-    const VkQueue& graphicsQueue,
-    const std::shared_ptr<CommandPool>& commandPool
+    const VkQueue& graphicsQueue
 ) {
 
     m_offscreenImage = std::make_shared<NormalTexture>("Offscreen");
@@ -279,7 +270,6 @@ void PrefilteredEnvMap<T>::createOffscreenFramebuffer(
         getRendererPointer()->getDevice(),
         getRendererPointer()->getVmaAllocator(),
         getRendererPointer()->getGraphicsQueue(),
-        getRendererPointer()->getCommandPool(),
         m_offscreenImage->getExtent(),
         m_offscreenImage->getFormat(),
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -407,7 +397,6 @@ void PrefilteredEnvMap<T>::createRenderPass()
     );
 
     m_renderPass = RenderPass(
-         getRendererPointer()->getDevice(),
         { colorAttachment },
         { subPassDescript },
         dependencies
@@ -426,7 +415,6 @@ void PrefilteredEnvMap<T>::createTargetImage()
         getRendererPointer()->getDevice(),
         getRendererPointer()->getVmaAllocator(),
         getRendererPointer()->getGraphicsQueue(),
-        getRendererPointer()->getCommandPool(),
         m_targetImage->getExtent(),
         m_targetImage->getFormat(),
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
@@ -448,7 +436,7 @@ template<typename T>
 void PrefilteredEnvMap<T>::destroy()
 {
     m_graphicsPipeline.destroy();
-    m_descriptorPool.destroy();
+    vkDestroyDescriptorPool(getRendererPointer()->getDevice(), m_descriptorPool, nullptr);
     m_targetImage->destroy();
     m_offscreenImage->destroy();
     m_renderPass.destroy();

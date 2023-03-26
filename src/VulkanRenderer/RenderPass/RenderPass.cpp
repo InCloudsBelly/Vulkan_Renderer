@@ -4,6 +4,7 @@
 #include <array>
 #include <vulkan/vulkan.h>
 
+#include "VulkanRenderer/Renderer.h"
 
 RenderPass::RenderPass() {}
 
@@ -11,22 +12,20 @@ RenderPass::~RenderPass() {}
 
 
 RenderPass::RenderPass(
-	const VkDevice& logicalDevice,
 	const std::vector<VkAttachmentDescription>& attachments,
 	const std::vector<VkSubpassDescription>& subpasses,
 	const std::vector<VkSubpassDependency>& dependencies ) 
-	: m_logicalDevice(logicalDevice)
 {
 	VkRenderPassCreateInfo info = {};
 	info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	info.attachmentCount = attachments.size();
 	info.pAttachments = attachments.data();
-	info.subpassCount = 1;
+	info.subpassCount = subpasses.size();
 	info.pSubpasses = subpasses.data();
 	info.dependencyCount = static_cast<uint32_t>(dependencies.size());
 	info.pDependencies = dependencies.data();
 
-	auto status = vkCreateRenderPass(logicalDevice, &info, nullptr, &m_renderPass);
+	auto status = vkCreateRenderPass(getRendererPointer()->getDevice(), &info, nullptr, &m_renderPass);
 
 	if (status != VK_SUCCESS)
 		throw std::runtime_error("Failed to create Imgui's render pass");
@@ -72,5 +71,5 @@ void RenderPass::end(const VkCommandBuffer& commandBuffer) const
 
 void RenderPass::destroy()
 {
-	vkDestroyRenderPass(m_logicalDevice, m_renderPass, nullptr);
+	vkDestroyRenderPass(getRendererPointer()->getDevice(), m_renderPass, nullptr);
 }

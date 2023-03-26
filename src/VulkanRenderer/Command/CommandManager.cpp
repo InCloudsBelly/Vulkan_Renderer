@@ -1,6 +1,9 @@
 #include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
+#include "VulkanRenderer/Renderer.h"
+
 #include <vector>
+#include <stdexcept>
 
 #define CHECKRESULT(x)          \
     {                             \
@@ -12,16 +15,15 @@
     }
 
 
-VkResult CommandManager::cmdCreateCommandPool(VkPhysicalDevice physicalDevice, VkDevice device, VkSurfaceKHR surface, VkCommandPool* commandPool)
+VkResult CommandManager::cmdCreateCommandPool(const VkDevice logicalDevice, const VkCommandPoolCreateFlags flags, const uint32_t graphicsFamilyIndex, VkCommandPool* commandPool)
 {
-	QueueFamilyIndices queueFamilyIndices;
-	queueFamilyIndices.getIndicesOfRequiredQueueFamilies(physicalDevice, surface);
-
-	VkCommandPoolCreateInfo poolInfo = {};
+	VkCommandPoolCreateInfo poolInfo{};
 	poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-	poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+	poolInfo.flags = flags;
+	poolInfo.queueFamilyIndex = graphicsFamilyIndex;
 
-	return vkCreateCommandPool(device, &poolInfo, nullptr, commandPool);
+	if (vkCreateCommandPool(logicalDevice, &poolInfo, nullptr, commandPool) != VK_SUCCESS)
+		throw std::runtime_error("Failed to create command pool!");
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -89,7 +91,7 @@ CommandManager::cmdBeginCommandBuffer(VkDevice device, VkRenderPass renderPass, 
 	* \returns VK_SUCCESS or a Vulkan error code
 	*
 	*/
-VkResult CommandManager::cmdBeginCommandBuffer(VkDevice device, VkCommandBuffer commandBuffer, VkCommandBufferUsageFlagBits usageFlags)
+VkResult CommandManager::cmdBeginCommandBuffer(VkCommandBuffer commandBuffer, VkCommandBufferUsageFlagBits usageFlags)
 {
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -111,36 +113,47 @@ VkResult CommandManager::cmdBeginCommandBuffer(VkDevice device, VkCommandBuffer 
 	* \returns VK_SUCCESS or a Vulkan error code
 	*
 	*/
-VkResult CommandManager::cmdSubmitCommandBuffer(VkDevice device, VkQueue queue, VkCommandBuffer commandBuffer, VkSemaphore waitSemaphore, VkSemaphore signalSemaphore, VkFence waitFence)
+VkResult CommandManager::cmdSubmitCommandBuffer(
+	const VkQueue&									queue,
+	const std::vector<VkCommandBuffer>&				commandBuffers,
+	const bool										waitForCompletition,
+	const std::vector<VkSemaphore>&					waitSemaphores,
+	const std::optional<VkPipelineStageFlags>		waitStages,
+	const std::vector<VkSemaphore>&					signalSemaphores,
+	const std::optional<VkFence>					fence
+)
 {
-	VkSubmitInfo submitInfo = {};
+	VkSubmitInfo submitInfo{};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = commandBuffers.size();
+	submitInfo.pCommandBuffers = commandBuffers.data();
 
-	VkSemaphore waitSemaphores[] = { waitSemaphore };
-	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-	if (waitSemaphore != VK_NULL_HANDLE)
+
+	submitInfo.waitSemaphoreCount = waitSemaphores.size();
+	// Specifies which semaphores to wait on before execution begins.
+	submitInfo.pWaitSemaphores = waitSemaphores.data();
+
+	if (waitStages.has_value())
 	{
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = waitSemaphores;
-		submitInfo.pWaitDstStageMask = waitStages;
+		// Specifies which stage/s of the pipeline to wait.
+		submitInfo.pWaitDstStageMask = &(waitStages.value());
 	}
 
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffer;
+	// Specifies which semaphores to signal once the command buffer/s have
+	// finished execution.
+	submitInfo.signalSemaphoreCount = signalSemaphores.size();
+	submitInfo.pSignalSemaphores = signalSemaphores.data();
 
-	VkSemaphore signalSemaphores[] = { signalSemaphore };
-	if (signalSemaphore != VK_NULL_HANDLE)
-	{
-		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = signalSemaphores;
-	}
+	// Submits and execute the cmd immediately and wait on this transfer to complete.
 
-	if (waitFence != VK_NULL_HANDLE)
-	{
-		vkResetFences(device, 1, &waitFence);
-	}
+	auto status = vkQueueSubmit(queue, 1, &submitInfo, (fence.has_value()) ? fence.value() : VK_NULL_HANDLE);
+	if (status != VK_SUCCESS)
+		throw std::runtime_error("Failed to submit draw command buffer!");
 
-	return vkQueueSubmit(queue, 1, &submitInfo, waitFence);
+	if (waitForCompletition)
+		vkQueueWaitIdle(queue);
+
+	return status;
 }
 
 /**

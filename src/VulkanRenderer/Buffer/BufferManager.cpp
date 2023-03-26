@@ -15,7 +15,6 @@
 
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Buffer/BufferUtils.h"
-#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
 #include "VulkanRenderer/Texture/CubemapUtils.h"
@@ -158,7 +157,6 @@ VkResult BufferManager::bufferCreateOffscreenResources(
 	VkDevice device,
 	VmaAllocator allocator,
 	VkQueue graphicsQueue,
-	VkCommandPool commandPool,
 	VkExtent2D extent,
 	VkFormat format,
 	VkImageUsageFlags usage,

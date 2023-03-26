@@ -12,19 +12,16 @@
 #include <glm/glm.hpp>
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
-#include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Model/Attributes.h"
-
-#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptor/DescriptorSets.h"
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
 
 #include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
+#include "VulkanRenderer/Descriptor/DescriptorTypes.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
 
 #include "VulkanRenderer/Renderer.h"
 
@@ -35,7 +32,7 @@ Skybox::Skybox(const ModelInfo& modelInfo)
 
 }
 
-void Skybox::destroy(const VkDevice& logicalDevice)
+void Skybox::destroy()
 {
     vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubo, m_uboAllocation);
 
@@ -69,28 +66,29 @@ void Skybox::processMesh(aiMesh* mesh, const aiScene* scene)
     }
 
     m_meshes.emplace_back(newMesh);
+
+    getRenderResource()->m_skyboxMeshes.emplace_back(newMesh);
 }
 
 Skybox::~Skybox() {}
 
-void Skybox::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)
+void Skybox::createDescriptorSets(const VkDescriptorSetLayout& descriptorSetLayout, std::vector<VkDescriptorImageInfo*> info, VkDescriptorPool& descriptorPool)
 {
     for (auto& mesh : m_meshes)
     {
-        mesh.descriptorSets = DescriptorSets(
-            logicalDevice,
-            GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
-            GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
+        DescriptorManager::allocDescriptorSet(descriptorPool, descriptorSetLayout, &mesh.descriptorSet);
+
+        DescriptorManager::createDescriptorSet(
+            GRAPHICS_PIPELINE::SKYBOX::DESCRIPTORS_INFO,
             mesh.textures,
-            descriptorSetLayout,
-            descriptorPool,
-            nullptr,
-            { m_ubo }
-        );
+            {},
+            { m_ubo },
+            &mesh.descriptorSet
+        ); 
     }
 }
 
-void Skybox::createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount)
+void Skybox::createUniformBuffers( const uint32_t& uboCount)
 {
     BufferManager::bufferCreateBuffer(
         getRendererPointer()->getVmaAllocator(),
@@ -102,7 +100,7 @@ void Skybox::createUniformBuffers(const VkPhysicalDevice& physicalDevice, const 
     );
 }
 
-void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void Skybox::uploadVertexData(const VkQueue& graphicsQueue, const VkCommandPool& commandPool)
 {
     for (auto& mesh : m_meshes)
     {
@@ -110,7 +108,7 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDe
             getRendererPointer()->getDevice(),
             getRendererPointer()->getVmaAllocator(),
             graphicsQueue,
-            commandPool->get(),
+            commandPool,
             mesh.vertices.data(),
             sizeof(mesh.vertices[0]) * mesh.vertices.size(),
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -122,7 +120,7 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDe
             getRendererPointer()->getDevice(),
             getRendererPointer()->getVmaAllocator(),
             graphicsQueue,
-            commandPool->get(),
+            commandPool,
             mesh.indices.data(),
             sizeof(mesh.indices[0]) * mesh.indices.size(),
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -133,7 +131,7 @@ void Skybox::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDe
     }
 }
 
-void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
+void Skybox::uploadTextures( const VkSampleCountFlagBits& samplesCount, const VkCommandPool& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::SKYBOX::TEXTURES_PER_MESH_COUNT;
     TextureToLoadInfo info = { m_name, m_folderName, VK_FORMAT_R32G32B32A32_SFLOAT, 4 };
@@ -163,7 +161,6 @@ void Skybox::uploadTextures(const VkPhysicalDevice& physicalDevice, const VkDevi
 }
 
 void Skybox::updateUBO(
-    const VkDevice& logicalDevice,
     const uint32_t& currentFrame,
     const UBOinfo& uboInfo
 ) {
@@ -179,7 +176,7 @@ void Skybox::updateUBO(
     vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocation);
 }
 
-void Skybox::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& commandBuffer, const uint32_t currentFrame)
+void Skybox::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& commandBuffer)
 {
     for (auto& mesh : m_meshes)
     {
@@ -189,7 +186,7 @@ void Skybox::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& c
         vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 
-        const std::vector<VkDescriptorSet> sets = { mesh.descriptorSets.get(currentFrame) };
+        const std::vector<VkDescriptorSet> sets = { mesh.descriptorSet };
         vkCmdBindDescriptorSets(
             commandBuffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,

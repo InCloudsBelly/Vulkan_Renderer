@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 
 #include "VulkanRenderer/Pipeline/Pipeline.h"
-#include "VulkanRenderer/Descriptor/DescriptorInfo.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
 
 class Compute : public Pipeline
 {
@@ -15,7 +15,6 @@ public:
 
     Compute();
     Compute(
-        const VkDevice& logicalDevice,
         const ShaderInfo& shaderInfo,
         const std::vector<DescriptorInfo>& bufferInfos,
         const std::vector<VkPushConstantRange>& pushConstantRanges

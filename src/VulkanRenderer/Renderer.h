@@ -18,9 +18,7 @@
 #include "VulkanRenderer/Pipeline/Compute.h"
 #include "VulkanRenderer/Features/DepthBuffer.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
-#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Device/Device.h"
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Model/ModelInfo.h"
 #include "VulkanRenderer/Model/Model.h"
@@ -32,13 +30,21 @@
 #include "VulkanRenderer/VKinstance/VKinstance.h"
 #include "VulkanRenderer/Scene/Scene.h"
 
+#include "VulkanRenderer/RenderResource.h"
+
 
 #ifndef getRendererPointer
 #define getRendererPointer() g_RendererSingleton
 #endif
 
-class Renderer;
 
+#ifndef getRenderResource
+#define getRenderResource() g_RenderResource
+#endif
+
+extern RenderResource* g_RenderResource;
+
+class Renderer;
 extern Renderer* g_RendererSingleton ;
 
 class Renderer
@@ -110,11 +116,15 @@ public:
 	///returns the thread command pool
 	virtual VkCommandPool getCommandPool()
 	{
-		return m_commandPoolForGraphics->get();
+		return m_commandPoolForGraphics1;
 	};
 
+	virtual QueueFamilyIndices& getQueueFamilyIndices()
+	{
+		return m_qfIndices;
+	}
+
 private:
-	void createCommandPools();
 	void initWindow();
 	void doComputations();
 	void handleInput();
@@ -134,8 +144,7 @@ private:
 		const std::vector<const Graphics*>& graphicsPipelines,
 		const uint32_t currentFrame,
 		const VkCommandBuffer& commandBuffer,
-		const std::vector<VkClearValue>& clearValues,
-		const std::shared_ptr<CommandPool>& commandPool
+		const std::vector<VkClearValue>& clearValues
 	);
 
 	void drawFrame(uint8_t& currentFrame);
@@ -161,6 +170,9 @@ private:
 	
 	Scene                               m_scene;
 
+	//std::vector<VkCommandPool>			m_commandPools = {}; ///<Array of command pools so that each thread in the thread pool has its own pool
+	//std::vector<VkCommandBuffer>		m_commandBuffers = {}; ///<the main command buffers for recording draw commands
+
 	std::vector<VkSemaphore>            m_imageAvailableSemaphores;
 	std::vector<VkSemaphore>            m_renderFinishedSemaphores;
 	std::vector<VkFence>                m_inFlightFences;
@@ -168,16 +180,19 @@ private:
 	std::vector<ModelInfo>              m_modelsToLoadInfo;
 
 	// Command Pool for main drawing commands.
-	std::shared_ptr<CommandPool>        m_commandPoolForGraphics;
-	std::shared_ptr<CommandPool>        m_commandPoolForCompute;
+	VkCommandPool						m_commandPoolForGraphics1;
+	VkCommandPool						m_commandPoolForCompute1;
+	std::vector<VkCommandBuffer>		m_commandBuffersForGraphics;
+	std::vector<VkCommandBuffer>		m_commandBuffersForCompute;
 
-	DescriptorPool                      m_descriptorPoolForGraphics;
-	DescriptorPool                      m_descriptorPoolForComputations;
+	VkDescriptorPool                    m_descriptorPoolForGraphics;
+	VkDescriptorPool                    m_descriptorPoolForComputations;
 
 
 	std::vector<VkClearValue>			m_clearValues;
 	std::vector<VkClearValue>			m_clearValuesShadowMap;
 	bool								m_isMouseInMotion;
+
 
 	// milliseconds per frame
 	double								m_mpf;

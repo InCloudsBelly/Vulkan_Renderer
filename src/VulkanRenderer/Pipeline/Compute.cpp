@@ -9,22 +9,20 @@
 #include <GLFW/glfw3.h>
 
 #include "VulkanRenderer/Shader/ShaderManager.h"
-#include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
+#include "VulkanRenderer/Renderer.h"
 
 Compute::Compute() {}
 
 Compute::~Compute() {}
 
 Compute::Compute(
-    const VkDevice& logicalDevice,
     const ShaderInfo& shaderInfo,
     const std::vector<DescriptorInfo>& bufferInfos,
     const std::vector<VkPushConstantRange>& pushConstantRanges
-) : Pipeline(logicalDevice, PipelineType::COMPUTE)
+) : Pipeline(PipelineType::COMPUTE)
 {
     // ---------------Descriptor Set Layout----------------
     createDescriptorSetLayout(bufferInfos);
-
 
     // ------------------Shader Module---------------------
     VkShaderModule shaderModule;
@@ -48,14 +46,14 @@ Compute::Compute(
     pipelineInfo.basePipelineHandle = 0;
     pipelineInfo.basePipelineIndex = 0;
 
-    auto status = vkCreateComputePipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+    auto status = vkCreateComputePipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create compute pipeline!");
 
     // Since after the creation of the Compute Pipeline the shaders are
   // already linked, we won't need the shader modules anymore.
-    ShaderManager::destroyShaderModule(shaderModule, logicalDevice);
+    ShaderManager::destroyShaderModule(shaderModule);
 }
 
 
@@ -83,9 +81,22 @@ void Compute::createShaderStageInfo(const VkShaderModule& shaderModule,const sha
 
 void Compute::createDescriptorSetLayout(const std::vector<DescriptorInfo>& bufferInfos) 
 {
-    DescriptorSetLayoutManager::Compute::createDescriptorSetLayout(
-        m_logicalDevice,
-        bufferInfos,
-        m_descriptorSetLayout
-    );
+    std::vector<VkDescriptorSetLayoutBinding> bindings(bufferInfos.size());
+    for (size_t i = 0; i < bufferInfos.size(); i++)
+    {
+        bindings[i].binding = bufferInfos[i].bindingNumber;
+        bindings[i].descriptorType = bufferInfos[i].descriptorType;
+        bindings[i].descriptorCount = 1;
+        bindings[i].stageFlags = bufferInfos[i].shaderStage;
+        bindings[i].pImmutableSamplers = nullptr;
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    auto status = vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout);
+    if (status != VK_SUCCESS)
+        throw std::runtime_error("Failed to create descriptor set layout!");
 }

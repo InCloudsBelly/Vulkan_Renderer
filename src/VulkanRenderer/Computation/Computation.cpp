@@ -4,22 +4,20 @@
 
 #include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Settings/ComputePipelineConfig.h"
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
+
 #include "VulkanRenderer/Renderer.h"
 
 Computation::Computation() {}
 
 Computation::Computation(
-    const VkPhysicalDevice& physicalDevice,
-    const VkDevice& logicalDevice,
     const std::string& shaderName,
     const uint32_t& inSize,
     const uint32_t& outSize,
     const QueueFamilyIndices& queueFamilyIndices,
-    DescriptorPool& descriptorPool,
+    VkDescriptorPool& descriptorPool,
     const std::vector<DescriptorInfo>& bufferInfos
 ) 
 {
@@ -45,9 +43,17 @@ Computation::Computation(
     );
 
     // TODO: Make it custom.
-    m_pipeline = Compute(logicalDevice, ShaderInfo(shaderType::COMPUTE, "BRDF"), bufferInfos, {});
+    m_pipeline = Compute(ShaderInfo(shaderType::COMPUTE, "BRDF"), bufferInfos, {});
 
-    m_descriptorSet = DescriptorSets(logicalDevice, COMPUTE_PIPELINE::BRDF::BUFFERS_INFO, { m_inBuffer, m_outBuffer }, m_pipeline.getDescriptorSetLayout(), descriptorPool);
+    DescriptorManager::allocDescriptorSet(descriptorPool, m_pipeline.getDescriptorSetLayout(), &m_descriptorSet);
+
+    DescriptorManager::createDescriptorSet(
+        COMPUTE_PIPELINE::BRDF::BUFFERS_INFO,
+        {},
+        {},
+        { m_inBuffer, m_outBuffer },
+        &m_descriptorSet
+    );
 
 }
 
@@ -58,7 +64,7 @@ void Computation::execute(const VkCommandBuffer& commandBuffer)
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline.get());
 
-    const std::vector<VkDescriptorSet> sets = { m_descriptorSet.get(0) };
+    const std::vector<VkDescriptorSet> sets = {m_descriptorSet};
     vkCmdBindDescriptorSets(
         commandBuffer,
         VK_PIPELINE_BIND_POINT_COMPUTE,

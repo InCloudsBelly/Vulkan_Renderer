@@ -25,7 +25,6 @@ MSAA::MSAA(
         getRendererPointer()->getDevice(),
         getRendererPointer()->getVmaAllocator(),
         getRendererPointer()->getGraphicsQueue(),
-        getRendererPointer()->getCommandPool(),
         m_image->getExtent(),
         m_image->getFormat(),
         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,

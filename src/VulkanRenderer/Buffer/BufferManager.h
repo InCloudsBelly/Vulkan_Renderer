@@ -5,7 +5,6 @@
 #include <stb_image.h>
 
 #include "VulkanRenderer/Buffer/BufferUtils.h"
-#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 #include "VulkanRenderer/Model/Attributes.h"
 
@@ -32,7 +31,7 @@ namespace BufferManager
 
     VkResult bufferCreateDepthResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D swapChainExtent, VkFormat depthFormat, VkSampleCountFlagBits sampleFlages, VkImage* depthImage, VmaAllocation* depthImageAllocation, VkImageView* depthImageView);
 
-    VkResult bufferCreateOffscreenResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, uint32_t miplevels,uint32_t arrayLayers, VkImageCreateFlags flags, VkSampleCountFlagBits sampleCounts, VkImageViewType viewType,  VmaAllocation* colorImageAllocation, std::shared_ptr<TextureBase> texture);
+    VkResult bufferCreateOffscreenResources(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkExtent2D extent, VkFormat format, VkImageUsageFlags usage, uint32_t miplevels,uint32_t arrayLayers, VkImageCreateFlags flags, VkSampleCountFlagBits sampleCounts, VkImageViewType viewType,  VmaAllocation* colorImageAllocation, std::shared_ptr<TextureBase> texture);
 
     VkResult createSharedConcurrentBuffer(
         VmaAllocator allocator,

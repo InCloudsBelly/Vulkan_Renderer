@@ -2,8 +2,6 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Command/CommandPool.h"
-
 namespace MipmapUtils
 {
     void generateMipmaps(

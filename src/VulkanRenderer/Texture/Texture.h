@@ -5,7 +5,6 @@
 
 
 #include "VulkanRenderer/Command/CommandManager.h"
-#include "VulkanRenderer/Command/CommandPool.h"
 
 struct TextureToLoadInfo
 {
@@ -19,6 +18,8 @@ struct TextureToLoadInfo
 class TextureBase
 {
 public:
+    TextureBase() {};
+
     TextureBase(const std::string name) { m_name = name; }
 
     TextureBase(

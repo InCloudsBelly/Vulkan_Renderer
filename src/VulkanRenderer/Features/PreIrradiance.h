@@ -7,11 +7,8 @@
 #include <glm/glm.hpp>
 
 #include "VulkanRenderer/Model/Model.h"
-#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
-#include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
-#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Texture/Texture.h"
 
 #define M_PI       3.14159265358979323846
@@ -30,7 +27,7 @@ public:
 
     PrefilteredIrradiance(
         const VkQueue& graphicsQueue,
-        const std::shared_ptr<CommandPool>& commandPool,
+        const VkCommandPool& commandBuffer,
         const uint32_t dim,
         const std::vector<Mesh<T>>& meshes,
         const std::shared_ptr<TextureBase>& envMap
@@ -45,8 +42,7 @@ private:
 
     void createPipeline();
     void createOffscreenFramebuffer(
-        const VkQueue& graphicsQueue,
-        const std::shared_ptr<CommandPool>& commandPool
+        const VkQueue& graphicsQueue
     );
     void createRenderPass();
     void createTargetImage();
@@ -59,7 +55,7 @@ private:
         const VkCommandBuffer& commandBuffer
     );
     void recordCommandBuffer(
-        const std::shared_ptr<CommandPool>& commandPool,
+        const VkCommandPool& commandBuffer,
         const VkQueue& graphicsQueue,
         const std::vector<Mesh<T>>& meshes
     );
@@ -74,8 +70,8 @@ private:
 
     RenderPass                       m_renderPass;
 
-    DescriptorSets                   m_descriptorSets;
-    DescriptorPool                   m_descriptorPool;
+    VkDescriptorSet                  m_descriptorSet;
+    VkDescriptorPool                 m_descriptorPool;
 
     VkFramebuffer                    m_framebuffer;
 

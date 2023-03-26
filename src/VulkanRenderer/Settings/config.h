@@ -4,7 +4,6 @@
 #include <string>
 
 #include <vulkan/vulkan.h>
-#include "VulkanRenderer/Descriptor/DescriptorInfo.h"
 
 namespace Config
 {

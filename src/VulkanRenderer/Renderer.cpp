@@ -34,7 +34,6 @@
 
 #include "VulkanRenderer/Swapchain/Swapchain.h"
 
-#include "VulkanRenderer/Command/CommandPool.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 
 #include "VulkanRenderer/Model/Model.h"
@@ -43,11 +42,8 @@
 #include "VulkanRenderer/Model/Types/Skybox.h"
 #include "VulkanRenderer/Model/Types/Light.h"
 
-#include "VulkanRenderer/Descriptor/DescriptorPool.h"
-#include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
-
 #include "VulkanRenderer/Descriptor/DescriptorTypes.h"
-#include "VulkanRenderer/Descriptor/DescriptorSets.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
 
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Texture/Texture.h"
@@ -66,6 +62,7 @@
 glm::fvec3 cameraPos = glm::fvec3(2.0f, 2.0f, 2.0f);
 
 Renderer* g_RendererSingleton = nullptr;
+RenderResource* g_RenderResource = nullptr;
 
 void Renderer::run()
 {
@@ -74,6 +71,7 @@ void Renderer::run()
 #endif
 
     g_RendererSingleton = this;
+    g_RenderResource = new RenderResource();
 
     // TODO: Improve this!
     // NUMBER OF VK_ATTACHMENT_LOAD_OP_CLEAR == CLEAR_VALUES
@@ -93,9 +91,8 @@ void Renderer::run()
     doComputations();
 
     m_scene.upload(
-        m_device->getPhysicalDevice(),
         m_qfHandles.graphicsQueue,
-        m_commandPoolForGraphics,
+        m_commandPoolForGraphics1,
         m_descriptorPoolForGraphics,
         m_shadowMap
     );
@@ -113,8 +110,6 @@ void Renderer::run()
     configureUserInputs();
 
     m_GUI = std::make_unique<GUI>(
-        m_device->getPhysicalDevice(),
-        m_device->getLogicalDevice(),
         m_vkInstance->get(),
         m_swapchain,
         m_qfIndices.graphicsFamily.value(),
@@ -184,20 +179,6 @@ void Renderer::createSyncObjects()
 }
 
 
-void Renderer::createCommandPools()
-{
-    
-
-    // Features Command Pool
-    {
-        m_shadowMap->createCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_qfIndices.graphicsFamily.value());
-
-        m_shadowMap->allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
-    }
-
-}
-
-
 void Renderer::initVulkan()
 {
 
@@ -222,53 +203,54 @@ void Renderer::initVulkan()
     
     vhMemCreateVMAAllocator(m_vkInstance->get(), m_device->getPhysicalDevice(), m_device->getLogicalDevice(), m_vmaAllocator);
 
-
-
-
     m_swapchain = std::make_unique<Swapchain>(m_device->getPhysicalDevice(), m_device->getLogicalDevice(), m_window, m_device->getSupportedProperties());
 
- 
-    //------------------------------Descriptor Pools----------------------------
-    m_descriptorPoolForGraphics = DescriptorPool(
-        m_device->getLogicalDevice(),
-        {
-            // framesInFlight * #allmeshes
-            {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 },
-            {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 }
-        },
-        m_modelsToLoadInfo.size()* Config::MAX_FRAMES_IN_FLIGHT * 100
-    );
 
-    m_descriptorPoolForComputations = DescriptorPool(
-        m_device->getLogicalDevice(),
-        {
-           {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2}
-        },
-        1 // just for the BRDF(for now..)
-    );
-
-    //------------------------------Graphics Pools----------------------------
+    //------------------------------Command Pools----------------------------
     // Graphics Command Pool
     {
-        m_commandPoolForGraphics = std::make_shared<CommandPool>(
-            m_device->getLogicalDevice(),
+        CommandManager::cmdCreateCommandPool(
+            getRendererPointer()->getDevice(),
             VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            m_qfIndices.graphicsFamily.value()
-            );
-
-        m_commandPoolForGraphics->allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+            getRendererPointer()->getQueueFamilyIndices().graphicsFamily.value(),
+            &m_commandPoolForGraphics1
+        );
+        
+        m_commandBuffersForGraphics.resize( Config::MAX_FRAMES_IN_FLIGHT);
+        CommandManager::cmdCreateCommandBuffers(
+            getRendererPointer()->getDevice(),
+            m_commandPoolForGraphics1,
+            VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            Config::MAX_FRAMES_IN_FLIGHT,
+            &m_commandBuffersForGraphics[0]
+        );
     }
 
     // Compute Command Pool
     {
-        m_commandPoolForCompute = std::make_shared<CommandPool>(
-            m_device->getLogicalDevice(),
-            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            m_qfIndices.computeFamily.value()
-            );
+        CommandManager::cmdCreateCommandPool(getRendererPointer()->getDevice(),VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,getRendererPointer()->getQueueFamilyIndices().computeFamily.value(), &m_commandPoolForCompute1);
 
-        m_commandPoolForCompute->allocCommandBuffers(1);
+        m_commandBuffersForCompute.resize(1);
+        CommandManager::cmdCreateCommandBuffers(getRendererPointer()->getDevice(),m_commandPoolForCompute1,VK_COMMAND_BUFFER_LEVEL_PRIMARY,1,&m_commandBuffersForCompute[0]);
     }
+
+
+
+ 
+    //------------------------------Descriptor Pools----------------------------
+    std::vector<VkDescriptorPoolSize> poolSizes = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 },
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 }
+    };
+    DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPoolForGraphics);
+
+
+    std::vector<VkDescriptorPoolSize> computePoolSizes = {
+       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2}
+    };
+    DescriptorManager::createDescriptorPool(computePoolSizes, &m_descriptorPoolForComputations);
+
+  
 
 
     // -------------------------------Main Features------------------------------
@@ -278,14 +260,11 @@ void Renderer::initVulkan()
 
  
     m_scene = Scene(
-        m_device->getLogicalDevice(),
         m_swapchain->getImageFormat(),
         m_swapchain->getExtent(),
         m_msaa.getSamplesCount(),
         m_depthBuffer.getFormat(),
         m_modelsToLoadInfo,
-        // Parameters needed by the computations.
-        m_device->getPhysicalDevice(),
         m_qfIndices,
         m_descriptorPoolForComputations,
         m_vmaAllocator
@@ -300,16 +279,19 @@ void Renderer::initVulkan()
             shadowExtent,
             m_swapchain->getImageCount(),
             m_depthBuffer.getFormat(),
-            Config::MAX_FRAMES_IN_FLIGHT,
-            &(std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel())->getMeshes()),
-            m_scene.getObjectModelIndices()
+            Config::MAX_FRAMES_IN_FLIGHT
         );
 
-    //----------------------------------Framebuffer----------------------------
-    m_swapchain->createFramebuffers(m_scene.getRenderPass(), m_depthBuffer, m_msaa);
+    ////------------------------------Secondary Command Pools----------------------------
+    //// Features Command Pool
+    //{
+    //    m_shadowMap->createCommandPool(VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_qfIndices.graphicsFamily.value());
 
-    //--------------------------------------------------------------------------
-    createCommandPools();
+    //    m_shadowMap->allocCommandBuffers(Config::MAX_FRAMES_IN_FLIGHT);
+    //}
+
+    //----------------------------------Framebuffer----------------------------
+    m_swapchain->createFramebuffers(m_scene.getRenderPass(), m_depthBuffer, m_msaa);    
 
     createSyncObjects();
 }
@@ -322,57 +304,51 @@ void Renderer::recordCommandBuffer(
     const std::vector<const Graphics*>& graphicsPipelines,
     const uint32_t currentFrame,
     const VkCommandBuffer& commandBuffer,
-    const std::vector<VkClearValue>& clearValues,
-    const std::shared_ptr<CommandPool>& commandPool
+    const std::vector<VkClearValue>& clearValues
 ) {
     // Resets the command buffer to be able to be recorded.
-    commandPool->resetCommandBuffer(currentFrame);
+    vkResetCommandBuffer(commandBuffer, 0);
 
     // Specifies some details about the usage of this specific command buffer.
-    commandPool->beginCommandBuffer(0, commandBuffer);
+    CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits)0);
 
     //--------------------------------RenderPass-----------------------------
     renderPass.begin(framebuffer, extent, clearValues, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
 
-        //---------------------------------CMDs-------------------------------
-        for (auto graphicsPipeline : graphicsPipelines)
+    //---------------------------------CMDs-------------------------------
+    for (auto graphicsPipeline : graphicsPipelines)
+    {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline->get());
+
+        // Set Dynamic States
+        VkViewport viewport{ 0.0f, 0.0f, extent.width,extent.height, 0.0f, 1.0f };
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+        VkRect2D scissor{ {0,0}, {extent.width,extent.height} };
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        if (graphicsPipeline->getGraphicsPipelineType() == GraphicsPipelineType::SHADOWMAP)
         {
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline->get());
+            m_shadowMap->bindData(commandBuffer, currentFrame);
 
-            // Set Dynamic States
-            VkViewport viewport{ 0.0f, 0.0f, extent.width,extent.height, 0.0f, 1.0f};
-            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-            
-            VkRect2D scissor{ {0,0}, {extent.width,extent.height} };
-            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+            continue;
+        }
 
-            if (graphicsPipeline->getGraphicsPipelineType() ==GraphicsPipelineType::SHADOWMAP) 
+
+        for (auto i : graphicsPipeline->getModelIndices())
+        {
+            auto& model = getRenderResource()->m_modelResource[i];
+
+            if (model->isHidden() == false)
             {
-                for (uint32_t i = 0; i < m_scene.getObjectModelIndices().size(); i++)
-                {
-                    auto& model = m_scene.getModel(m_scene.getObjectModelIndices()[i]);
-                    if (model->isHidden() == false)
-                    {
-                        m_shadowMap->bindData(&(std::dynamic_pointer_cast<NormalPBR>(model)->getMeshes()),i, commandBuffer, currentFrame);
-                    }
-                }
-                continue;
-            }
-
-            for (auto i : graphicsPipeline->getModelIndices())
-            {
-                auto& model = m_scene.getModel(i);
-                
-                if (model->isHidden() == false)
-                {
-                    model->bindData(graphicsPipeline, commandBuffer, currentFrame);
-                }
+                model->bindData(graphicsPipeline, commandBuffer);
             }
         }
-        renderPass.end(commandBuffer);
+    }
+    renderPass.end(commandBuffer);
 
-    commandPool->endCommandBuffer(commandBuffer);
+    vkEndCommandBuffer(commandBuffer);
 }
 
 
@@ -397,33 +373,9 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
     // First we update the shadow map since the other models of the scene have dependencies with it.
     // Shadow Map
-    {
-        auto pLight = std::dynamic_pointer_cast<Light>(m_scene.getDirectionalLight());
+    m_shadowMap->updateUBO();
 
-      /*  auto pMainModel = std::dynamic_pointer_cast<NormalPBR>(m_scene.getMainModel());*/
-
-        for (uint32_t i = 0;  i < m_scene.getObjectModelIndices().size(); i++)
-        {
-            m_shadowMap->updateUBO(
-                // TODO: make it for more than 1 model
-                (std::dynamic_pointer_cast<NormalPBR>(m_scene.getModel(m_scene.getObjectModelIndices()[i])))->getModelM(),
-                pLight->getPos(),
-                pLight->getTargetPos(),
-                1.0,
-                Config::Z_NEAR_SHADOW,
-                Config::Z_FAR_SHADOW,
-                currentFrame,
-                i
-            );
-        }
-    }
-
-    m_scene.updateUBO(
-        m_camera,
-        m_shadowMap->getLightSpace(),
-        m_swapchain->getExtent(),
-        currentFrame
-    );
+    m_scene.updateUBO(m_camera,m_shadowMap->getLightSpace(),m_swapchain->getExtent(),currentFrame);
 
     //--------------------Acquires an image from the swapchain------------------
 
@@ -442,8 +394,7 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         { &m_shadowMap->getGraphicsPipeline() },
         currentFrame,
         m_shadowMap->getCommandBuffer(currentFrame),
-        m_clearValuesShadowMap,
-        m_shadowMap->getCommandPool()
+        m_clearValuesShadowMap
     );
 
     // Scene
@@ -453,9 +404,8 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         m_swapchain->getExtent(),
         { &m_scene.getLightPipeline(),&m_scene.getPBRpipeline(), &m_scene.getSkyboxPipeline() },
         currentFrame,
-        m_commandPoolForGraphics->getCommandBuffer(currentFrame),
-        m_clearValues,
-        m_commandPoolForGraphics
+        m_commandBuffersForGraphics[currentFrame],
+        m_clearValues
     );
 
     // GUI
@@ -463,13 +413,13 @@ void Renderer::drawFrame(uint8_t& currentFrame)
 
     //----------------------Submits the command buffer -------------------------
 
-    std::vector<VkCommandBuffer> commandBuffersToSubmit = { m_shadowMap->getCommandBuffer(currentFrame), m_commandPoolForGraphics->getCommandBuffer(currentFrame),m_GUI->getCommandBuffer(currentFrame) };
+    std::vector<VkCommandBuffer> commandBuffersToSubmit = { m_shadowMap->getCommandBuffer(currentFrame), m_commandBuffersForGraphics[currentFrame],m_GUI->getCommandBuffer(currentFrame) };
 
     std::vector<VkSemaphore> waitSemaphores = { m_imageAvailableSemaphores[currentFrame] };
     std::vector<VkSemaphore> signalSemaphores = { m_renderFinishedSemaphores[currentFrame] };
 
-    m_commandPoolForGraphics->submitCommandBuffer(
-        m_qfHandles.graphicsQueue, 
+    CommandManager::cmdSubmitCommandBuffer(
+        m_qfHandles.graphicsQueue,
         commandBuffersToSubmit,
         false,
         waitSemaphores,
@@ -477,7 +427,6 @@ void Renderer::drawFrame(uint8_t& currentFrame)
         signalSemaphores,
         m_inFlightFences[currentFrame]
     );
-
 
     //-------------------Presentation of the swapchain image--------------------
     
@@ -569,10 +518,7 @@ void Renderer::mainLoop()
 
         handleInput();
         m_GUI->draw(
-            m_scene.getModels(),
             m_camera,
-            m_scene.getObjectModelIndices(),
-            m_scene.getLightModelIndices(),
             m_device->getDeviceName(),
             m_mpf,
             m_msaa.getSamplesCount(),
@@ -589,14 +535,15 @@ void Renderer::doComputations()
 
     std::cout << "Doing computations.\n";
 
-    const VkCommandBuffer& commandBuffer = (m_commandPoolForCompute->getCommandBuffer(0));
+    const VkCommandBuffer& commandBuffer = (m_commandBuffersForCompute[0]);
 
     for (auto& computation : computations)
     {
         // Resets the command buffer to be able to be recorded.
-        m_commandPoolForCompute->resetCommandBuffer(0);
+        vkResetCommandBuffer(commandBuffer, 0);
         // Specifies some details about the usage of this specific command buffer.
-        m_commandPoolForCompute->beginCommandBuffer(0, commandBuffer);
+        CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits) 0);
+
 
         computation.execute(commandBuffer);
 
@@ -627,9 +574,13 @@ void Renderer::doComputations()
             0, {}
         );
 
-        m_commandPoolForCompute->endCommandBuffer(commandBuffer);
+        vkEndCommandBuffer(commandBuffer);
 
-        m_commandPoolForCompute->submitCommandBuffer(m_qfHandles.computeQueue, { commandBuffer }, true);
+        CommandManager::cmdSubmitCommandBuffer(
+            m_qfHandles.computeQueue, 
+            { commandBuffer }, 
+            true
+        );
     }
 
     std::cout << "All the computations have been completed.\n";
@@ -676,15 +627,18 @@ void Renderer::cleanup()
     m_shadowMap->destroy();
    
     // Descriptor Pool
-    m_descriptorPoolForGraphics.destroy();
-    m_descriptorPoolForComputations.destroy();
+    vkDestroyDescriptorPool(getRendererPointer()->getDevice(), m_descriptorPoolForGraphics, nullptr);
+    vkDestroyDescriptorPool(getRendererPointer()->getDevice(), m_descriptorPoolForComputations, nullptr);
 
     // Sync objects
     destroySyncObjects();
 
     // Command Pools
-    if (m_commandPoolForGraphics) m_commandPoolForGraphics->destroy();
-    if (m_commandPoolForCompute)  m_commandPoolForCompute->destroy();
+    //if (m_commandPoolForGraphics) m_commandPoolForGraphics->destroy();
+    //if (m_commandPoolForCompute)  m_commandPoolForCompute->destroy();
+
+    vkDestroyCommandPool(getRendererPointer()->getDevice(), m_commandPoolForGraphics1, nullptr);
+    vkDestroyCommandPool(getRendererPointer()->getDevice(), m_commandPoolForCompute1, nullptr);
 
     //VM Allocator
     vmaDestroyAllocator(m_vmaAllocator);

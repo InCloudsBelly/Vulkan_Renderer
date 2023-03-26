@@ -9,6 +9,7 @@
 #include "VulkanRenderer/Math/MathUtils.h"
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
 
 #include "VulkanRenderer/Renderer.h"
 
@@ -20,7 +21,7 @@ NormalPBR::NormalPBR(const ModelInfo& modelInfo)
 
 NormalPBR::~NormalPBR() {}
 
-void NormalPBR::destroy(const VkDevice& logicalDevice)
+void NormalPBR::destroy()
 {
 	vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubo, m_uboAllocation);
 	vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_uboLight, m_uboLightAllocation);
@@ -156,7 +157,7 @@ void NormalPBR::processMesh(aiMesh* mesh, const aiScene* scene)
 	m_meshes.emplace_back(newMesh);
 }
 
-void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount)
+void NormalPBR::createUniformBuffers( const uint32_t& uboCount)
 {
 	BufferManager::bufferCreateBuffer(
 		getRendererPointer()->getVmaAllocator(),
@@ -177,7 +178,7 @@ void NormalPBR::createUniformBuffers(const VkPhysicalDevice& physicalDevice, con
 	);
 }
 
-void NormalPBR::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& commandBuffer, const uint32_t currentFrame)
+void NormalPBR::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer& commandBuffer)
 {
 	for (auto& mesh : m_meshes)
 	{
@@ -186,10 +187,9 @@ void NormalPBR::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
 		vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-
-		const std::vector<VkDescriptorSet> sets = { mesh.descriptorSets.get(currentFrame) };
+		const std::vector<VkDescriptorSet> sets = { mesh.descriptorSet };
 		vkCmdBindDescriptorSets(
-			commandBuffer,
+			commandBuffer, 
 			VK_PIPELINE_BIND_POINT_GRAPHICS,
 			graphicsPipeline->getPipelineLayout(),
 			// Index of the first descriptor set.
@@ -203,24 +203,23 @@ void NormalPBR::bindData(const Graphics* graphicsPipeline, const VkCommandBuffer
 }
 
 
-void NormalPBR::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)
+void NormalPBR::createDescriptorSets(const VkDescriptorSetLayout& descriptorSetLayout, std::vector<VkDescriptorImageInfo*> info, VkDescriptorPool& descriptorPool)
 {
 	for (auto& mesh : m_meshes)
 	{
-		mesh.descriptorSets = DescriptorSets(
-			logicalDevice,
-			GRAPHICS_PIPELINE::PBR::UBOS_INFO,
-			GRAPHICS_PIPELINE::PBR::SAMPLERS_INFO,
+		DescriptorManager::allocDescriptorSet(descriptorPool, descriptorSetLayout, &mesh.descriptorSet);
+
+		DescriptorManager::createDescriptorSet(
+			GRAPHICS_PIPELINE::PBR::DESCRIPTORS_INFO,
 			mesh.textures,
-			descriptorSetLayout,
-			descriptorPool,
 			info,
-			{ (m_ubo),(m_uboLight) }
+			{ (m_ubo),(m_uboLight) },
+			&mesh.descriptorSet
 		);
 	}
 }
 
-void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void NormalPBR::uploadVertexData(const VkQueue& graphicsQueue, const VkCommandPool& commandPool)
 {
 
 	for (auto& mesh : m_meshes)
@@ -229,7 +228,7 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice, const V
 			getRendererPointer()->getDevice(),
 			getRendererPointer()->getVmaAllocator(),
 			graphicsQueue,
-			commandPool->get(),
+			commandPool,
 			mesh.vertices.data(),
 			sizeof(mesh.vertices[0]) * mesh.vertices.size(),
 			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -241,7 +240,7 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice, const V
 			getRendererPointer()->getDevice(),
 			getRendererPointer()->getVmaAllocator(),
 			graphicsQueue,
-			commandPool->get(),
+			commandPool,
 			mesh.indices.data(),
 			sizeof(mesh.indices[0]) * mesh.indices.size(),
 			VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -254,7 +253,7 @@ void NormalPBR::uploadVertexData(const VkPhysicalDevice& physicalDevice, const V
 /*
  * Creates and loads all the samplers used in the shader of each mesh.
  */
-void NormalPBR::uploadTextures(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
+void NormalPBR::uploadTextures(const VkSampleCountFlagBits& samplesCount, const VkCommandPool& commandPool, const VkQueue& graphicsQueue)
 {
 	const size_t nTextures = GRAPHICS_PIPELINE::PBR::TEXTURES_PER_MESH_COUNT;
 
@@ -289,7 +288,6 @@ const glm::mat4& NormalPBR::getModelM() const
 }
 
 void NormalPBR::updateUBO(
-	const VkDevice& logicalDevice,
 	const uint32_t& currentFrame,
 	const UBOinfo& uboInfo
 ) {
@@ -309,16 +307,13 @@ void NormalPBR::updateUBO(
 }
 
 void NormalPBR::updateUBOlights(
-	const VkDevice& logicalDevice,
-	const std::vector<size_t> lightModelIndices,
-	const std::vector<std::shared_ptr<Model>>& models,
 	const uint32_t& currentFrame
 ) {
-	for (size_t i = 0; i < lightModelIndices.size(); i++)
+	for (size_t i = 0; i < getRenderResource()->m_lightModelIndices.size(); i++)
 	{
-		size_t j = lightModelIndices[i];
+		size_t j = getRenderResource()->m_lightModelIndices[i];
 
-		if (auto pModel = std::dynamic_pointer_cast<Light>(models[j]))
+		if (auto pModel = std::dynamic_pointer_cast<Light>(getRenderResource()->m_modelResource[j]))
 		{
 			m_lightsInfo[i].pos = pModel->getPos();
 			m_lightsInfo[i].color = pModel->getColor();

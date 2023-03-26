@@ -35,7 +35,7 @@ class Pipeline
 public:
 
     Pipeline();
-    Pipeline(const VkDevice& logicalDevice,const PipelineType& type);
+    Pipeline(const PipelineType& type);
     virtual ~Pipeline() = 0;
     const VkPipeline& get() const;
     const VkPipelineLayout& getPipelineLayout() const;
@@ -51,7 +51,6 @@ protected:
 
     PipelineType            m_type;
 
-    VkDevice                m_logicalDevice;
 
     VkPipeline              m_pipeline;
     VkPipelineLayout        m_pipelineLayout;

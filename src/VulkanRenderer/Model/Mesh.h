@@ -3,10 +3,10 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <vulkan/vulkan.h>
+#include <VMA/vk_mem_alloc.h>
 
 #include "VulkanRenderer/Texture/Texture.h"
-
-#include "VulkanRenderer/Descriptor/DescriptorSets.h"
 #include "VulkanRenderer/Model/Attributes.h"
 
 template<typename T>
@@ -25,7 +25,6 @@ struct Mesh
 
 	std::vector<TextureToLoadInfo>         texturesToLoadInfo;
 
-	// (One descriptor set for all the ubo and samplers of a mesh)
-	// (The same descriptor set for each frame in flight)
-	DescriptorSets                         descriptorSets;
+
+	VkDescriptorSet						   descriptorSet;
 };

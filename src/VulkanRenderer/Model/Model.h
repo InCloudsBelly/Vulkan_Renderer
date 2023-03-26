@@ -14,9 +14,7 @@
 #include "VulkanRenderer/Buffer/BufferUtils.h"
 #include "VulkanRenderer/Model/Mesh.h"
 #include "VulkanRenderer/Texture/Texture.h"
-#include "VulkanRenderer/Command/CommandPool.h"
-#include "VulkanRenderer/Descriptor/DescriptorInfo.h"
-#include "VulkanRenderer/Descriptor/DescriptorSets.h"
+
 #include "VulkanRenderer/Features/ShadowMap.h"
 
 enum class ModelType
@@ -38,31 +36,26 @@ public:
 		const glm::fvec3& size = glm::fvec3(1.0f));
 
 	virtual ~Model() = 0;
-	virtual void destroy(const VkDevice& logicalDevice) = 0;
+	virtual void destroy() = 0;
 
 	void upload(
-		const VkPhysicalDevice& physicalDevice,
-		const VkDevice& logicalDevice,
 		const VkQueue& graphicsQueue,
-		const std::shared_ptr<CommandPool>& commandPool,
+		const VkCommandPool& commandPool,
 		const uint32_t						uboCount
 	);
 
 	virtual void bindData(
 		const Graphics* graphicsPipeline,
-		const VkCommandBuffer& commandBUffer,
-		const uint32_t				currentFrame
+		const VkCommandBuffer& commandBUffer
 	) = 0;
 
 	virtual void createDescriptorSets(
-		const VkDevice& logicalDevice,
 		const VkDescriptorSetLayout& descriptorSetLayout,
-		DescriptorSetInfo* info,
-		DescriptorPool& descriptorPool
+		std::vector<VkDescriptorImageInfo*> info,
+		VkDescriptorPool& descriptorPool
 	) = 0;
 
 	virtual void updateUBO(
-		const VkDevice& logicalDevice,
 		const uint32_t& currentFrame,
 		const UBOinfo& uboInfo
 	) = 0;
@@ -83,21 +76,15 @@ protected:
 	void loadModel(const char* pathToModel);
 
 	virtual void uploadVertexData(
-		const VkPhysicalDevice& physicalDevice,
-		const VkDevice& logicalDevice,
 		const VkQueue& graphicsQueue,
-		const std::shared_ptr<CommandPool>& commandPool
+		const VkCommandPool& commandPool
 	) = 0;
 	virtual void uploadTextures(
-		const VkPhysicalDevice& physicalDevice,
-		const VkDevice& logicalDevice,
 		const VkSampleCountFlagBits& samplesCount,
-		const std::shared_ptr<CommandPool>& commandPool,
+		const VkCommandPool& commandPool,
 		const VkQueue& graphicsQueue
 	) = 0;
 	virtual void createUniformBuffers(
-		const VkPhysicalDevice& physicalDevice,
-		const VkDevice& logicalDevice,
 		const uint32_t& uboCount
 	) = 0;
 

@@ -6,6 +6,7 @@
 #include "VulkanRenderer/Math/MathUtils.h"
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Command/CommandManager.h"
+#include "VulkanRenderer/Descriptor/DescriptorManager.h"
 
 #include "VulkanRenderer/Renderer.h"
 
@@ -26,7 +27,7 @@ Light::Light(const ModelInfo& modelInfo)
 
 Light::~Light() {}
 
-void Light::destroy(const VkDevice& logicalDevice)
+void Light::destroy()
 {
     vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubo, m_uboAllocation);
 
@@ -73,7 +74,7 @@ void Light::processMesh(aiMesh* mesh, const aiScene* scene)
     m_meshes.emplace_back(newMesh);
 }
 
-void Light::createUniformBuffers(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const uint32_t& uboCount)
+void Light::createUniformBuffers(const uint32_t& uboCount)
 {
     BufferManager::bufferCreateBuffer(
         getRendererPointer()->getVmaAllocator(),
@@ -85,27 +86,25 @@ void Light::createUniformBuffers(const VkPhysicalDevice& physicalDevice, const V
     );
 }
 
-void Light::createDescriptorSets(const VkDevice& logicalDevice, const VkDescriptorSetLayout& descriptorSetLayout, DescriptorSetInfo* info, DescriptorPool& descriptorPool)
+void Light::createDescriptorSets(const VkDescriptorSetLayout& descriptorSetLayout, std::vector<VkDescriptorImageInfo*> info, VkDescriptorPool& descriptorPool)
 {
     for (auto& mesh : m_meshes)
     {
-        mesh.descriptorSets = DescriptorSets(
-            logicalDevice,
-            GRAPHICS_PIPELINE::SKYBOX::UBOS_INFO,
-            GRAPHICS_PIPELINE::SKYBOX::SAMPLERS_INFO,
+        DescriptorManager::allocDescriptorSet(descriptorPool, descriptorSetLayout, &mesh.descriptorSet);
+
+        DescriptorManager::createDescriptorSet(
+            GRAPHICS_PIPELINE::SKYBOX::DESCRIPTORS_INFO,
             mesh.textures,
-            descriptorSetLayout,
-            descriptorPool,
-            nullptr,
-            { m_ubo }
+            {},
+            { m_ubo },
+            &mesh.descriptorSet
         );
     }
 }
 
 void Light::bindData(
     const Graphics* graphicsPipeline,
-    const VkCommandBuffer& commandBuffer,
-    const uint32_t currentFrame
+    const VkCommandBuffer& commandBuffer
 ) {
     for (auto& mesh : m_meshes)
     {
@@ -114,7 +113,7 @@ void Light::bindData(
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
         vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        const std::vector<VkDescriptorSet> sets = { mesh.descriptorSets.get(currentFrame) };
+        const std::vector<VkDescriptorSet> sets = { mesh.descriptorSet };
         vkCmdBindDescriptorSets(
             commandBuffer,
             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -129,7 +128,7 @@ void Light::bindData(
     }
 }
 
-void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkQueue& graphicsQueue, const std::shared_ptr<CommandPool>& commandPool)
+void Light::uploadVertexData(const VkQueue& graphicsQueue, const VkCommandPool& commandPool)
 {
 
     for (auto& mesh : m_meshes)
@@ -138,7 +137,7 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDev
             getRendererPointer()->getDevice(),
             getRendererPointer()->getVmaAllocator(),
             graphicsQueue,
-            commandPool->get(),
+            commandPool,
             mesh.vertices.data(),
             sizeof(mesh.vertices[0]) * mesh.vertices.size(),
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -150,7 +149,7 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDev
             getRendererPointer()->getDevice(),
             getRendererPointer()->getVmaAllocator(),
             graphicsQueue,
-            commandPool->get(),
+            commandPool,
             mesh.indices.data(),
             sizeof(mesh.indices[0]) * mesh.indices.size(),
             VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -160,7 +159,7 @@ void Light::uploadVertexData(const VkPhysicalDevice& physicalDevice, const VkDev
     }
 }
 
-void Light::uploadTextures(const VkPhysicalDevice& physicalDevice, const VkDevice& logicalDevice, const VkSampleCountFlagBits& samplesCount, const std::shared_ptr<CommandPool>& commandPool, const VkQueue& graphicsQueue)
+void Light::uploadTextures(const VkSampleCountFlagBits& samplesCount, const VkCommandPool& commandPool, const VkQueue& graphicsQueue)
 {
     const size_t nTextures = GRAPHICS_PIPELINE::LIGHT::TEXTURES_PER_MESH_COUNT;
     const TextureToLoadInfo info = { "DefaultTexture.png", "defaultTextures",VK_FORMAT_R8G8B8A8_SRGB , 4 };
@@ -185,7 +184,7 @@ void Light::uploadTextures(const VkPhysicalDevice& physicalDevice, const VkDevic
     }
 }
 
-void Light::updateUBO(const VkDevice& logicalDevice, const uint32_t& currentFrame, const UBOinfo& uboInfo)
+void Light::updateUBO(const uint32_t& currentFrame, const UBOinfo& uboInfo)
 {
 
     m_dataInShader.model = MathUtils::getUpdatedModelMatrix(m_pos, m_rot, m_size);

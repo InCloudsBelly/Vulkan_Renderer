@@ -10,7 +10,7 @@
 
 #include "VulkanRenderer/Shader/ShaderManager.h"
 #include "VulkanRenderer/Features/FeaturesUtils.h"
-#include "VulkanRenderer/Descriptor/DescriptorSetLayoutManager.h"
+#include "VulkanRenderer/Renderer.h"
 
 Graphics::Graphics() {}
 
@@ -19,7 +19,6 @@ Graphics::~Graphics() {}
 // Improve this for more types(it can contain the type in the 
 // param. with a vector containing the ShadrModules to create)
 Graphics::Graphics(
-    const VkDevice& logicalDevice,
     const GraphicsPipelineType type,
     const VkExtent2D& extent,
     const RenderPass& renderPass,
@@ -28,22 +27,39 @@ Graphics::Graphics(
     VkVertexInputBindingDescription vertexBindingDescriptions,
     std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
     const std::vector<size_t>& modelIndices,
-    const std::vector<DescriptorInfo>& uboInfo,
-    const std::vector<DescriptorInfo>& samplersInfo,
+    const std::vector<DescriptorInfo>& descriptorInfo,
     const std::vector<VkPushConstantRange>& pushConstantRanges
 )
-    : Pipeline(logicalDevice, PipelineType::GRAPHICS),m_gType(type), m_modelIndices(modelIndices)
+    : Pipeline(PipelineType::GRAPHICS), m_gType(type), m_modelIndices(modelIndices)
 {
+    //-------------------DescriptorSetLayout--------------------
+    
+    std::vector<VkDescriptorSetLayoutBinding> bindings(descriptorInfo.size());
 
-    createDescriptorSetLayout(uboInfo, samplersInfo);
+    for (size_t i = 0; i < descriptorInfo.size(); i++)
+    {
+        bindings[i].binding = descriptorInfo[i].bindingNumber;
+        bindings[i].descriptorType = descriptorInfo[i].descriptorType;
+        bindings[i].descriptorCount = 1;
+        bindings[i].stageFlags = descriptorInfo[i].shaderStage;
+        bindings[i].pImmutableSamplers = nullptr;
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create descriptor set layout!");
 
     // -------------------Shader Modules--------------------
     std::vector<VkShaderModule> shaderModules(shaderInfos.size());
     std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
     for (size_t i = 0; i < shaderInfos.size(); i++)
     {
-        createShaderModule(shaderInfos[i],shaderModules[i]);
-        createShaderStageInfo(shaderModules[i],shaderInfos[i].type,shaderStagesInfos[i]);
+        createShaderModule(shaderInfos[i], shaderModules[i]);
+        createShaderStageInfo(shaderModules[i], shaderInfos[i].type, shaderStagesInfos[i]);
     }
 
     // -------------------Fixed Functions------------------
@@ -137,7 +153,7 @@ Graphics::Graphics(
     // Optional
     pipelineInfo.basePipelineIndex = -1;
 
-    auto status = vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+    auto status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create graphics pipeline!");
@@ -146,7 +162,7 @@ Graphics::Graphics(
     // already linked, we won't need the shader modules anymore.
     for (auto& shaderModule : shaderModules)
     {
-        ShaderManager::destroyShaderModule(shaderModule,logicalDevice);
+        ShaderManager::destroyShaderModule(shaderModule);
     }
 }
 
@@ -345,11 +361,33 @@ const GraphicsPipelineType Graphics::getGraphicsPipelineType() const
 void Graphics::createDescriptorSetLayout(
     const std::vector<DescriptorInfo>& uboInfo,
     const std::vector<DescriptorInfo>& samplersInfo
-) {
-    DescriptorSetLayoutManager::Graphics::createDescriptorSetLayout(
-        m_logicalDevice,
-        uboInfo,
-        samplersInfo,
-        m_descriptorSetLayout
-    );
+) 
+{
+    std::vector<VkDescriptorSetLayoutBinding> bindings(uboInfo.size() + samplersInfo.size());
+    // UBOs
+    for (size_t i = 0; i < uboInfo.size(); i++)
+    {
+        bindings[i].binding = uboInfo[i].bindingNumber;
+        bindings[i].descriptorType = uboInfo[i].descriptorType;
+        bindings[i].descriptorCount = 1;
+        bindings[i].stageFlags = uboInfo[i].shaderStage;
+        bindings[i].pImmutableSamplers = nullptr;
+    }
+    // Samplers
+    for (size_t i = 0; i < samplersInfo.size(); i++)
+    {
+        bindings[i + uboInfo.size()].binding = samplersInfo[i].bindingNumber;
+        bindings[i + uboInfo.size()].descriptorType = samplersInfo[i].descriptorType;
+        bindings[i + uboInfo.size()].descriptorCount = 1;
+        bindings[i + uboInfo.size()].stageFlags = samplersInfo[i].shaderStage;
+        bindings[i + uboInfo.size()].pImmutableSamplers = nullptr;
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
+
+    if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create descriptor set layout!");
 }

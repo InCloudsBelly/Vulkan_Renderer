@@ -4,7 +4,8 @@
 #include <iostream>
 
 #include "VulkanRenderer/Renderer.h"
-
+#include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Math/MathUtils.h"
 
 Scene::Scene() {}
 
@@ -147,6 +148,60 @@ void Scene::createRenderPass(
     );
 }
 
+void Scene::createUniformBuffer(const std::shared_ptr<Model> modelPtr, std::vector<size_t>& uboSizeInfos)
+{
+    for (uint32_t meshIndex : modelPtr->getMeshIndices())
+    {
+        // create UBO PerMesh
+        m_ubosMap[meshIndex].resize(uboSizeInfos.size());
+        m_uboAllocationsMap[meshIndex].resize(uboSizeInfos.size());
+
+        for (uint32_t i = 0; i < uboSizeInfos.size(); ++i)
+        {
+            BufferManager::bufferCreateBuffer(
+                getRendererPointer()->getVmaAllocator(),
+                uboSizeInfos[i],
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VMA_MEMORY_USAGE_CPU_TO_GPU,
+                &m_ubosMap[meshIndex][i],
+                &m_uboAllocationsMap[meshIndex][i]
+            );
+        }
+    }
+}
+
+void Scene::createDescriptorSet(const std::shared_ptr<Model> modelPtr, const VkDescriptorPool& descriptorPool, const VkDescriptorSetLayout& layout, std::vector<VkDescriptorImageInfo*> additionalImages, const std::vector<DescriptorInfo>& descriptorInfos)
+{
+    for (uint32_t meshIndex : modelPtr->getMeshIndices())
+    {
+        //create DescriptorSet PerMesh
+        DescriptorManager::allocDescriptorSet(descriptorPool, layout, &m_descriptorSetsMap[meshIndex]);
+
+        RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
+        std::vector<std::shared_ptr<TextureBase>> materialTextures;
+        if (renderMeshInfo.ref_material != nullptr)
+        {
+            materialTextures = {
+                renderMeshInfo.ref_material->colorTexture,
+                renderMeshInfo.ref_material->metallic_RoughnessTexture,
+                renderMeshInfo.ref_material->emissiveTexture,
+                renderMeshInfo.ref_material->AOTexture,
+                renderMeshInfo.ref_material->normalTexture
+            };
+        }
+        else
+            materialTextures = {};
+
+        DescriptorManager::createDescriptorSet(
+            descriptorInfos,
+            materialTextures,
+            additionalImages,
+            m_ubosMap[meshIndex],
+            &m_descriptorSetsMap[meshIndex]
+        );
+    }
+}
+
 
 void Scene::createPipelines(
     const VkFormat& format,
@@ -161,7 +216,6 @@ void Scene::createPipelines(
         msaaSamplesCount,
         Attributes::SKYBOX::getBindingDescription(),
         Attributes::SKYBOX::getAttributeDescriptions(),
-        { getRenderResource()->m_skyboxIndex },
         GRAPHICS_PIPELINE::SKYBOX::DESCRIPTORS_INFO,
         {}
     );
@@ -175,7 +229,6 @@ void Scene::createPipelines(
         Attributes::PBR::getBindingDescription(),
         Attributes::PBR::getAttributeDescriptions(),
         //Models asssocciated with this graphics pipeline.
-        getRenderResource()->m_objectModelIndices,
         GRAPHICS_PIPELINE::PBR::DESCRIPTORS_INFO,
         {}
     );
@@ -189,7 +242,6 @@ void Scene::createPipelines(
         Attributes::LIGHT::getBindingDescription(),
         Attributes::LIGHT::getAttributeDescriptions(),
         // Models assocciated with this graphics pipeline.
-        getRenderResource()->m_lightModelIndices,
         GRAPHICS_PIPELINE::LIGHT::DESCRIPTORS_INFO,
         {}
     );
@@ -200,11 +252,11 @@ void Scene::loadModels(const std::vector<ModelInfo>& modelsToLoadInfo)
 {
     std::vector<std::thread> threads;
 
-    const size_t maxThreadsCount = std::thread::hardware_concurrency() - 1;
-    size_t chunckSize = ((modelsToLoadInfo.size() < maxThreadsCount) ?1 :modelsToLoadInfo.size() / maxThreadsCount);
-    const size_t threadsCount = ((modelsToLoadInfo.size() < maxThreadsCount) ?modelsToLoadInfo.size() :maxThreadsCount);
+    const uint32_t maxThreadsCount = std::thread::hardware_concurrency() - 1;
+    uint32_t chunckSize = ((modelsToLoadInfo.size() < maxThreadsCount) ?1 :modelsToLoadInfo.size() / maxThreadsCount);
+    const uint32_t threadsCount = ((modelsToLoadInfo.size() < maxThreadsCount) ?modelsToLoadInfo.size() :maxThreadsCount);
 
-    for (size_t i = 0; i < threadsCount; i++)
+    for (uint32_t i = 0; i < threadsCount; i++)
     {
         if (i == threadsCount - 1 && maxThreadsCount < modelsToLoadInfo.size())
         {
@@ -216,59 +268,37 @@ void Scene::loadModels(const std::vector<ModelInfo>& modelsToLoadInfo)
     for (auto& thread : threads)
         thread.join();
 
-    if (getRenderResource()->m_objectModelIndices.size() == 0)
+  /*  if (getRenderResource()->m_objectModelIndices.size() == 0)
         throw std::runtime_error("Add at least 1 model." );
     if (getRenderResource()->m_directionalLightIndex == -1)
         throw std::runtime_error("Add at least 1 directional light.");
     if (getRenderResource()->m_skyboxIndex == -1)
-        throw std::runtime_error("Add at least 1 skybox.");
+        throw std::runtime_error("Add at least 1 skybox.");*/
 }
 
-void Scene::loadModel(const size_t startI,const size_t chunckSize,const std::vector<ModelInfo>& modelsToLoadInfo) 
+void Scene::loadModel(const uint32_t startI,const uint32_t chunckSize,const std::vector<ModelInfo>& modelsToLoadInfo) 
 {
-    const size_t endI = startI + chunckSize;
+    const uint32_t endI = startI + chunckSize;
 
-    for (size_t i = startI; i < endI; i++)
+    for (uint32_t i = startI; i < endI; i++)
     {
         const ModelInfo& modelInfo = modelsToLoadInfo[i];
 
-        switch (modelInfo.type)
+        std::shared_ptr<Model> model = std::make_shared<Model>(modelInfo.name, modelInfo.fileName, modelInfo.folderName, modelInfo.type, glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size);
+       
+        if (modelInfo.type == ModelType::NORMAL_PBR)
+            getRenderResource()->m_normalModels.push_back(model);
+        else if (modelInfo.type == ModelType::SKYBOX)
+            getRenderResource()->m_skybox = model;
+        else if (modelInfo.type == ModelType::LIGHT)
         {
-            case ModelType::SKYBOX:
-            {
-                getRenderResource()->m_modelResource.push_back(std::make_shared<Skybox>(modelInfo));
-               
-                if (getRenderResource()->m_skyboxIndex != -1)
-                    throw std::runtime_error("You can't add more than 1 skybox per scene!");
+            getRenderResource()->m_lightModels.push_back(model);
 
-                getRenderResource()->m_skyboxIndex = getRenderResource()->m_modelResource.size() - 1;
-                m_skybox = std::dynamic_pointer_cast<Skybox>(getRenderResource()->m_modelResource[getRenderResource()->m_skyboxIndex]);
-
-                break;
-
-            }
-            case ModelType::NORMAL_PBR:
-            {
-               
-                getRenderResource()->m_modelResource.push_back(std::make_shared<NormalPBR>(modelInfo));
-                getRenderResource()->m_objectModelIndices.push_back(getRenderResource()->m_modelResource.size() - 1);
-
-                break;
-
-            }
-            case ModelType::LIGHT:
-            {
-                getRenderResource()->m_modelResource.push_back(std::make_shared<Light>(modelInfo));
-                getRenderResource()->m_lightModelIndices.push_back(getRenderResource()->m_modelResource.size() - 1);
-
-                if (modelInfo.lType == LightType::DIRECTIONAL_LIGHT)
-                {
-                    if (getRenderResource()->m_directionalLightIndex != -1)
-                        throw std::runtime_error("You can't add more than 1 directional light per scene!");
-                    getRenderResource()->m_directionalLightIndex = getRenderResource()->m_modelResource.size() - 1;
-                }
-                break;
-            }
+            LightInfo lightInfo{ modelInfo.name,glm::fvec4(modelInfo.pos, 1.0f), modelInfo.rot, modelInfo.size, glm::fvec4(modelInfo.endPos, 1.0f), glm::fvec4(modelInfo.color,1.0f), 1.0f, modelInfo.lType, model };
+            lightInfo.m_intensity = lightInfo.m_lightType == LightType::DIRECTIONAL_LIGHT ? 15.0f : 70.0f;
+            getRenderResource()->m_lightsInfo.push_back(lightInfo);
+            if (lightInfo.m_lightType == LightType::DIRECTIONAL_LIGHT)
+                getRenderResource()->m_directionalLightIndex = getRenderResource()->m_lightsInfo.size() - 1;
         }
     }
 }
@@ -300,21 +330,85 @@ void Scene::updateUBO(
         camera->getViewM(),
         camera->getProjectionM(),
         lightSpace,
-         static_cast<uint32_t>(getRenderResource()->m_lightModelIndices.size()),
+        getRenderResource()->m_lightsInfo.size(),
         extent
     };
 
     // Scene
 
-    for (auto& model : getRenderResource()->m_modelResource)
+    for (auto ptr : getRenderResource()->m_normalModels)
     {
-        model->updateUBO(currentFrame, uboInfo);
-
-        if (auto pModel = std::dynamic_pointer_cast<NormalPBR>(model))
+        for (uint32_t meshIndex : ptr->getMeshIndices())
         {
-            pModel->updateUBOlights(currentFrame);
+            // update normal UBO 
+            DescriptorTypes::UniformBufferObject::NormalPBR  uboData1;
+            uboData1.model = ptr->getModelMatrix();
+            uboData1.view = uboInfo.view;
+            uboData1.proj = uboInfo.proj;
+            uboData1.lightSpace = uboInfo.lightSpace;
+
+            uboData1.cameraPos = uboInfo.cameraPos;
+            uboData1.lightsCount = uboInfo.lightsCount;
+
+            void* data1;
+            vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0], &data1);
+            memcpy(data1, &uboData1, sizeof(uboData1));
+            vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0]);
+
+
+            // update lights UBO
+            DescriptorTypes::UniformBufferObject::LightInfo uboData2[Config::LIGHTS_COUNT];
+
+            for (uint32_t i = 0; i < getRenderResource()->m_lightsInfo.size(); i++)
+            {
+                LightInfo info = getRenderResource()->m_lightsInfo[i];
+                uboData2[i].pos = info.pos;
+                uboData2[i].color = info.m_color;
+                uboData2[i].dir = info.m_targetPos - info.pos;
+                uboData2[i].intensity = info.m_intensity;
+                uboData2[i].type = (int)info.m_lightType;
+            }
+
+            void* data2;
+            vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][1], &data2);
+            memcpy(data2, &uboData2, sizeof(uboData2[0]) * 10);
+            vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][1]);
         }
     }
+
+    for (auto ptr : getRenderResource()->m_lightModels)
+    {
+        for (uint32_t meshIndex : ptr->getMeshIndices())
+        {
+            DescriptorTypes::UniformBufferObject::Light newUBO;
+            newUBO.model = ptr->getModelMatrix();
+
+            newUBO.view = uboInfo.view;
+            newUBO.proj = uboInfo.proj;
+            newUBO.lightColor = glm::fvec4(1.0f);
+
+            void* data;
+            vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0], &data);
+            memcpy(data, &newUBO, sizeof(newUBO));
+            vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0]);
+        }
+    }
+ 
+    auto skybox = getRenderResource()->m_skybox;
+    for (uint32_t meshIndex : skybox->getMeshIndices())
+    {
+        DescriptorTypes::UniformBufferObject::Skybox newUBO;
+
+        newUBO.model = glm::translate(glm::mat4(1.0f), glm::vec3(uboInfo.cameraPos));
+        newUBO.view = uboInfo.view;
+        newUBO.proj = MathUtils::getUpdatedProjMatrix(glm::radians(75.0f), uboInfo.extent.width / (float)uboInfo.extent.height, 0.01f, 40.0f);
+
+        void* data;
+        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0], &data);
+        memcpy(data, &newUBO, sizeof(newUBO));
+        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0]);
+    }
+   
 }
 
 
@@ -328,45 +422,42 @@ void Scene::upload(
     const VkCommandPool& commandPool,
     VkDescriptorPool& descriptorPool,
     // Features
-    const std::shared_ptr<ShadowMap<Attributes::PBR::Vertex>> shadowMap
+    const std::shared_ptr<ShadowMap<MeshVertex>> shadowMap
 ) {
-    // First we upload the skybox because we need some dependencies from it for
-    // the descriptor sets of the other models.
-    m_skybox->upload(
-        graphicsQueue,
-        commandPool,
-        Config::MAX_FRAMES_IN_FLIGHT
-    );
 
-    m_skybox->createDescriptorSets(
-        m_graphicsPipelineSkybox.getDescriptorSetLayout(),
-        {},
-        descriptorPool
-    );
+    for (auto ptr : getRenderResource()->m_normalModels)
+    {
+        ptr->upload(commandPool, graphicsQueue);
+    }
+
+    for (auto ptr : getRenderResource()->m_lightModels)
+    {
+        ptr->upload(commandPool, graphicsQueue);
+    }
+
+    auto skybox = getRenderResource()->m_skybox;
+    skybox->upload(commandPool, graphicsQueue);
+
 
     // IBL
     {
         loadBRDFlut(graphicsQueue, commandPool, m_vmaAllocator);
 
-
-        m_prefilteredIrradiance = std::make_shared<PrefilteredIrradiance<Attributes::SKYBOX::Vertex>>(
+        m_prefilteredIrradiance = std::make_shared<PrefilteredIrradiance>(
             graphicsQueue,
             commandPool,
             Config::PREF_IRRADIANCE_DIM,
-            m_skybox->getMeshes(),
-            m_skybox->getEnvMap()
+            getRenderResource()->m_skyboxCubeMap
             );
 
-        m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap<Attributes::SKYBOX::Vertex>>(
+        m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap>(
             graphicsQueue,
             commandPool,
             Config::PREF_ENV_MAP_DIM,
-            m_skybox->getMeshes(),
-            m_skybox->getEnvMap()
+            getRenderResource()->m_skyboxCubeMap
             );
     }
 
-    //getRenderResource()->updateIBLResource(m_BRDFlut, m_prefilteredIrradiance->get(), m_prefilteredEnvMap->get());
     getRenderResource()->updateIBLResource(m_BRDFlut, m_prefilteredIrradiance->get(), m_prefilteredEnvMap->get());
 
 
@@ -378,28 +469,66 @@ void Scene::upload(
     };
 
 
-    VkDescriptorSetLayout descriptorSetLayout;
-    for (auto& model : getRenderResource()->m_modelResource)
+    for (auto ptr : getRenderResource()->m_normalModels)
     {
-        auto type = model->getType();
-        if (type == ModelType::SKYBOX) continue;
+        std::vector<size_t> uboSizeInfos = {
+               sizeof(DescriptorTypes::UniformBufferObject::NormalPBR),
+               sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10
+        };
+        createUniformBuffer(ptr, uboSizeInfos);
 
-        model->upload(graphicsQueue, commandPool, Config::MAX_FRAMES_IN_FLIGHT);
-        if (type == ModelType::NORMAL_PBR)
-            descriptorSetLayout = (m_graphicsPipelinePBR.getDescriptorSetLayout());
-        else
-            if (type == ModelType::LIGHT)
-                descriptorSetLayout = (m_graphicsPipelineLight.getDescriptorSetLayout());
+        createDescriptorSet(ptr, descriptorPool, m_graphicsPipelinePBR.getDescriptorSetLayout(), additionalImage, GRAPHICS_PIPELINE::PBR::DESCRIPTORS_INFO);
+    }
 
-        model->createDescriptorSets(descriptorSetLayout, additionalImage, descriptorPool);
+    for (auto ptr : getRenderResource()->m_lightModels)
+    {
+        std::vector<size_t> uboSizeInfos = {sizeof(DescriptorTypes::UniformBufferObject::Light)};
+        createUniformBuffer(ptr, uboSizeInfos);
+        createDescriptorSet(ptr, descriptorPool, m_graphicsPipelineLight.getDescriptorSetLayout(), { &getRenderResource()->m_defaultTexture->getDescriptorImageInfo() }, GRAPHICS_PIPELINE::LIGHT::DESCRIPTORS_INFO);
+    }
+
+    {
+        auto skybox = getRenderResource()->m_skybox;
+        std::vector<size_t> uboSizeInfos = { sizeof(DescriptorTypes::UniformBufferObject::Skybox) };
+        createUniformBuffer(skybox, uboSizeInfos);
+        createDescriptorSet(skybox, descriptorPool, m_graphicsPipelineSkybox.getDescriptorSetLayout(), { &getRenderResource()->m_skyboxCubeMap->getDescriptorImageInfo() }, GRAPHICS_PIPELINE::SKYBOX::DESCRIPTORS_INFO);
     }
 }
 
 
 void Scene::destroy()
 {
-    for (auto& model : getRenderResource()->m_modelResource)
-        model->destroy();
+    for (auto ptr : getRenderResource()->m_normalModels)
+    {
+        for (uint32_t meshIndex : ptr->getMeshIndices())
+        {
+            for (uint32_t i = 0; i < m_ubosMap[meshIndex].size(); ++i)
+            {
+                vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubosMap[meshIndex][i], m_uboAllocationsMap[meshIndex][i]);
+            }
+        }
+    }
+
+    for (auto ptr : getRenderResource()->m_lightModels)
+    {
+        for (uint32_t meshIndex : ptr->getMeshIndices())
+        {
+            for (uint32_t i = 0; i < m_ubosMap[meshIndex].size(); ++i)
+            {
+                vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubosMap[meshIndex][i], m_uboAllocationsMap[meshIndex][i]);
+            }
+        }
+    }
+
+    auto skybox = getRenderResource()->m_skybox;
+    for (uint32_t meshIndex : skybox->getMeshIndices())
+    {
+        for (uint32_t i = 0; i < m_ubosMap[meshIndex].size(); ++i)
+        {
+            vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubosMap[meshIndex][i], m_uboAllocationsMap[meshIndex][i]);
+        }
+    }
+
 
     m_graphicsPipelinePBR.destroy();
     m_graphicsPipelineSkybox.destroy();
@@ -420,7 +549,7 @@ void Scene::loadBRDFlut(
     const VmaAllocator& vmaAllocator
 ) {
    
-    std::string TextureName = "BRDF_LUT.tga";
+    std::string TextureName ="BRDF_LUT.png";
     TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4};
 
     m_BRDFlut = std::make_shared<NormalTexture>(

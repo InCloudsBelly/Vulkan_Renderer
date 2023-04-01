@@ -45,11 +45,11 @@ VkResult DescriptorManager::createDescriptorSet(
 
     // UBOs  / Samplers of textures / Sampler of additional textures 
     {
-        for (size_t j = 0; j < bufferInfos.size(); ++j)
+        for (uint32_t j = 0; j < bufferInfos.size(); ++j)
             createDescriptorBufferInfo(UBOs[j], bufferInfos[j]);
-        for (size_t j = 0; j < textures.size(); j++)
+        for (uint32_t j = 0; j < textures.size(); j++)
             createDescriptorImageInfo(textures[j]->getImageView(), textures[j]->getSampler(), imageInfos[j]);
-        for (size_t j = 0; j < additionalTextureInfos.size(); j++)
+        for (uint32_t j = 0; j < additionalTextureInfos.size(); j++)
             createDescriptorImageInfo(additionalTextureInfos[j]->imageView, additionalTextureInfos[j]->sampler, imageInfos[textures.size() + j]);
     }
 
@@ -57,9 +57,9 @@ VkResult DescriptorManager::createDescriptorSet(
 
     // UBOs  / Samplers
     {
-        for (size_t j = 0; j < bufferInfos.size(); j++)
+        for (uint32_t j = 0; j < bufferInfos.size(); j++)
             createDescriptorWriteInfo(bufferInfos[j], *descriptorset, descriptorInfos[j].bindingNumber, 0, descriptorInfos[j].descriptorType, descriptorWrites[j]);
-        for (size_t j = 0; j < imageInfos.size(); j++)
+        for (uint32_t j = 0; j < imageInfos.size(); j++)
             createDescriptorWriteInfo(imageInfos[j], *descriptorset, descriptorInfos[bufferInfos.size() + j].bindingNumber, 0, descriptorInfos[bufferInfos.size() + j].descriptorType, descriptorWrites[bufferInfos.size() + j]);
     }
 

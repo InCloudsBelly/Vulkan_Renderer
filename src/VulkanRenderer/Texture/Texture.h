@@ -5,15 +5,7 @@
 
 
 #include "VulkanRenderer/Command/CommandManager.h"
-
-struct TextureToLoadInfo
-{
-    std::string name;
-    std::string folderName;
-    VkFormat    format;
-    int         desiredChannels;
-};
-
+#include "VulkanRenderer/RenderDataTypes.h"
 
 class TextureBase
 {

@@ -6,7 +6,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
-#include "VulkanRenderer/Model/ModelInfo.h"
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
@@ -17,12 +16,11 @@
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
 #include "VulkanRenderer/Renderer.h"
 
-template<typename T>
-PrefilteredIrradiance<T>::PrefilteredIrradiance(
+
+PrefilteredIrradiance::PrefilteredIrradiance(
     const VkQueue& graphicsQueue,
     const VkCommandPool& commandPool,
     const uint32_t dim,
-    const std::vector<Mesh<T>>& meshes,
     const std::shared_ptr<TextureBase>& envMap
 ) : m_dim(dim), m_format(VK_FORMAT_R32G32B32A32_SFLOAT)
 {
@@ -34,11 +32,11 @@ PrefilteredIrradiance<T>::PrefilteredIrradiance(
     createPipeline();
     createDescriptorPool();
     createDescriptorSet(envMap);
-    recordCommandBuffer(commandPool, graphicsQueue, meshes);
+    recordCommandBuffer(commandPool, graphicsQueue);
 }
 
-template<typename T>
-void PrefilteredIrradiance<T>::createDescriptorPool()
+
+void PrefilteredIrradiance::createDescriptorPool()
 {
     std::vector<VkDescriptorPoolSize> poolSizes = {
        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1}
@@ -47,8 +45,8 @@ void PrefilteredIrradiance<T>::createDescriptorPool()
     DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPool);
 }
 
-template<typename T>
-void PrefilteredIrradiance<T>::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
+
+void PrefilteredIrradiance::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
 {
     DescriptorManager::allocDescriptorSet(m_descriptorPool, m_graphicsPipeline.getDescriptorSetLayout(), &m_descriptorSet);
 
@@ -62,11 +60,10 @@ void PrefilteredIrradiance<T>::createDescriptorSet(const std::shared_ptr<Texture
 
 }
 
-template<typename T>
-void PrefilteredIrradiance<T>::recordCommandBuffer(
+
+void PrefilteredIrradiance::recordCommandBuffer(
     const VkCommandPool& commandPool,
-    const VkQueue& graphicsQueue,
-    const std::vector<Mesh<T>>& meshes
+    const VkQueue& graphicsQueue
 ) {
     VkClearValue clearValues;
     clearValues.color = { {0.0f, 0.0f, 0.2f, 0.0f} };
@@ -141,14 +138,15 @@ void PrefilteredIrradiance<T>::recordCommandBuffer(
                 0, {}
             );
 
-            for (auto& mesh : meshes)
-            {
-                std::vector<VkBuffer> vertexBuffers = { mesh.vertexBuffer };
-                std::vector<VkDeviceSize> offsets = { 0 };
-                vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
-                vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-                vkCmdDrawIndexed(commandBuffer, mesh.indices.size(), 1, 0, 0, 0);
+            {
+                RenderMeshInfo& info =  getRenderResource()->m_meshInfoMap[getRenderResource()->m_defaultCubeMeshIndex];
+
+                std::vector<VkDeviceSize> offsets = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, info.ref_mesh->vertexBuffer, offsets.data());
+                vkCmdBindIndexBuffer(commandBuffer, *info.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                vkCmdDrawIndexed(commandBuffer, info.ref_mesh->meshIndexCount, 1, 0, 0, 0);
             }
 
             m_renderPass.end(commandBuffer);
@@ -206,8 +204,8 @@ void PrefilteredIrradiance<T>::recordCommandBuffer(
 }
 
 
-template<typename T>
-void PrefilteredIrradiance<T>::copyRegionOfImage(
+
+void PrefilteredIrradiance::copyRegionOfImage(
     float face,
     float mipLevel,
     float viewportDim,
@@ -243,8 +241,8 @@ void PrefilteredIrradiance<T>::copyRegionOfImage(
 }
 
 
-template<typename T>
-void PrefilteredIrradiance<T>::createPipeline()
+
+void PrefilteredIrradiance::createPipeline()
 {
     m_graphicsPipeline = Graphics(
         GraphicsPipelineType::PREFILTER_ENV_MAP,
@@ -255,15 +253,14 @@ void PrefilteredIrradiance<T>::createPipeline()
         // It uses the same attributes as the skybox shader.
         Attributes::SKYBOX::getBindingDescription(),
         Attributes::SKYBOX::getAttributeDescriptions(),
-        {},
         GRAPHICS_PIPELINE::PREFILTER_IRRADIANCE::DESCRIPTORS_INFO,
         { {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(PushBlockIrradiance)} }
     );
 }
 
 
-template<typename T>
-void PrefilteredIrradiance<T>::createOffscreenFramebuffer(
+
+void PrefilteredIrradiance::createOffscreenFramebuffer(
     const VkQueue& graphicsQueue
 ) {
     
@@ -329,8 +326,8 @@ void PrefilteredIrradiance<T>::createOffscreenFramebuffer(
 }
 
 
-template<typename T>
-void PrefilteredIrradiance<T>::createRenderPass()
+
+void PrefilteredIrradiance::createRenderPass()
 {
     // Color Attachment
     VkAttachmentDescription colorAttachment{};
@@ -409,8 +406,8 @@ void PrefilteredIrradiance<T>::createRenderPass()
 }
 
 
-template<typename T>
-void PrefilteredIrradiance<T>::createTargetImage()
+
+void PrefilteredIrradiance::createTargetImage()
 {
     m_targetImage = std::make_shared<CubeMapTexture>("Irradiance");
     m_targetImage->getExtent() = VkExtent2D({ m_dim, m_dim });
@@ -435,11 +432,11 @@ void PrefilteredIrradiance<T>::createTargetImage()
 
 }
 
-template<typename T>
-PrefilteredIrradiance<T>::~PrefilteredIrradiance() {}
 
-template<typename T>
-void PrefilteredIrradiance<T>::destroy()
+PrefilteredIrradiance::~PrefilteredIrradiance() {}
+
+
+void PrefilteredIrradiance::destroy()
 {
     m_graphicsPipeline.destroy();
     vkDestroyDescriptorPool(getRendererPointer()->getDevice(), m_descriptorPool, nullptr);
@@ -451,12 +448,8 @@ void PrefilteredIrradiance<T>::destroy()
     vkDestroyFramebuffer( getRendererPointer()->getDevice(), m_framebuffer, nullptr);
 }
 
-template<typename T>
-const std::shared_ptr<TextureBase> PrefilteredIrradiance<T>::get() const
+
+const std::shared_ptr<TextureBase> PrefilteredIrradiance::get() const
 {
     return m_targetImage;
 }
-
-
-////////////////////////////////////INSTANCES//////////////////////////////////
-template class PrefilteredIrradiance<Attributes::SKYBOX::Vertex>;

@@ -36,11 +36,7 @@
 
 #include "VulkanRenderer/Command/CommandManager.h"
 
-#include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/Model/Attributes.h"
-#include "VulkanRenderer/Model/Types/NormalPBR.h"
-#include "VulkanRenderer/Model/Types/Skybox.h"
-#include "VulkanRenderer/Model/Types/Light.h"
 
 #include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
@@ -165,7 +161,7 @@ void Renderer::createSyncObjects()
 
     //---------------------Creation of Sync. Objects---------------------------
 
-    for (size_t i = 0; i < Config::MAX_FRAMES_IN_FLIGHT; i++)
+    for (uint32_t i = 0; i < Config::MAX_FRAMES_IN_FLIGHT; i++)
     {
         if (vkCreateSemaphore(m_device->getLogicalDevice(), &semaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create semaphore!");
@@ -275,7 +271,7 @@ void Renderer::initVulkan()
     //(these features they are not used by all the pipelines and need dependencies)
 
     const VkExtent2D shadowExtent = { 2 * m_swapchain->getExtent().height, 2 * m_swapchain->getExtent().width };
-    m_shadowMap = std::make_shared<ShadowMap<Attributes::PBR::Vertex>>(
+    m_shadowMap = std::make_shared<ShadowMap<MeshVertex>>(
             shadowExtent,
             m_swapchain->getImageCount(),
             m_depthBuffer.getFormat(),
@@ -335,14 +331,86 @@ void Renderer::recordCommandBuffer(
             continue;
         }
 
-
-        for (auto i : graphicsPipeline->getModelIndices())
+        if (graphicsPipeline->getGraphicsPipelineType() == GraphicsPipelineType::PBR)
         {
-            auto& model = getRenderResource()->m_modelResource[i];
-
-            if (model->isHidden() == false)
+            for (auto& ptr : getRenderResource()->m_normalModels)
             {
-                model->bindData(graphicsPipeline, commandBuffer);
+                if (ptr->isHidden() == false)
+                {
+                    for (uint32_t meshIndex : ptr->getMeshIndices())
+                    {
+                        RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
+
+                        std::vector<VkDeviceSize> offsets = { 0 };
+                        vkCmdBindVertexBuffers(commandBuffer, 0, 1, renderMeshInfo.ref_mesh->vertexBuffer, offsets.data());
+                        vkCmdBindIndexBuffer(commandBuffer, *renderMeshInfo.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                        const std::vector<VkDescriptorSet> sets = { m_scene.getMeshDescriptorSet(meshIndex) };
+                        vkCmdBindDescriptorSets(
+                            commandBuffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            graphicsPipeline->getPipelineLayout(),
+                            0,
+                            sets.size(), sets.data(),
+                            0, {}
+                        );
+
+                        vkCmdDrawIndexed(commandBuffer, renderMeshInfo.ref_mesh->meshIndexCount, 1, 0, 0, 0);
+                    }
+                }
+            }
+        }
+        else if (graphicsPipeline->getGraphicsPipelineType() == GraphicsPipelineType::LIGHT)
+        {
+            for (auto& ptr : getRenderResource()->m_lightModels)
+            {
+                if (ptr->isHidden() == false)
+                {
+                    for (uint32_t meshIndex : ptr->getMeshIndices())
+                    {
+                        RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
+
+                        std::vector<VkDeviceSize> offsets = { 0 };
+                        vkCmdBindVertexBuffers(commandBuffer, 0, 1, renderMeshInfo.ref_mesh->vertexBuffer, offsets.data());
+                        vkCmdBindIndexBuffer(commandBuffer, *renderMeshInfo.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                        const std::vector<VkDescriptorSet> sets = { m_scene.getMeshDescriptorSet(meshIndex) };
+                        vkCmdBindDescriptorSets(
+                            commandBuffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            graphicsPipeline->getPipelineLayout(),
+                            0,
+                            sets.size(), sets.data(),
+                            0, {}
+                        );
+
+                        vkCmdDrawIndexed(commandBuffer, renderMeshInfo.ref_mesh->meshIndexCount, 1, 0, 0, 0);
+                    }
+                }
+            }
+        }
+        else if (graphicsPipeline->getGraphicsPipelineType() == GraphicsPipelineType::SKYBOX)
+        {
+            auto skybox = getRenderResource()->m_skybox;
+            for (uint32_t meshIndex : skybox->getMeshIndices())
+            {
+                RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
+
+                std::vector<VkDeviceSize> offsets = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, renderMeshInfo.ref_mesh->vertexBuffer, offsets.data());
+                vkCmdBindIndexBuffer(commandBuffer, *renderMeshInfo.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                const std::vector<VkDescriptorSet> sets = { m_scene.getMeshDescriptorSet(meshIndex) };
+                vkCmdBindDescriptorSets(
+                    commandBuffer,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    graphicsPipeline->getPipelineLayout(),
+                    0,
+                    sets.size(), sets.data(),
+                    0, {}
+                );
+
+                vkCmdDrawIndexed(commandBuffer, renderMeshInfo.ref_mesh->meshIndexCount, 1, 0, 0, 0);
             }
         }
     }
@@ -594,7 +662,7 @@ void Renderer::destroySyncObjects()
     ZoneScoped;
 #endif
 
-    for (size_t i = 0; i < Config::MAX_FRAMES_IN_FLIGHT; i++)
+    for (uint32_t i = 0; i < Config::MAX_FRAMES_IN_FLIGHT; i++)
     {
         vkDestroySemaphore(m_device->getLogicalDevice(), m_imageAvailableSemaphores[i], nullptr);
         vkDestroySemaphore(m_device->getLogicalDevice(), m_renderFinishedSemaphores[i], nullptr);
@@ -607,7 +675,7 @@ void Renderer::cleanup()
 #ifdef RELEASE_MODE_ON
     ZoneScoped;
 #endif
-
+    g_RenderResource->destroy();
     // MSAA
     m_msaa.destroy();
 

@@ -4,7 +4,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
-#include "VulkanRenderer/Model/ModelInfo.h"
 #include "VulkanRenderer/Model/Attributes.h"
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
@@ -15,12 +14,11 @@
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
 #include "VulkanRenderer/Renderer.h"
 
-template<typename T>
-PrefilteredEnvMap<T>::PrefilteredEnvMap(
+
+PrefilteredEnvMap::PrefilteredEnvMap(
     const VkQueue& graphicsQueue,
     const VkCommandPool& commandPool,
     const uint32_t dim,
-    const std::vector<Mesh<T>>& meshes,
     const std::shared_ptr<TextureBase>& envMap
 ) :  m_dim(dim), m_format(VK_FORMAT_R16G16B16A16_SFLOAT)
 {
@@ -32,11 +30,11 @@ PrefilteredEnvMap<T>::PrefilteredEnvMap(
     createPipeline();
     createDescriptorPool();
     createDescriptorSet(envMap);
-    recordCommandBuffer(commandPool, graphicsQueue, meshes);
+    recordCommandBuffer(commandPool, graphicsQueue);
 }
 
-template<typename T>
-void PrefilteredEnvMap<T>::createDescriptorPool()
+
+void PrefilteredEnvMap::createDescriptorPool()
 {
     std::vector<VkDescriptorPoolSize> poolSizes = {
        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1}
@@ -45,8 +43,8 @@ void PrefilteredEnvMap<T>::createDescriptorPool()
     DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPool);
 }
 
-template<typename T>
-void PrefilteredEnvMap<T>::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
+
+void PrefilteredEnvMap::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
 {
     DescriptorManager::allocDescriptorSet(m_descriptorPool, m_graphicsPipeline.getDescriptorSetLayout(), &m_descriptorSet);
 
@@ -59,11 +57,10 @@ void PrefilteredEnvMap<T>::createDescriptorSet(const std::shared_ptr<TextureBase
     );
 }
 
-template<typename T>
-void PrefilteredEnvMap<T>::recordCommandBuffer(
+
+void PrefilteredEnvMap::recordCommandBuffer(
     const VkCommandPool& commandPool,
-    const VkQueue& graphicsQueue,
-    const std::vector<Mesh<T>>& meshes
+    const VkQueue& graphicsQueue
 ) {
     VkClearValue clearValues;
     clearValues.color = { {0.0f, 0.0f, 0.2f, 0.0f} };
@@ -138,14 +135,15 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
                 0, {}
             );
 
-            for (auto& mesh : meshes)
-            {
-                std::vector<VkBuffer> vertexBuffers = { mesh.vertexBuffer };
-                std::vector<VkDeviceSize> offsets = { 0 };
-                vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers.data(), offsets.data());
-                vkCmdBindIndexBuffer(commandBuffer, mesh.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-                vkCmdDrawIndexed(commandBuffer, mesh.indices.size(), 1, 0, 0, 0);
+            {
+                RenderMeshInfo& info = getRenderResource()->m_meshInfoMap[getRenderResource()->m_defaultCubeMeshIndex];
+
+                std::vector<VkDeviceSize> offsets = { 0 };
+                vkCmdBindVertexBuffers(commandBuffer, 0, 1, info.ref_mesh->vertexBuffer, offsets.data());
+                vkCmdBindIndexBuffer(commandBuffer, *info.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                vkCmdDrawIndexed(commandBuffer, info.ref_mesh->meshIndexCount, 1, 0, 0, 0);
             }
 
             m_renderPass.end(commandBuffer);
@@ -201,8 +199,8 @@ void PrefilteredEnvMap<T>::recordCommandBuffer(
 }
 
 
-template<typename T>
-void PrefilteredEnvMap<T>::copyRegionOfImage(
+
+void PrefilteredEnvMap::copyRegionOfImage(
     float face,
     float mipLevel,
     float viewportDim,
@@ -238,8 +236,8 @@ void PrefilteredEnvMap<T>::copyRegionOfImage(
 }
 
 
-template<typename T>
-void PrefilteredEnvMap<T>::createPipeline()
+
+void PrefilteredEnvMap::createPipeline()
 {
     m_graphicsPipeline = Graphics(
         GraphicsPipelineType::PREFILTER_ENV_MAP,
@@ -250,15 +248,14 @@ void PrefilteredEnvMap<T>::createPipeline()
         // It uses the same attributes as the skybox shader.
         Attributes::SKYBOX::getBindingDescription(),
         Attributes::SKYBOX::getAttributeDescriptions(),
-        {},
         GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::DESCRIPTORS_INFO,
         { {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(PushBlockPrefilterEnv)} }
     );
 }
 
 
-template<typename T>
-void PrefilteredEnvMap<T>::createOffscreenFramebuffer(
+
+void PrefilteredEnvMap::createOffscreenFramebuffer(
     const VkQueue& graphicsQueue
 ) {
 
@@ -324,8 +321,8 @@ void PrefilteredEnvMap<T>::createOffscreenFramebuffer(
 }
 
 
-template<typename T>
-void PrefilteredEnvMap<T>::createRenderPass()
+
+void PrefilteredEnvMap::createRenderPass()
 {
     // Color Attachment
     VkAttachmentDescription colorAttachment{};
@@ -404,8 +401,8 @@ void PrefilteredEnvMap<T>::createRenderPass()
 }
 
 
-template<typename T>
-void PrefilteredEnvMap<T>::createTargetImage() 
+
+void PrefilteredEnvMap::createTargetImage() 
 {
     m_targetImage = std::make_shared<CubeMapTexture>("PreEnv");
     m_targetImage->getExtent() = VkExtent2D({ m_dim, m_dim });
@@ -429,11 +426,11 @@ void PrefilteredEnvMap<T>::createTargetImage()
 
 }
 
-template<typename T>
-PrefilteredEnvMap<T>::~PrefilteredEnvMap() {}
 
-template<typename T>
-void PrefilteredEnvMap<T>::destroy()
+PrefilteredEnvMap::~PrefilteredEnvMap() {}
+
+
+void PrefilteredEnvMap::destroy()
 {
     m_graphicsPipeline.destroy();
     vkDestroyDescriptorPool(getRendererPointer()->getDevice(), m_descriptorPool, nullptr);
@@ -444,12 +441,9 @@ void PrefilteredEnvMap<T>::destroy()
     vkDestroyFramebuffer( getRendererPointer()->getDevice(), m_framebuffer, nullptr);
 }
 
-template<typename T>
-const std::shared_ptr<TextureBase> PrefilteredEnvMap<T>::get() const
+
+const std::shared_ptr<TextureBase> PrefilteredEnvMap::get() const
 {
     return m_targetImage;
 }
 
-
-////////////////////////////////////INSTANCES//////////////////////////////////
-template class PrefilteredEnvMap<Attributes::SKYBOX::Vertex>;

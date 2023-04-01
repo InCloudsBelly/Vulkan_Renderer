@@ -33,14 +33,12 @@ public:
 		const VkSampleCountFlagBits& samplesCount,
 		VkVertexInputBindingDescription vertexBindingDescriptions,
 		std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
-		const std::vector<size_t>& modelIndices,
 		const std::vector<DescriptorInfo>& descriptorInfo,
 		const std::vector<VkPushConstantRange>& pushConstantRanges
 	);
 
 
 	const GraphicsPipelineType getGraphicsPipelineType() const;
-	const std::vector<size_t>& getModelIndices() const;
 
 private:
 
@@ -70,6 +68,4 @@ private:
 	
 
 	GraphicsPipelineType m_gType;
-
-	std::vector<size_t> m_modelIndices;
 };

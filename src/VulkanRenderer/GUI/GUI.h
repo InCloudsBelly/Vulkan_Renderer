@@ -8,7 +8,6 @@
 #include "VulkanRenderer/SwapChain/Swapchain.h"
 #include "VulkanRenderer/Camera/Camera.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
-#include "VulkanRenderer/Model/Model.h"
 
 class GUI
 {
@@ -41,14 +40,11 @@ public:
 
 private:
 
-    void displayLightModels(std::vector<std::shared_ptr<Model>> models, const std::vector<size_t> indices);
+    void displayLightModels();
     void displayCamera(const std::shared_ptr<Camera>& camera);
-    void createModelsWindow(
-        std::vector<std::shared_ptr<Model>> models, 
-        const std::vector<size_t> objectIndices,
-        const std::vector<size_t> lightIndices,
-        const std::shared_ptr<Camera>& camera
-    );
+
+    void createModelsWindow(const std::shared_ptr<Camera>& camera);
+
     void createProfilingWindow(
         const std::string& deviceName,
         const double mpf,

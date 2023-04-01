@@ -55,77 +55,79 @@ int main()
     try
     {
         // SCENE 1
-        {
-            app.addSkybox("sky.hdr", "DaySky");
-          /*  app.addObjectPBR(
-                "DamagedHelmet",
-                "damagedHelmet",
-                "DamagedHelmet.gltf",
-                glm::fvec3(0.0f),
-                glm::fvec3(0.0f),
-                glm::fvec3(0.3f)
-            );*/
-            app.addObjectPBR(
-                "Sponza",
-                "sponzaTGA",
-                "SponzaPBR.obj",
-                glm::fvec3(0.0f),
-                glm::fvec3(1.0f, -1.555, 1.0f),
-                glm::fvec3(1.0f)
-            );
-           
-            //app.addPointLight(
-            //      "Point",
-            //      "lightSphere.obj",
-            //      glm::fvec3(1.0f),
-            //      glm::fvec3(0.0f),
-            //      glm::fvec3(0.125f)
-            //);
-            //app.addSpotLight(
-            //      "Spot1",
-            //      "lightSphereDefault",
-            //      "lightSphere.obj",
-            //      glm::fvec3(1.0f),
-            //      glm::fvec3(0.0f),
-            //      glm::fvec3(0.0f),
-            //      glm::fvec3(0.0f),
-            //      glm::fvec3(0.125f)
-            //);
-            app.addDirectionalLight(
-                "Sun",
-                "lightSphereDefault",
-                "lightSphere.obj",
-                glm::fvec3(1.0f),
-                glm::fvec3(1.2f, 13.3f, 2.14f),
-                glm::fvec3(5.735f, -40.0f, 2.14f),
-                glm::fvec3(0.3f)
-            );
-        }
-
-
-        // SCENE 2
-
         //{
-        //    //app.addSkybox("countryClub.hdr", "CountryClub");
-        //    app.addSkybox("neonStudio.hdr", "NeonStudio");
+        //    app.addSkybox("sky.hdr", "DaySky");
+
         //    app.addObjectPBR(
         //        "DamagedHelmet",
         //        "damagedHelmet",
         //        "DamagedHelmet.gltf",
         //        glm::fvec3(0.0f),
         //        glm::fvec3(0.0f),
+        //        glm::fvec3(0.3f)
+        //    );
+
+        //    app.addObjectPBR(
+        //        "Sponza",
+        //        "sponzaTGA",
+        //        "SponzaPBR.obj",
+        //        glm::fvec3(0.0f),
+        //        glm::fvec3(1.0f, -1.555, 1.0f),
         //        glm::fvec3(1.0f)
         //    );
+        //   
+        //    //app.addPointLight(
+        //    //      "Point",
+        //    //      "lightSphere.obj",
+        //    //      glm::fvec3(1.0f),
+        //    //      glm::fvec3(0.0f),
+        //    //      glm::fvec3(0.125f)
+        //    //);
+        //    //app.addSpotLight(
+        //    //      "Spot1",
+        //    //      "lightSphereDefault",
+        //    //      "lightSphere.obj",
+        //    //      glm::fvec3(1.0f),
+        //    //      glm::fvec3(0.0f),
+        //    //      glm::fvec3(0.0f),
+        //    //      glm::fvec3(0.0f),
+        //    //      glm::fvec3(0.125f)
+        //    //);
         //    app.addDirectionalLight(
         //        "Sun",
         //        "lightSphereDefault",
         //        "lightSphere.obj",
         //        glm::fvec3(1.0f),
-        //        glm::fvec3(1.0f, 32.18f, -49.0f),
-        //        glm::fvec3(1.461f, 2.619f, 57.457f),
-        //        glm::fvec3(0.125f)
+        //        glm::fvec3(1.2f, 13.3f, 2.14f),
+        //        glm::fvec3(5.735f, -40.0f, 2.14f),
+        //        glm::fvec3(0.3f)
         //    );
         //}
+
+
+        // SCENE 2
+
+        {
+            //app.addSkybox("countryClub.hdr", "CountryClub");
+            app.addSkybox("neonStudio.hdr", "NeonStudio");
+            app.addObjectPBR(
+                "DamagedHelmet",
+                "damagedHelmet",
+                "DamagedHelmet.gltf",
+                glm::fvec3(0.0f),
+                glm::fvec3(0.0f),
+                glm::fvec3(1.0f)
+            );
+            app.addDirectionalLight(
+                "Sun",
+                "lightSphereDefault",
+                "lightSphere.obj",
+                glm::fvec3(1.0f),
+                glm::fvec3(1.0f, 32.18f, -49.0f),
+                glm::fvec3(1.461f, 2.619f, 57.457f),
+                glm::fvec3(0.125f)
+            );
+        }
  
 
         app.run();

@@ -20,10 +20,8 @@
 #include "VulkanRenderer/SwapChain/Swapchain.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
-#include "VulkanRenderer/Model/Model.h"
-#include "VulkanRenderer/Model/Types/NormalPBR.h"
-#include "VulkanRenderer/Model/Types/Light.h"
 #include "VulkanRenderer/Renderer.h"
+#include "VulkanRenderer/RenderResource.h"
 
 GUI::GUI(
     const VkInstance&                   vkInstance,
@@ -51,26 +49,7 @@ GUI::GUI(
     };
 
     DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPool);
-    //m_descriptorPool = DescriptorPool(
-    //    // Type of descriptors / Count of each type of descriptor in the pool.
-    //    {
-    //       { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-    //       { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-    //    },
-    //    // Descriptor SETS count.
-    //    // (11 -> count of all the descriptor types)
-    //    1000 * 11
-    //);
-
+  
     // - RenderPass
     createRenderPass();
 
@@ -338,7 +317,8 @@ void GUI::draw(
         paddingY = 0.05f;
         ImGui::SetNextWindowSize(ImVec2(sizeX, sizeY),ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImVec2(sizeX,paddingY),ImGuiCond_Always,ImVec2(1.0f, 0.0f));
-        createModelsWindow(getRenderResource()->m_modelResource, getRenderResource()->m_objectModelIndices, getRenderResource()->m_lightModelIndices,camera);
+
+        createModelsWindow(camera);
     }
 
     ImGui::Render();
@@ -387,55 +367,49 @@ void GUI::createProfilingWindow(
 }
 
 
-void GUI::displayLightModels(std::vector<std::shared_ptr<Model>> models,const std::vector<size_t> indices) 
+void GUI::displayLightModels() 
 {
-    for (const size_t& j : indices)
+    for (auto& info : getRenderResource()->m_lightsInfo)
     {
-        if (auto model =std::dynamic_pointer_cast<Light>(models[j])) 
+        const std::string modelName = info.name;
+        std::string subMenuName;
+        std::string sliderName;
+
+        glm::fvec4 newPos = info.pos;
+        glm::fvec3 newRot = info.rot;
+        glm::fvec3 newSize = info.size;
+        glm::fvec4 color = info.m_color;
+        float intensity = info.m_intensity;
+
+        if (ImGui::TreeNode(modelName.c_str()))
         {
-            const std::string modelName = model.get()->getName();
-            std::string subMenuName;
-            std::string sliderName;
+            ImGui::ColorEdit4(("Color###" + modelName).c_str(), &(color.x));
 
-            glm::fvec4 newPos = model.get()->getPos();
-            glm::fvec3 newRot = model.get()->getRot();
-            glm::fvec3 newSize = model.get()->getSize();
-            glm::fvec4 color = model.get()->getColor();
-            float intensity = model.get()->getIntensity();
-            bool isHidden = model.get()->isHidden();
+            createTransformationsInfo(newPos, newRot, newSize, modelName);
 
-            if (ImGui::TreeNode(modelName.c_str()))
+            if (info.m_lightType != LightType::POINT_LIGHT)
             {
-                ImGui::ColorEdit4(("Color###" + modelName).c_str(),&(color.x));
+                glm::fvec4 targetPos = info.m_targetPos;
+                // Target's position.
+                createTranslationSliders(modelName, "Target Pos.", targetPos, -100.0f, 100.0f);
 
-                ImGui::Checkbox("Hide", &isHidden);
-
-                createTransformationsInfo(newPos,newRot,newSize,modelName);
-
-                if (model.get()->getLightType() != LightType::POINT_LIGHT)
-                {
-                    glm::fvec4 targetPos = model.get()->getTargetPos();
-                    // Target's position.
-                    createTranslationSliders(modelName,"Target Pos.",targetPos,-100.0f,100.0f);
-
-                    model.get()->setTargetPos(targetPos);
-                }
-
-                // Intensity
-                subMenuName = ("Intensity###LightProperty::Intensity" + modelName);
-                sliderName = ("###Intensity::" + modelName);
-                createSlider(subMenuName,sliderName,100.0f,0.0f,intensity);
-
-                ImGui::TreePop();
-                ImGui::Separator();
+                info.m_targetPos = targetPos;
             }
-            model.get()->setPos(newPos);
-            model.get()->setRot(newRot);
-            model.get()->setSize(newSize);
-            model.get()->setIntensity(intensity);
-            model.get()->setColor(color);
-            model.get()->setHideStatus(isHidden);
+
+            // Intensity
+            subMenuName = ("Intensity###LightProperty::Intensity" + modelName);
+            sliderName = ("###Intensity::" + modelName);
+            createSlider(subMenuName, sliderName, 100.0f, 0.0f, intensity);
+
+            ImGui::TreePop();
+            ImGui::Separator();
         }
+        info.pos = newPos;
+        info.modelPtr->setPos(newPos);
+        info.rot = (newRot);
+        info.size = (newSize);
+        info.m_intensity = (intensity);
+        info.m_color = (color);
     }
 }
 
@@ -452,46 +426,41 @@ void GUI::createSlider(const std::string& subMenuName,const std::string& sliceNa
 }
 
 
-void GUI::createModelsWindow(std::vector<std::shared_ptr<Model>> models,
-    const std::vector<size_t> objectIndices,
-    const std::vector<size_t> lightIndices,
-    const std::shared_ptr<Camera>& camera)
+void GUI::createModelsWindow(const std::shared_ptr<Camera>& camera)
 {
     ImGui::Begin("Models",NULL,ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
     ImGui::Text("Objects");
     ImGui::Separator();
-    for (const size_t& j : objectIndices)
+
+    for (auto ptr : getRenderResource()->m_normalModels)
     {
-        if (auto model = std::dynamic_pointer_cast<NormalPBR>(models[j]))
+        const std::string modelName = ptr->getName();
+
+        glm::fvec4 newPos = ptr->getPos();
+        glm::fvec3 newRot = ptr->getRot();
+        glm::fvec3 newSize = ptr->getSize();
+        bool isHidden = ptr->isHidden();
+
+        if (ImGui::TreeNode(modelName.c_str()))
         {
-            const std::string modelName = model.get()->getName();
+            ImGui::Checkbox("Hide", &isHidden);
 
-            glm::fvec4 newPos = model.get()->getPos();
-            glm::fvec3 newRot = model.get()->getRot();
-            glm::fvec3 newSize = model.get()->getSize();
-            bool isHidden = model.get()->isHidden();
+            createTransformationsInfo(newPos, newRot, newSize, modelName);
 
-            if (ImGui::TreeNode(modelName.c_str()))
-            {
-                ImGui::Checkbox("Hide", &isHidden);
-
-                createTransformationsInfo(newPos, newRot, newSize, modelName);
-
-                ImGui::TreePop();
-                ImGui::Separator();
-            }
-            model.get()->setPos(newPos);
-            model.get()->setRot(newRot);
-            model.get()->setSize(newSize);
-
-            model.get()->setHideStatus(isHidden);
+            ImGui::TreePop();
+            ImGui::Separator();
         }
-    } 
+        ptr->setPos(newPos);
+        ptr->setRot(newRot);
+        ptr->setSize(newSize);
+        ptr->setHideStatus(isHidden);
+    }
+   
 
     ImGui::Text("Lights");
     ImGui::Separator();
-    displayLightModels(models, lightIndices);
+    displayLightModels();
 
     ImGui::Text("Camera");
     ImGui::Separator();
@@ -508,7 +477,7 @@ void GUI::createTranslationSliders(const std::string& name, const std::string& t
 
     if (ImGui::TreeNode((treeNodeName + "##TRANSLATION::" + name).c_str()))
     {
-        for (size_t i = 0; i < sliderNames.size(); i++)
+        for (uint32_t i = 0; i < sliderNames.size(); i++)
         {
             ImGui::SliderFloat(sliderNames[i].c_str(), values[i], minR, maxR);
         }
@@ -525,7 +494,7 @@ void GUI::createRotationSliders( const std::string& name,glm::fvec3& pos,const f
 
     if (ImGui::TreeNode(("Rotation##ROTATION::" + name).c_str())) 
     {
-        for (size_t i = 0; i < sliderNames.size(); i++)
+        for (uint32_t i = 0; i < sliderNames.size(); i++)
         {
             ImGui::SliderFloat(sliderNames[i].c_str(),values[i],minR,maxR);
         }
@@ -540,7 +509,7 @@ void GUI::createSizeSliders(const std::string& name,glm::fvec3& pos,const float 
     std::vector<float*> values = { &pos.x,&pos.y,&pos.z };
 
     if (ImGui::TreeNode(("Scale##SIZE::" + name).c_str())) {
-        for (size_t i = 0; i < sliderNames.size(); i++)
+        for (uint32_t i = 0; i < sliderNames.size(); i++)
         {
             ImGui::SliderFloat(sliderNames[i].c_str(),values[i],minR,maxR);
         }

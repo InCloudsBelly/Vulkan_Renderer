@@ -6,7 +6,6 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Texture/Texture.h"
@@ -20,7 +19,6 @@ struct PushBlockIrradiance {
 };
 
 
-template<typename T>
 class PrefilteredIrradiance
 {
 public:
@@ -29,7 +27,6 @@ public:
         const VkQueue& graphicsQueue,
         const VkCommandPool& commandBuffer,
         const uint32_t dim,
-        const std::vector<Mesh<T>>& meshes,
         const std::shared_ptr<TextureBase>& envMap
     );
     ~PrefilteredIrradiance();
@@ -56,8 +53,7 @@ private:
     );
     void recordCommandBuffer(
         const VkCommandPool& commandBuffer,
-        const VkQueue& graphicsQueue,
-        const std::vector<Mesh<T>>& meshes
+        const VkQueue& graphicsQueue
     );
 
 

@@ -18,4 +18,5 @@ void main()
 {
 	outUVW = inPos;
 	gl_Position = pushConsts.mvp * vec4(inPos.xyz, 1.0);
+	gl_Position.y = -gl_Position.y;
 }

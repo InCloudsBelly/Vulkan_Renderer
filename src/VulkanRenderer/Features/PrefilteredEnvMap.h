@@ -6,7 +6,6 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 
-#include "VulkanRenderer/Model/Model.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Texture/Texture.h"
@@ -18,7 +17,7 @@ struct PushBlockPrefilterEnv
 	int samplesCount = 32;
 };
 
-template<typename T>
+
 class PrefilteredEnvMap
 {
 public:
@@ -27,7 +26,6 @@ public:
         const VkQueue& graphicsQueue,
         const VkCommandPool& commandPool,
         const uint32_t dim,
-        const std::vector<Mesh<T>>& meshes,
         const std::shared_ptr<TextureBase>& envMap
     );
     ~PrefilteredEnvMap();
@@ -54,8 +52,7 @@ private:
     );
     void recordCommandBuffer(
         const VkCommandPool& commandPool,
-        const VkQueue& graphicsQueue,
-        const std::vector<Mesh<T>>& meshes
+        const VkQueue& graphicsQueue
     );
 
 

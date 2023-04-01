@@ -26,17 +26,16 @@ Graphics::Graphics(
     const VkSampleCountFlagBits& samplesCount,
     VkVertexInputBindingDescription vertexBindingDescriptions,
     std::vector<VkVertexInputAttributeDescription> vertexAttribDescriptions,
-    const std::vector<size_t>& modelIndices,
     const std::vector<DescriptorInfo>& descriptorInfo,
     const std::vector<VkPushConstantRange>& pushConstantRanges
 )
-    : Pipeline(PipelineType::GRAPHICS), m_gType(type), m_modelIndices(modelIndices)
+    : Pipeline(PipelineType::GRAPHICS), m_gType(type)
 {
     //-------------------DescriptorSetLayout--------------------
     
     std::vector<VkDescriptorSetLayoutBinding> bindings(descriptorInfo.size());
 
-    for (size_t i = 0; i < descriptorInfo.size(); i++)
+    for (uint32_t i = 0; i < descriptorInfo.size(); i++)
     {
         bindings[i].binding = descriptorInfo[i].bindingNumber;
         bindings[i].descriptorType = descriptorInfo[i].descriptorType;
@@ -56,7 +55,7 @@ Graphics::Graphics(
     // -------------------Shader Modules--------------------
     std::vector<VkShaderModule> shaderModules(shaderInfos.size());
     std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
-    for (size_t i = 0; i < shaderInfos.size(); i++)
+    for (uint32_t i = 0; i < shaderInfos.size(); i++)
     {
         createShaderModule(shaderInfos[i], shaderModules[i]);
         createShaderStageInfo(shaderModules[i], shaderInfos[i].type, shaderStagesInfos[i]);
@@ -345,13 +344,6 @@ void Graphics::createColorBlendingGlobalInfo(const VkPipelineColorBlendAttachmen
     colorBlendingInfo.blendConstants[3] = 0.0f; // Optional
 }
 
-// TODO: make this safer.
-const std::vector<size_t>& Graphics::getModelIndices() const
-{
-    return m_modelIndices;
-}
-
-
 
 const GraphicsPipelineType Graphics::getGraphicsPipelineType() const
 {
@@ -365,7 +357,7 @@ void Graphics::createDescriptorSetLayout(
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings(uboInfo.size() + samplersInfo.size());
     // UBOs
-    for (size_t i = 0; i < uboInfo.size(); i++)
+    for (uint32_t i = 0; i < uboInfo.size(); i++)
     {
         bindings[i].binding = uboInfo[i].bindingNumber;
         bindings[i].descriptorType = uboInfo[i].descriptorType;
@@ -374,7 +366,7 @@ void Graphics::createDescriptorSetLayout(
         bindings[i].pImmutableSamplers = nullptr;
     }
     // Samplers
-    for (size_t i = 0; i < samplersInfo.size(); i++)
+    for (uint32_t i = 0; i < samplersInfo.size(); i++)
     {
         bindings[i + uboInfo.size()].binding = samplersInfo[i].bindingNumber;
         bindings[i + uboInfo.size()].descriptorType = samplersInfo[i].descriptorType;

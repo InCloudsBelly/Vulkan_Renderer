@@ -20,15 +20,12 @@
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Device/Device.h"
 #include "VulkanRenderer/Texture/Texture.h"
-#include "VulkanRenderer/Model/ModelInfo.h"
-#include "VulkanRenderer/Model/Model.h"
-#include "VulkanRenderer/Model/Types/Skybox.h"
-#include "VulkanRenderer/Model/Types/Light.h"
 #include "VulkanRenderer/Camera/Camera.h"
 #include "VulkanRenderer/Camera/Types/Arcball.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 #include "VulkanRenderer/VKinstance/VKinstance.h"
 #include "VulkanRenderer/Scene/Scene.h"
+#include "VulkanRenderer/Guid_Allocator.h"
 
 #include "VulkanRenderer/RenderResource.h"
 
@@ -124,6 +121,9 @@ public:
 		return m_qfIndices;
 	}
 
+	//GuidAllocator<Mesh>& getMeshIdAllocator() { return m_Mesh_id_allocator; };
+	//GuidAllocator<MaterialSourceDesc>& getMaterialAssetdAllocator() { return m_material_asset_id_allocator; };
+
 private:
 	void initWindow();
 	void doComputations();
@@ -199,5 +199,5 @@ private:
 	//---------------------------Features--------------------------------------
 	DepthBuffer											m_depthBuffer;
 	MSAA												m_msaa;
-	std::shared_ptr<ShadowMap<Attributes::PBR::Vertex>> m_shadowMap;
+	std::shared_ptr<ShadowMap<MeshVertex>> m_shadowMap;
 };

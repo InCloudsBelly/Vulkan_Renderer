@@ -127,7 +127,7 @@ void Swapchain::createAllImageViews()
 {
 	m_imageViews.resize(m_images.size());
 
-	for (size_t i = 0; i < m_images.size(); i++)
+	for (uint32_t i = 0; i < m_images.size(); i++)
 	{
 		BufferManager::bufferCreateImageView(
 			getRendererPointer()->getDevice(),
@@ -146,7 +146,7 @@ void Swapchain::createFramebuffers(const RenderPass& renderPass,const DepthBuffe
 {
 	m_framebuffers.resize(m_imageViews.size());
 
-	for (size_t i = 0; i < m_imageViews.size(); i++)
+	for (uint32_t i = 0; i < m_imageViews.size(); i++)
 	{
 		// Images in which we'll write in.
 		std::vector<VkImageView> attachments = {

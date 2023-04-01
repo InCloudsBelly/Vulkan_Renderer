@@ -8,7 +8,6 @@
 
 #include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Pipeline/Graphics.h"
-#include "VulkanRenderer/Model/Mesh.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 
 #include "VulkanRenderer/Texture/Texture.h"
@@ -39,7 +38,7 @@ public:
 	const VkImageView& getShadowMapView() const;
 	const VkSampler& getSampler() const;
 	const glm::mat4& getLightSpace() const;
-	//const VkDescriptorSet& getDescriptorSet(const size_t index, const uint32_t currentFrame) const;
+	//const VkDescriptorSet& getDescriptorSet(const uint32_t index, const uint32_t currentFrame) const;
 	const VkFramebuffer& getFramebuffer(const uint32_t imageIndex) const;
 	const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
 
@@ -72,8 +71,7 @@ private:
 
 	DescriptorTypes::UniformBufferObject::ShadowMap m_basicInfo;
 
-	std::vector<VkDescriptorSet>		m_modelDescriptorSets;
-
-	std::vector<VkBuffer>				m_ubos;
-	std::vector<VmaAllocation>			m_uboAllocations;
+	std::unordered_map<uint32_t, VkBuffer>			m_ubosMap;
+	std::unordered_map<uint32_t, VmaAllocation>		m_uboAllocationsMap;
+	std::unordered_map<uint32_t, VkDescriptorSet>	m_descriptorSetsMap;
 };

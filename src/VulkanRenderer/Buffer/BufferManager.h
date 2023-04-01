@@ -95,8 +95,8 @@ namespace BufferManager
         uint32_t height,
         uint32_t imageSize);
 
-    VkResult bufferCreateVertexBuffer(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::vector<Attributes::PBR::Vertex>& vertices, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation);
-    VkResult createBufferAndTransferToDevice(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, void* vertices, size_t size, VkBufferUsageFlags usageDstBuffer, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation);
+    VkResult bufferCreateVertexBuffer(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::vector<MeshVertex>& vertices, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation);
+    VkResult createBufferAndTransferToDevice(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, void* vertices, uint32_t size, VkBufferUsageFlags usageDstBuffer, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation);
 
     VkResult
         bufferCreateIndexBuffer(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::vector<uint32_t>& indices, VkBuffer* indexBuffer, VmaAllocation* indexBufferAllocation);

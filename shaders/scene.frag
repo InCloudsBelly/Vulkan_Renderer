@@ -8,11 +8,6 @@ layout(std140, binding = 0) uniform UniformBufferObject
     mat4 lightSpace;
     vec4 cameraPos;
     int  lightsCount;
-    // TODO: Wrap this data in a diff. UBO called Material.
-    float metallicFactor;
-    float roughnessFactor;
-    int hasNormalMap;
-    int hasMetallicRoughnessMap;
 } ubo;
 
 
@@ -119,7 +114,7 @@ float filterPCF(vec3 shadowCoords);
 float calculateShadow(vec3 shadowCoords, vec2 off);
 
 vec3 getIBLcontribution(PBRinfo pbrInfo, IBLinfo iblInfo, Material material);
-float ambient = 0.3;
+float ambient = 0.5;
 
 
 void main()
@@ -127,22 +122,14 @@ void main()
     vec3 normal = calculateNormal();
     vec3 view = normalize(vec3(ubo.cameraPos) - inPosition);
     vec3 reflection = - normalize(reflect(view, normal));
-    reflection.y = - reflection.y;
+    reflection.y = -reflection.y;
 
     Material material;
     {
         material.albedo = texture(baseColorSampler, inTexCoord).rgb;
         
-        if (ubo.hasMetallicRoughnessMap == 1)
-        {
-             material.metallicFactor = texture(metallicRoughnessSampler, inTexCoord).b;
-             material.roughnessFactor = texture(metallicRoughnessSampler, inTexCoord).g;
-        }
-        else
-        {
-             material.metallicFactor = clamp(ubo.metallicFactor, 0.0, 1.0);
-             material.roughnessFactor = clamp(ubo.roughnessFactor, 0.04, 1.0);
-        }
+        material.metallicFactor = texture(metallicRoughnessSampler, inTexCoord).b;
+        material.roughnessFactor = texture(metallicRoughnessSampler, inTexCoord).g;
         
         material.AO = texture(AOsampler, inTexCoord).r;
         material.AO = (material.AO < 0.01) ? 1.0 : material.AO;
@@ -182,7 +169,7 @@ void main()
         float mipCount = float(textureQueryLevels(prefilteredEnvMapSampler));
         float lod = pbrInfo.perceptualRoughness * mipCount;
 
-        iblInfo.brdf = texture(BRDFlutSampler, vec2( pbrInfo.NdotV, pbrInfo.perceptualRoughness)).rg;
+        iblInfo.brdf = texture(BRDFlutSampler, vec2( max(pbrInfo.NdotV, 0.0), 1.0 - pbrInfo.perceptualRoughness)).rg;
         iblInfo.specularLight = textureLod(prefilteredEnvMapSampler,reflection.xyz,lod).rgb;
    }
 
@@ -218,7 +205,8 @@ void main()
     color = pow(color,vec3(1.0 / 2.2));
 
     outColor = ambient * vec4(color, 1.0);
-//    outColor =  vec4((iblInfo.diffuseLight) , 1.0);
+
+//    outColor =  vec4(iblInfo.specularLight * (pbrInfo.specularColor* iblInfo.brdf.x + iblInfo.brdf.y) , 1.0);
 
 }
 

@@ -82,7 +82,7 @@ void Compute::createShaderStageInfo(const VkShaderModule& shaderModule,const sha
 void Compute::createDescriptorSetLayout(const std::vector<DescriptorInfo>& bufferInfos) 
 {
     std::vector<VkDescriptorSetLayoutBinding> bindings(bufferInfos.size());
-    for (size_t i = 0; i < bufferInfos.size(); i++)
+    for (uint32_t i = 0; i < bufferInfos.size(); i++)
     {
         bindings[i].binding = bufferInfos[i].bindingNumber;
         bindings[i].descriptorType = bufferInfos[i].descriptorType;

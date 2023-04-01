@@ -692,7 +692,7 @@ BufferManager::bufferCreateTextureImage(
 	CHECKRESULT(vmaMapMemory(allocator, stagingBufferAllocation, (void**)&mappedData));
 
 		memPointer = mappedData;
-		memcpy(memPointer, imageData.pixels, static_cast<size_t>(imageData.imageSize));
+		memcpy(memPointer, imageData.pixels, static_cast<uint32_t>(imageData.imageSize));
 		stbi_image_free(imageData.pixels);
 
 	vmaUnmapMemory(allocator, stagingBufferAllocation);
@@ -836,7 +836,7 @@ BufferManager::bufferCreateTextureCubeMap(
 	memPointer = mappedData;
 	for (uint32_t i = 0; i < 6; ++i)
 	{
-		memcpy(memPointer, allData + i * imageSize, static_cast<size_t>(imageSize));
+		memcpy(memPointer, allData + i * imageSize, static_cast<uint32_t>(imageSize));
 		memPointer += imageSize;
 	}
 	vmaUnmapMemory(allocator, stagingBufferAllocation);
@@ -975,7 +975,7 @@ BufferManager::bufferCreateTextureCubeMap(
 //
 //	void* mappedData;
 //	vmaMapMemory(allocator, stagingBufferAllocation, &mappedData);
-//	memcpy(mappedData, pixels, static_cast<size_t>(imageSize));
+//	memcpy(mappedData, pixels, static_cast<uint32_t>(imageSize));
 //	vmaUnmapMemory(allocator, stagingBufferAllocation);
 //
 //	CHECKRESULT( BufferManager::bufferCreateImage(allocator, texWidth, texHeight, mipLevels, 6, *pFormat,
@@ -1089,7 +1089,7 @@ VkResult BufferManager::bufferCreateFramebuffers(VkDevice device,
 	uint32_t loops = (uint32_t)std::max(imageViews.size(), depthImageViews.size());
 	frameBuffers.resize(loops);
 
-	for (size_t i = 0; i < loops; i++)
+	for (uint32_t i = 0; i < loops; i++)
 	{
 		std::vector<VkImageView> attachments;
 
@@ -1138,7 +1138,7 @@ VkResult BufferManager::bufferCreateFramebuffersOffscreen(VkDevice device,
 	uint32_t loops = (uint32_t)std::max(positionImageViews.size(), depthImageViews.size());
 	frameBuffers.resize(loops);
 
-	for (size_t i = 0; i < loops; i++)
+	for (uint32_t i = 0; i < loops; i++)
 	{
 		std::vector<VkImageView> attachments;
 
@@ -1205,7 +1205,7 @@ VkResult BufferManager::bufferCopySwapChainImageToHost(VkDevice device, VmaAlloc
 
 	void* data;
 	CHECKRESULT(vmaMapMemory(allocator, stagingBufferAllocation, &data));
-	memcpy(bufferData, data, (size_t)imageSize);
+	memcpy(bufferData, data, (uint32_t)imageSize);
 	vmaUnmapMemory(allocator, stagingBufferAllocation);
 
 	for (uint32_t i = 0; i < width * height; i++)
@@ -1268,7 +1268,7 @@ VkResult BufferManager::bufferCopyImageToHost(VkDevice device, VmaAllocator allo
 
 	void* data;
 	CHECKRESULT(vmaMapMemory(allocator, stagingBufferAllocation, &data));
-	memcpy(bufferData, data, (size_t)imageSize);
+	memcpy(bufferData, data, (uint32_t)imageSize);
 	vmaUnmapMemory(allocator, stagingBufferAllocation);
 
 	vmaDestroyBuffer(allocator, stagingBuffer, stagingBufferAllocation);
@@ -1291,7 +1291,7 @@ VkResult BufferManager::bufferCopyImageToHost(VkDevice device, VmaAllocator allo
 * \returns VK_SUCCESS or a Vulkan error code
 *
 */
-VkResult BufferManager::bufferCreateVertexBuffer(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::vector<Attributes::PBR::Vertex>& vertices, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation)
+VkResult BufferManager::bufferCreateVertexBuffer(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, std::vector<MeshVertex>& vertices, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation)
 {
 	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -1303,7 +1303,7 @@ VkResult BufferManager::bufferCreateVertexBuffer(VkDevice device, VmaAllocator a
 
 	void* data;
 	CHECKRESULT(vmaMapMemory(allocator, stagingBufferAllocation, &data));
-	memcpy(data, vertices.data(), (size_t)bufferSize);
+	memcpy(data, vertices.data(), (uint32_t)bufferSize);
 	vmaUnmapMemory(allocator, stagingBufferAllocation);
 
 	CHECKRESULT(BufferManager::bufferCreateBuffer(allocator, bufferSize,
@@ -1320,7 +1320,7 @@ VkResult BufferManager::bufferCreateVertexBuffer(VkDevice device, VmaAllocator a
 }
 
 
-VkResult BufferManager::createBufferAndTransferToDevice(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, void* vertices, size_t size, VkBufferUsageFlags usageDstBuffer, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation)
+VkResult BufferManager::createBufferAndTransferToDevice(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool, void* vertices, uint32_t size, VkBufferUsageFlags usageDstBuffer, VkBuffer* vertexBuffer, VmaAllocation* vertexBufferAllocation)
 {
 	VkBuffer stagingBuffer;
 	VmaAllocation stagingBufferAllocation;
@@ -1372,7 +1372,7 @@ BufferManager::bufferCreateIndexBuffer(VkDevice device, VmaAllocator allocator, 
 
 	void* data;
 	CHECKRESULT(vmaMapMemory(allocator, stagingBufferAllocation, &data));
-	memcpy(data, indices.data(), (size_t)bufferSize);
+	memcpy(data, indices.data(), (uint32_t)bufferSize);
 	vmaUnmapMemory(allocator, stagingBufferAllocation);
 
 	CHECKRESULT(BufferManager::bufferCreateBuffer(allocator, bufferSize,
@@ -1410,7 +1410,7 @@ VkResult BufferManager::bufferCreateUniformBuffers(
 	uniformBuffers.resize(numberBuffers);
 	uniformBuffersAllocation.resize(numberBuffers);
 
-	for (size_t i = 0; i < numberBuffers; i++)
+	for (uint32_t i = 0; i < numberBuffers; i++)
 	{
 		CHECKRESULT(
 			BufferManager::bufferCreateBuffer(

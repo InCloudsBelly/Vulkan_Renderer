@@ -27,7 +27,7 @@ VkVertexInputBindingDescription Attributes::PBR::getBindingDescription()
 	// attribute descriptions).
 	bindingDescription.binding = 0;
 	// Specifies the number of bytes from one entry to the next.
-	bindingDescription.stride = sizeof(PBR::Vertex);
+	bindingDescription.stride = sizeof(MeshVertex);
 	// -VK_VERTEX_INPUT_RATE_VERTEX = Move to the next data entry after each
 	//                                vertex(vertex rendering).
 	// -VK_VERTEX_INPUT_RATE_INSTANCE = Move to the next data entry after each
@@ -43,7 +43,7 @@ VkVertexInputBindingDescription Attributes::PBR::getBindingDescription()
  */
 std::vector<VkVertexInputAttributeDescription> Attributes::PBR::getAttributeDescriptions()
 {
-	std::vector<VkVertexInputAttributeDescription> attributeDescriptions(6);
+	std::vector<VkVertexInputAttributeDescription> attributeDescriptions(4);
 
 	// -Vertex Attribute: Position
 
@@ -54,50 +54,25 @@ std::vector<VkVertexInputAttributeDescription> Attributes::PBR::getAttributeDesc
 
 	// Format -> vec3
 	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[0].offset = offsetof(Vertex, pos);
+	attributeDescriptions[0].offset = offsetof(MeshVertex, pos);
 
 	// - Vertex Attribute: Texture coord.
 	attributeDescriptions[1].binding = 0;
 	attributeDescriptions[1].location = 1;
 	attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
-	attributeDescriptions[1].offset = offsetof(Vertex, texCoord);
+	attributeDescriptions[1].offset = offsetof(MeshVertex, texCoord);
 
 	// - Vertex Attribute: Normal
 	attributeDescriptions[2].binding = 0;
 	attributeDescriptions[2].location = 2;
 	attributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[2].offset = offsetof(Vertex, normal);
+	attributeDescriptions[2].offset = offsetof(MeshVertex, normal);
 
 	// - Vertex Attribute: Tangent
 	attributeDescriptions[3].binding = 0;
 	attributeDescriptions[3].location = 3;
 	attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[3].offset = offsetof(PBR::Vertex, tangent);
-
-	// - Vertex Attribute: Bitangent
-	attributeDescriptions[4].binding = 0;
-	attributeDescriptions[4].location = 4;
-	attributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[4].offset = offsetof(PBR::Vertex, bitangent);
-
-	//// - Vertex Attribute: TBNtransposed
-
-	//for (int i = 0; i < 3; i++)
-	//{
-	//   attributeDescriptions[3 + i].binding = 0;
-	//   attributeDescriptions[3 + i].location = 3 + i;
-	//   attributeDescriptions[3 + i].format = VK_FORMAT_R32G32B32_SFLOAT;
-	//   attributeDescriptions[3 + i].offset = array_offsetof(
-	//         PBR::Vertex, TBNtransposed, i
-	//   );
-	//}
-
-
-	// - Vertex Attribute: posInLightSpace
-	attributeDescriptions[5].binding = 0;
-	attributeDescriptions[5].location = 5;
-	attributeDescriptions[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	attributeDescriptions[5].offset = offsetof(PBR::Vertex, posInLightSpace);
+	attributeDescriptions[3].offset = offsetof(MeshVertex, tangent);
 
 	return attributeDescriptions;
 }
@@ -113,7 +88,7 @@ VkVertexInputBindingDescription Attributes::SKYBOX::getBindingDescription()
 	// attribute descriptions).
 	bindingDescription.binding = 0;
 	// Specifies the number of bytes from one entry to the next.
-	bindingDescription.stride = sizeof(SKYBOX::Vertex);
+	bindingDescription.stride = sizeof(MeshVertex);
 	// -VK_VERTEX_INPUT_RATE_VERTEX = Move to the next data entry after each
 	//                                vertex(vertex rendering).
 	// -VK_VERTEX_INPUT_RATE_INSTANCE = Move to the next data entry after each
@@ -137,7 +112,7 @@ Attributes::SKYBOX::getAttributeDescriptions()
 	attributeDescriptions[0].location = 0;
 	// Format ->pos3
 	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[0].offset = offsetof(SKYBOX::Vertex, pos);
+	attributeDescriptions[0].offset = offsetof(MeshVertex, pos);
 
 	return attributeDescriptions;
 }
@@ -152,7 +127,7 @@ VkVertexInputBindingDescription Attributes::LIGHT::getBindingDescription()
 	// attribute descriptions).
 	bindingDescription.binding = 0;
 	// Specifies the number of bytes from one entry to the next.
-	bindingDescription.stride = sizeof(LIGHT::Vertex);
+	bindingDescription.stride = sizeof(MeshVertex);
 	// -VK_VERTEX_INPUT_RATE_VERTEX = Move to the next data entry after each
 	//                                vertex(vertex rendering).
 	// -VK_VERTEX_INPUT_RATE_INSTANCE = Move to the next data entry after each
@@ -175,14 +150,14 @@ Attributes::LIGHT::getAttributeDescriptions()
 	attributeDescriptions[0].location = 0;
 	// Format -> vec3
 	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[0].offset = offsetof(LIGHT::Vertex, pos);
+	attributeDescriptions[0].offset = offsetof(MeshVertex, pos);
 
 	// - Vertex Attribute: Texture coord.
 
 	attributeDescriptions[1].binding = 0;
 	attributeDescriptions[1].location = 1;
 	attributeDescriptions[1].format = VK_FORMAT_R32G32_SFLOAT;
-	attributeDescriptions[1].offset = offsetof(LIGHT::Vertex, texCoord);
+	attributeDescriptions[1].offset = offsetof(MeshVertex, texCoord);
 
 	return attributeDescriptions;
 }
@@ -196,7 +171,7 @@ VkVertexInputBindingDescription Attributes::SHADOWMAP::getBindingDescription()
 	// attribute descriptions).
 	bindingDescription.binding = 0;
 	// Specifies the number of bytes from one entry to the next.
-	bindingDescription.stride = sizeof(PBR::Vertex);
+	bindingDescription.stride = sizeof(MeshVertex);
 	// -VK_VERTEX_INPUT_RATE_VERTEX = Move to the next data entry after each
 	//                                vertex(vertex rendering).
 	// -VK_VERTEX_INPUT_RATE_INSTANCE = Move to the next data entry after each
@@ -218,7 +193,7 @@ std::vector<VkVertexInputAttributeDescription> Attributes::SHADOWMAP::getAttribu
 	attributeDescriptions[0].location = 0;
 	// Format -> vec3
 	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-	attributeDescriptions[0].offset = offsetof(SHADOWMAP::Vertex, pos);
+	attributeDescriptions[0].offset = offsetof(MeshVertex, pos);
 
 	return attributeDescriptions;
 }

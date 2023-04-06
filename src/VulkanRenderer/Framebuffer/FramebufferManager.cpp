@@ -12,7 +12,7 @@ void FramebufferManager::createFramebuffer(
     const uint32_t width,
     const uint32_t height,
     const uint32_t layersCount,
-    VkFramebuffer& framebuffer ) 
+    VkFramebuffer* framebuffer ) 
 {
 
     VkFramebufferCreateInfo framebufferInfo{};
@@ -24,7 +24,7 @@ void FramebufferManager::createFramebuffer(
     framebufferInfo.height = height;
     framebufferInfo.layers = layersCount;
 
-    auto status = vkCreateFramebuffer(logicalDevice,&framebufferInfo,nullptr,&framebuffer);
+    auto status = vkCreateFramebuffer(logicalDevice,&framebufferInfo,nullptr,framebuffer);
 
     if (status != VK_SUCCESS)
         throw std::runtime_error("Failed to create framebuffer!");

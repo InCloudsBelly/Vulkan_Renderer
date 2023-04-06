@@ -33,7 +33,9 @@ Swapchain::Swapchain(
 
 	m_imageFormat = surfaceFormat.format;
 	m_extent = extent;
-	
+	m_viewport = VkViewport{ 0.0f, 0.0f, (float)m_extent.width, (float)m_extent.height, 0.0f, 1.0f };
+	m_scissor = VkRect2D{ {0,0}, {extent.width,extent.height} };
+
 	// Chooses how many images we want to have in the swap chain.
 	// (It's always recommended to request at least one more image that the
 	// minimum because if we stick to this minimum, it means that we may
@@ -113,13 +115,10 @@ Swapchain::Swapchain(
 
 void Swapchain::destroy()
 {
-	for (auto& framebuffer : m_framebuffers)
-		vkDestroyFramebuffer(m_logicalDevice, framebuffer, nullptr);
-
 	vkDestroySwapchainKHR(m_logicalDevice, m_swapchain, nullptr);
 
 	for (auto& imageView : m_imageViews)
-		vkDestroyImageView(m_logicalDevice, imageView, nullptr);
+		vkDestroyImageView(m_logicalDevice, *imageView, nullptr);
 }
 
 
@@ -129,6 +128,8 @@ void Swapchain::createAllImageViews()
 
 	for (uint32_t i = 0; i < m_images.size(); i++)
 	{
+		m_imageViews[i] = new VkImageView;
+
 		BufferManager::bufferCreateImageView(
 			getRendererPointer()->getDevice(),
 			m_images[i],
@@ -137,35 +138,11 @@ void Swapchain::createAllImageViews()
 			1,
 			1,
 			VK_IMAGE_ASPECT_COLOR_BIT,
-			&m_imageViews[i]
+			m_imageViews[i]
 		);
 	}
 }
 
-void Swapchain::createFramebuffers(const RenderPass& renderPass,const DepthBuffer& depthBuffer,const MSAA& msaa)
-{
-	m_framebuffers.resize(m_imageViews.size());
-
-	for (uint32_t i = 0; i < m_imageViews.size(); i++)
-	{
-		// Images in which we'll write in.
-		std::vector<VkImageView> attachments = {
-			msaa.getImageView(),
-			depthBuffer.getImageView(),
-			m_imageViews[i]
-		};
-
-		FramebufferManager::createFramebuffer(
-			m_logicalDevice, 
-			renderPass.get(),
-			attachments,
-			m_extent.width,
-			m_extent.height,
-			1,
-			m_framebuffers[i]
-		); 
-	}
-}
 
 const uint32_t Swapchain::getNextImageIndex(const VkSemaphore& semaphore) const
 {
@@ -186,7 +163,7 @@ const uint32_t Swapchain::getNextImageIndex(const VkSemaphore& semaphore) const
 }
 
 const VkImageView& Swapchain::getImageView(const uint32_t index) const {
-	return m_imageViews[index];
+	return *m_imageViews[index];
 }
 
 void Swapchain::chooseBestSettings(
@@ -250,15 +227,12 @@ VkExtent2D Swapchain::chooseBestExtent(const VkSurfaceCapabilitiesKHR& capabilit
 	return actualExtent;
 }
 
+
 const VkExtent2D& Swapchain::getExtent() const
 {
 	return m_extent;
 }
 
-const VkFramebuffer& Swapchain::getFramebuffer(const uint32_t imageIndex) const
-{
-	return m_framebuffers[imageIndex];
-}
 
 const VkFormat& Swapchain::getImageFormat() const
 {

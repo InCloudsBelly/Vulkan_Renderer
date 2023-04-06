@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 
 #include <glm/glm.hpp>
 #include <assimp/Importer.hpp>
@@ -54,7 +55,7 @@ public:
 		const std::string& filename,
 		const std::string& folderName,
 		const ModelType& type,
-		const glm::fvec4& pos = glm::fvec4(0.0f),
+		const glm::fvec3& pos = glm::fvec3(0.0f),
 		const glm::fvec3& rot = glm::fvec3(0.0f),
 		const glm::fvec3& size = glm::fvec3(1.0f)
 	);
@@ -65,13 +66,13 @@ public:
 
 	const std::string& getName() const { return m_name; };
 	const ModelType& getType() const { return m_type; };
-	const glm::fvec4& getPos() const { return m_pos; };
+	const glm::fvec3& getPos() const { return m_pos; };
 	const glm::fvec3& getRot() const { return m_rot; };
 	const glm::fvec3& getSize() const { return m_size; };
 	const std::vector<uint32_t>& getMeshIndices() { return m_meshIndices; };
 
 	const bool isHidden() const { return m_hideStatus; };
-	void setPos(const glm::fvec4& newPos) { m_pos = newPos; };
+	void setPos(const glm::fvec3& newPos) { m_pos = newPos; };
 	void setRot(const glm::fvec3& newRot) { m_rot = newRot; };
 	void setSize(const glm::fvec3& newSize) { m_size = newSize; };
 	void setHideStatus(const bool status) { m_hideStatus = status; };
@@ -91,14 +92,14 @@ private:
 	std::string				m_fileName;
 	std::string				m_folderName;
 
-	glm::fvec4				m_pos;
+	glm::fvec3				m_pos;
 	glm::fvec3				m_rot;
 	glm::fvec3				m_size;
 
 
 	// only used for Light obj, TODO : Move LightInfos to Resource Manaegr
-	glm::fvec4				m_targetPos;
-	glm::fvec4				m_color;
+	glm::fvec3				m_targetPos;
+	glm::fvec3				m_color;
 	float					m_intensity;
 	LightType				m_lightType;
 

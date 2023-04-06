@@ -23,13 +23,13 @@
 #include "VulkanRenderer/Renderer.h"
 #include "VulkanRenderer/RenderResource.h"
 
-GUI::GUI(
-    const VkInstance&                   vkInstance,
-    const std::shared_ptr<Swapchain>&   swapchain,
-    const uint32_t&                     graphicsFamilyIndex,
-    const VkQueue&                      graphicsQueue,
-    const std::shared_ptr<Window>&      window
-) :  m_opSwapchain(&(*swapchain)) {
+GUI::GUI()
+{
+    const VkInstance& vkInstance = getRendererPointer()->getVKinstance();
+    const VkQueue& graphicsQueue = getRendererPointer()->getGraphicsQueue();
+    const uint32_t& graphicsFamilyIndex = getRendererPointer()->getQueueFamilyIndices().graphicsFamily.value();
+    const std::shared_ptr<Swapchain> swapchain = getRendererPointer()->getSwapchain();
+
     // -Descriptor Pool
 
     // (calculates the total size of the pool depending of the descriptors
@@ -50,6 +50,12 @@ GUI::GUI(
 
     DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPool);
   
+    
+    // Clear Color
+    m_clearValues.resize(2);
+    m_clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    m_clearValues[1].color = { 1.0f, 0.0f };
+    
     // - RenderPass
     createRenderPass();
 
@@ -62,7 +68,7 @@ GUI::GUI(
     //ImGui::StyleColorsDark();
     applyStyle();
 
-    ImGui_ImplGlfw_InitForVulkan(window->m_window, true);
+    ImGui_ImplGlfw_InitForVulkan(getRendererPointer()->getWindow()->get(), true);
     ImGui_ImplVulkan_InitInfo initInfo = {};
     initInfo.Instance = vkInstance;
     initInfo.PhysicalDevice = getRendererPointer()->getPhysicalDevice();
@@ -72,8 +78,8 @@ GUI::GUI(
     initInfo.PipelineCache = VK_NULL_HANDLE;
     initInfo.DescriptorPool = m_descriptorPool;
     initInfo.Allocator = nullptr;
-    initInfo.MinImageCount = m_opSwapchain->getMinImageCount();
-    initInfo.ImageCount = m_opSwapchain->getImageCount();
+    initInfo.MinImageCount = swapchain->getMinImageCount();
+    initInfo.ImageCount = swapchain->getImageCount();
     initInfo.CheckVkResultFn = nullptr;
     ImGui_ImplVulkan_Init(&initInfo, m_renderPass.get());
 
@@ -177,19 +183,16 @@ void GUI::applyStyle()
 void GUI::uploadFonts(const VkQueue& graphicsQueue)
 {
     // (one time command buffer)
-
     VkCommandBuffer newCommandBuffer = CommandManager::cmdBeginSingleTimeCommands(getRendererPointer()->getDevice(), m_commandPool);
     ImGui_ImplVulkan_CreateFontsTexture(newCommandBuffer);
 
     CommandManager::cmdEndSingleTimeCommands(getRendererPointer()->getDevice(), graphicsQueue, m_commandPool, newCommandBuffer);
 
-    //m_commandPool->endCommandBuffer(newCommandBuffer);
-    //m_commandPool->submitCommandBuffer(graphicsQueue, { newCommandBuffer }, true);
 }
 
 void GUI::createFrameBuffers()
 {
-    m_framebuffers.resize(m_opSwapchain->getImageCount());
+    m_framebuffers.resize(getRendererPointer()->getSwapchain()->getImageCount());
 
     VkImageView attachment[1];
     VkFramebufferCreateInfo info = {};
@@ -197,14 +200,14 @@ void GUI::createFrameBuffers()
     info.renderPass = m_renderPass.get();
     info.attachmentCount = 1;
     info.pAttachments = attachment;
-    info.width = m_opSwapchain->getExtent().width;
-    info.height = m_opSwapchain->getExtent().height;
+    info.width = getRendererPointer()->getSwapchain()->getExtent().width;
+    info.height = getRendererPointer()->getSwapchain()->getExtent().height;
     // The layers is 1 because our imageViews are single images and not
     // arrays.
     info.layers = 1;
-    for (uint32_t i = 0; i < m_opSwapchain->getImageCount(); i++)
+    for (uint32_t i = 0; i < getRendererPointer()->getSwapchain()->getImageCount(); i++)
     {
-        attachment[0] = m_opSwapchain->getImageView(i);
+        attachment[0] = getRendererPointer()->getSwapchain()->getImageView(i);
         vkCreateFramebuffer(getRendererPointer()->getDevice(), &info, nullptr, &m_framebuffers[i]);
     }
 }
@@ -214,7 +217,7 @@ void GUI::createRenderPass()
     // - Attachments
     VkAttachmentDescription attachment = {};
     AttachmentUtils::createAttachmentDescriptionWithStencil(
-        m_opSwapchain->getImageFormat(),
+        getRendererPointer()->getSwapchain()->getImageFormat(),
         VK_SAMPLE_COUNT_1_BIT,
         // Tells Vulkan to not clear the content of the framebuffer but to
         // draw over it instead.
@@ -269,18 +272,18 @@ void GUI::createRenderPass()
 
 
 
-void GUI::recordCommandBuffer(const uint8_t currentFrame,const uint8_t imageIndex,const std::vector<VkClearValue>& clearValues) 
+void GUI::recordCommandBuffer(const uint8_t currentFrame,const uint8_t imageIndex) 
 {
-    const VkCommandBuffer& commandBuffer = (m_commandBuffers[currentFrame]);
+    const VkCommandBuffer& commandBuffer = getRendererPointer()->getGraphicsCommandBuffer(currentFrame);
 
-    vkResetCommandBuffer(commandBuffer, 0);
-    CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits)VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
+   /* vkResetCommandBuffer(commandBuffer, 0);
+    CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits)VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);*/
 
-        m_renderPass.begin(m_framebuffers[imageIndex], m_opSwapchain->getExtent(), { clearValues[currentFrame] }, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
+        m_renderPass.begin(m_framebuffers[imageIndex], getRendererPointer()->getSwapchain()->getExtent(), { m_clearValues[currentFrame] }, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
         m_renderPass.end(commandBuffer);
 
-    vkEndCommandBuffer(commandBuffer);
+  /*  vkEndCommandBuffer(commandBuffer);*/
 }
 
 const VkCommandBuffer& GUI::getCommandBuffer(const uint32_t index) const
@@ -289,18 +292,11 @@ const VkCommandBuffer& GUI::getCommandBuffer(const uint32_t index) const
 }
 
 
-void GUI::draw(
-    const std::shared_ptr<Camera>& camera,
-    const std::string& deviceName,
-    const double mpf,
-    const VkSampleCountFlagBits samplesCount,
-    const uint32_t apiVersion
-)
+void GUI::draw(const uint8_t currentFrame, const uint8_t imageIndex)
 {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    
     float sizeX, sizeY, paddingY;
     {
         sizeX = float(ImGui::GetIO().DisplaySize.x) * 0.2f;
@@ -308,9 +304,8 @@ void GUI::draw(
         paddingY = 0.05f;
         ImGui::SetNextWindowSize(ImVec2(sizeX, sizeY),ImGuiCond_Always );
         ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x,0.0f),ImGuiCond_Always,ImVec2(1.0f, 0.0f));
-        createProfilingWindow(deviceName, mpf, samplesCount, apiVersion);
+        createProfilingWindow();
     }
-
     {
         sizeX = float(ImGui::GetIO().DisplaySize.x) * 0.2f;
         sizeY = float(ImGui::GetIO().DisplaySize.y);
@@ -318,19 +313,22 @@ void GUI::draw(
         ImGui::SetNextWindowSize(ImVec2(sizeX, sizeY),ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImVec2(sizeX,paddingY),ImGuiCond_Always,ImVec2(1.0f, 0.0f));
 
-        createModelsWindow(camera);
+        createModelsWindow();
     }
-
     ImGui::Render();
+
+
+    recordCommandBuffer(currentFrame, imageIndex);
 }
 
 
-void GUI::createProfilingWindow(
-    const std::string& deviceName,
-    const double mpf,
-    const VkSampleCountFlagBits samplesCount,
-    const uint32_t apiVersion)
+void GUI::createProfilingWindow()
 {
+    const std::string& deviceName = getRendererPointer()->getDeviceName();
+    const double mpf = getRendererPointer()->getMicroSecondPerFrame();
+    const VkSampleCountFlagBits& samplesCount = getRendererPointer()->getMSAA()->getSamplesCount();
+    const uint32_t& apiVersion = getRendererPointer()->getApiVersion();
+
     ImGui::Begin("Profiling", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
     ImGui::Columns(2);
 
@@ -375,25 +373,25 @@ void GUI::displayLightModels()
         std::string subMenuName;
         std::string sliderName;
 
-        glm::fvec4 newPos = info.pos;
+        glm::fvec3 newPos = info.pos;
         glm::fvec3 newRot = info.rot;
         glm::fvec3 newSize = info.size;
-        glm::fvec4 color = info.m_color;
+        glm::fvec3 color = info.m_color;
         float intensity = info.m_intensity;
 
         if (ImGui::TreeNode(modelName.c_str()))
         {
-            ImGui::ColorEdit4(("Color###" + modelName).c_str(), &(color.x));
+            ImGui::ColorEdit3(("Color###" + modelName).c_str(), &(color.x));
 
             createTransformationsInfo(newPos, newRot, newSize, modelName);
 
             if (info.m_lightType != LightType::POINT_LIGHT)
             {
-                glm::fvec4 targetPos = info.m_targetPos;
+                glm::fvec3 targetPos = info.m_targetPos;
                 // Target's position.
                 createTranslationSliders(modelName, "Target Pos.", targetPos, -100.0f, 100.0f);
 
-                info.m_targetPos = targetPos;
+                info.m_targetPos =targetPos;
             }
 
             // Intensity
@@ -426,7 +424,7 @@ void GUI::createSlider(const std::string& subMenuName,const std::string& sliceNa
 }
 
 
-void GUI::createModelsWindow(const std::shared_ptr<Camera>& camera)
+void GUI::createModelsWindow()
 {
     ImGui::Begin("Models",NULL,ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
 
@@ -437,7 +435,7 @@ void GUI::createModelsWindow(const std::shared_ptr<Camera>& camera)
     {
         const std::string modelName = ptr->getName();
 
-        glm::fvec4 newPos = ptr->getPos();
+        glm::fvec3 newPos = ptr->getPos();
         glm::fvec3 newRot = ptr->getRot();
         glm::fvec3 newSize = ptr->getSize();
         bool isHidden = ptr->isHidden();
@@ -464,12 +462,12 @@ void GUI::createModelsWindow(const std::shared_ptr<Camera>& camera)
 
     ImGui::Text("Camera");
     ImGui::Separator();
-    displayCamera(camera);
+    displayCamera();
 
     ImGui::End();
 }
 
-void GUI::createTranslationSliders(const std::string& name, const std::string& treeNodeName, glm::fvec4& pos,const float minR,const float maxR)
+void GUI::createTranslationSliders(const std::string& name, const std::string& treeNodeName, glm::fvec3& pos,const float minR,const float maxR)
 {
     const std::vector<std::string> sliderNames = { "X##TRANSLATION::" + name,"Y##TRANSLATION::" + name,"Z##TRANSLATION::" + name };
 
@@ -518,17 +516,17 @@ void GUI::createSizeSliders(const std::string& name,glm::fvec3& pos,const float 
     }
 }
 
-void GUI::createTransformationsInfo(glm::vec4& pos,glm::vec3& rot,glm::vec3& size, const std::string& modelName)
+void GUI::createTransformationsInfo(glm::vec3& pos,glm::vec3& rot,glm::vec3& size, const std::string& modelName)
 {
     createTranslationSliders(modelName, "Position", pos, -100.0f, 100.0f);
     createRotationSliders(modelName, rot, -5.0f, 5.0f);
     createSizeSliders(modelName, size, 0.0f, 1.0f);
 }
 
-void GUI::displayCamera(const std::shared_ptr<Camera>& camera)
+void GUI::displayCamera()
 {
-    glm::fvec4 cameraPos = camera->getPos();
-    glm::fvec4 targetPos = camera->getTargetPos();
+    glm::fvec3 cameraPos = getRenderResource()->m_camera.getCameraPos();
+    glm::fvec3 lookAtDir = getRenderResource()->m_camera.getCameraFront();
 
     // TODO: Name based on the camera type.
     if (ImGui::TreeNode("Arcball"))
@@ -536,12 +534,9 @@ void GUI::displayCamera(const std::shared_ptr<Camera>& camera)
         // Moves the camera.
         createTranslationSliders("Camera", "Position", cameraPos, -100.0f, 100.0f);
         // Moves the target's position.
-        createTranslationSliders("Camera", "Target Pos.", targetPos, -100.0f, 100.0f);
+        createTranslationSliders("Camera", "FrontDir.", lookAtDir, -100.0f, 100.0f);
         ImGui::TreePop();
     }
-
-    camera->setPos(cameraPos);
-    camera->setTargetPos(targetPos);
 }
 
 void GUI::destroy()

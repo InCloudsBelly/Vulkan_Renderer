@@ -14,6 +14,10 @@
 #include "VulkanRenderer/RenderDataTypes.h"
 #include "VulkanRenderer/Settings/Config.h"
 
+#include "VulkanRenderer/Features/PreIrradiance.h"
+#include "VulkanRenderer/Features/PrefilteredEnvMap.h"
+
+#include "VulkanRenderer/Camera/Camera.h"
 
 struct IBLResource
 {
@@ -103,11 +107,11 @@ struct RenderMeshInfo
 struct LightInfo
 {
     std::string             name;
-    glm::fvec4              pos;
+    glm::fvec3              pos;
     glm::fvec3              rot;
     glm::fvec3              size;
-    glm::fvec4				m_targetPos;
-    glm::fvec4				m_color;
+    glm::fvec3				m_targetPos;
+    glm::fvec3				m_color;
     float					m_intensity;
     LightType				m_lightType;
     std::shared_ptr<Model>  modelPtr;
@@ -119,27 +123,28 @@ class RenderResource
 public:
     RenderResource() {};
 
+    void loadModels(const std::vector<ModelInfo>& modelsToLoadInfo);
+    void loadModel(const uint32_t startI, const uint32_t chunckSize, const std::vector<ModelInfo>& modelsToLoadInfo);
+    void uploadModels(const VkQueue& graphicsQueue, const VkCommandPool& commandPool);
+
     void updateIBLResource(std::shared_ptr<TextureBase> brdfLUT, std::shared_ptr<TextureBase> Irradiance, std::shared_ptr<TextureBase> Env);
 
     void destroy();
 
 public:
 
-    uint32_t                                        staging_index = 1;
+    uint32_t                                            staging_index = 1;
 
-    IBLResource                                     m_IBLResource;
+    IBLResource                                         m_IBLResource;
 
-    MeshPerframeStorageBufferObject                 m_PerframeResource;
-    //// cached mesh and material
-    //std::map<uint32_t, MeshInfo>                      m_vulkan_meshes;
-    //std::map<uint32_t, MaterialInfo>                  m_vulkan_pbr_materials;
+    Camera                                           m_camera;
 
-    std::unordered_map<uint32_t, RenderMeshInfo>      m_meshInfoMap;
-    std::shared_ptr<TextureBase>                      m_skyboxCubeMap;
-    std::shared_ptr<TextureBase>                      m_defaultTexture;
+    std::unordered_map<uint32_t, RenderMeshInfo>        m_meshInfoMap;
+    std::shared_ptr<TextureBase>                        m_skyboxCubeMap;
+    std::shared_ptr<TextureBase>                        m_defaultTexture;
 
-    uint32_t                                          m_defaultCubeMeshIndex = 0;
-    uint32_t                                          m_lightSphericalMeshIndex = 0;
+    uint32_t                                            m_defaultCubeMeshIndex = 0;
+    uint32_t                                            m_lightSphericalMeshIndex = 0;
 
     std::vector<std::shared_ptr<Model>>			        m_normalModels;
     std::shared_ptr<Model>			                    m_skybox;
@@ -148,7 +153,11 @@ public:
     std::vector<LightInfo>                            m_lightsInfo;
     uint32_t                                          m_directionalLightIndex;
 
-    VkDescriptorSetLayout* const* mMeshDescriptorSetLayout{ nullptr };
-    VkDescriptorSetLayout* const* mMaterialDescriptorSetLayout{ nullptr };
+    //VkDescriptorSetLayout* const* mMeshDescriptorSetLayout{ nullptr };
+    //VkDescriptorSetLayout* const* mMaterialDescriptorSetLayout{ nullptr };
 
+
+    // Global Features
+    std::shared_ptr<PrefilteredIrradiance>             m_prefilteredIrradiance;
+    std::shared_ptr<PrefilteredEnvMap>                 m_prefilteredEnv;
 };

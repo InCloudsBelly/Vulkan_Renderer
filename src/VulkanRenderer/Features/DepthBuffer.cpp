@@ -47,14 +47,19 @@ DepthBuffer::DepthBuffer(
 
 DepthBuffer::~DepthBuffer() {}
 
-const VkImageView& DepthBuffer::getImageView() const
+const VkImageView& DepthBuffer::getImageView() const 
 {
     return m_image->getImageView();
 }
 
-const VkFormat& DepthBuffer::getFormat() const
+const VkFormat& DepthBuffer::getFormat()const
 {
     return m_format;
+}
+
+const VkImage& DepthBuffer::getImage()const
+{
+    return  m_image->getImage();
 }
 
 void DepthBuffer::destroy()

@@ -23,13 +23,6 @@ layout(location = 3) out vec3 outTangent;
 layout(location = 4) out vec3 outBitangent;
 layout(location = 5) out vec4 outShadowCoords;
 
-/*
- * We need to compute the current fragment¡¯s position in the same
- * space that the one we used when creating the shadowmap. So we need to
- * transform it once with the usual MVP matrix, and another time with the
- * depthMVP matrix. So this transforms [-1, 1] -> [0, 1].
- */
-
 
 void main()
 {

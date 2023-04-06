@@ -14,8 +14,11 @@ public:
         const VkSampleCountFlagBits& samplesCount
     );
     ~DepthBuffer();
-    const VkImageView& getImageView() const;
-    const VkFormat& getFormat() const;
+
+    std::shared_ptr<TextureBase> getTexture(){return m_image; }
+    const VkImageView& getImageView()const;
+    const VkImage& getImage()const;
+    const VkFormat& getFormat()const;
 
     void destroy();
 

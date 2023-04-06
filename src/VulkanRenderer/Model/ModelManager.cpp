@@ -8,7 +8,7 @@
 Model::Model(
     const std::string& name, const std::string& filename, const std::string& folderName,
     const ModelType& type,
-    const glm::fvec4& pos,
+    const glm::fvec3& pos,
     const glm::fvec3& rot,
     const glm::fvec3& size
 ) : m_name(name), m_fileName(filename), m_folderName(folderName), m_type(type), m_pos(pos), m_rot(rot), m_size(size), m_hideStatus(false)
@@ -134,6 +134,8 @@ MaterialDataInfo Model::processMaterial(aiMesh* mesh, const aiScene* scene)
     MaterialDataInfo ret;
     aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
     // Roughness and metallic factor.
+    aiGetMaterialFloat( material,AI_MATKEY_METALLIC_FACTOR,&ret.autoMetallic);
+    aiGetMaterialFloat(material,AI_MATKEY_ROUGHNESS_FACTOR,&ret.autoRoughness);
 
     // Material Textures
     struct MaterialInfo
@@ -148,7 +150,7 @@ MaterialDataInfo Model::processMaterial(aiMesh* mesh, const aiScene* scene)
     std::vector<MaterialInfo> materials =
     {
         { aiTextureType_DIFFUSE,	"DIFFUSE",				"DefaultTexture.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
-        { aiTextureType_UNKNOWN,	"METALIC_ROUGHNESS",	"metallicRoughness.png",	VK_FORMAT_R8G8B8A8_SRGB,	4},
+        { aiTextureType_UNKNOWN,	"METALIC_ROUGHNESS",	"metallicRoughness.jpg",	VK_FORMAT_R8G8B8A8_SRGB,	4},
         { aiTextureType_EMISSIVE,	"EMISSIVE",				"emissiveColor.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
         { aiTextureType_LIGHTMAP,	"AO",					"ambientOcclusion.png",		VK_FORMAT_R8G8B8A8_SRGB,	4},
         { aiTextureType_NORMALS,	"NORMALS",				"DefaultNormal.png",		VK_FORMAT_R8G8B8A8_SRGB,	4}
@@ -235,6 +237,7 @@ void Model::upload(const VkCommandPool& commandPool, const VkQueue& graphicsQueu
             materialInfo->normalTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[4].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[4].folderName, m_materialData[meshIndex].info[4].format);
 
 
+
             m_materialData[meshIndex].info.clear();
             m_materialData[meshIndex].info.shrink_to_fit();
         }
@@ -252,4 +255,6 @@ void Model::upload(const VkCommandPool& commandPool, const VkQueue& graphicsQueu
     }
 
 }
+
+
 

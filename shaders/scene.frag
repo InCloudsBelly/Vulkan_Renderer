@@ -207,6 +207,10 @@ void main()
     outColor = ambient * vec4(color, 1.0);
 
 //    outColor =  vec4(iblInfo.specularLight * (pbrInfo.specularColor* iblInfo.brdf.x + iblInfo.brdf.y) , 1.0);
+    
+//    vec3 shadowCoords = inShadowCoords.xyz / inShadowCoords.w;
+//    shadowCoords.xy = shadowCoords.xy * 0.5 + 0.5;
+//    outColor = vec4( shadowCoords.z - texture(shadowMapSampler, shadowCoords.xy).r); 
 
 }
 
@@ -269,7 +273,7 @@ float calculateShadow(vec3 shadowCoords, vec2 off)
         float closestDepth = texture(shadowMapSampler, shadowCoords.xy + off).r;
         float currentDepth = shadowCoords.z;
 
-        if (closestDepth > currentDepth)
+        if (closestDepth> currentDepth)
             return 0.0;
     }
     return 1.0;

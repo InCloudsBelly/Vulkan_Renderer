@@ -37,8 +37,6 @@ public:
 	);
 	~Swapchain();
 
-	void createFramebuffers(const RenderPass& renderPass, const DepthBuffer& depthBuffer, const MSAA& msaa);
-
 	void presentImage(const uint32_t imageIndex, const std::vector<VkSemaphore> signalSemaphores, const VkQueue& presentQueue);
 
 	void destroy();
@@ -47,10 +45,14 @@ public:
 
 	const VkExtent2D& getExtent() const;
 	const VkFormat& getImageFormat() const;
-	const VkFramebuffer& getFramebuffer(const uint32_t imageIndex) const;
+	VkViewport& getViewport()  { return m_viewport; }
+	VkRect2D& getScissor() { return m_scissor; }
+	std::vector<VkImageView*> getImageViews() { return m_imageViews; }
+
 	const VkSwapchainKHR& get() const;
 	const uint32_t getImageCount() const;
 	const uint32_t getMinImageCount() const;
+
 	const VkImageView& getImageView(const uint32_t index) const;
 
 private:
@@ -74,9 +76,10 @@ private:
 	VkSwapchainKHR             m_swapchain;
 	VkFormat                   m_imageFormat;
 	VkExtent2D                 m_extent;
+	VkViewport				   m_viewport;
+	VkRect2D				   m_scissor;
 	std::vector<VkImage>       m_images;
-	std::vector<VkImageView>   m_imageViews;
-	std::vector<VkFramebuffer> m_framebuffers;
+	std::vector<VkImageView*>  m_imageViews;
 
 	// Used for the creation of the Imgui instance.
 	uint32_t                   m_minImageCount;

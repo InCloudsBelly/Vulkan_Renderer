@@ -12,25 +12,13 @@
 class GUI
 {
 public:
-    GUI(
-        const VkInstance& vkInstance,
-        const std::shared_ptr<Swapchain>& swapchain,
-        const uint32_t& graphicsFamilyIndex,
-        const VkQueue& graphicsQueue,
-        const std::shared_ptr<Window>& window
-    );
+    GUI();
 
     ~GUI();
 
-    void recordCommandBuffer(const uint8_t currentFrame, const uint8_t imageIndex, const std::vector<VkClearValue>& clearValues);
+    void recordCommandBuffer(const uint8_t currentFrame, const uint8_t imageIndex);
 
-    void draw(
-        const std::shared_ptr<Camera>& camera, 
-        const std::string& deviceName,
-        const double mpf,
-        const VkSampleCountFlagBits samplesCount,
-        const uint32_t apiVersion
-    );
+    void draw(const uint8_t currentFrame, const uint8_t imageIndex);
 
     const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
 
@@ -41,20 +29,15 @@ public:
 private:
 
     void displayLightModels();
-    void displayCamera(const std::shared_ptr<Camera>& camera);
+    void displayCamera();
 
-    void createModelsWindow(const std::shared_ptr<Camera>& camera);
+    void createModelsWindow();
 
-    void createProfilingWindow(
-        const std::string& deviceName,
-        const double mpf,
-        const VkSampleCountFlagBits samplesCount,
-        const uint32_t apiVersion
-    );
+    void createProfilingWindow();
 
     void createSlider(const std::string& subMenuName, const std::string& sliceName, const float& maxV, const float& minV, float& value);
-    void createTransformationsInfo(glm::vec4& pos,glm::vec3& rot, glm::vec3& size, const std::string& modelName);
-    void createTranslationSliders(const std::string& name, const std::string& treeNodeName, glm::fvec4& pos, const float minR, const float maxR);
+    void createTransformationsInfo(glm::vec3& pos,glm::vec3& rot, glm::vec3& size, const std::string& modelName);
+    void createTranslationSliders(const std::string& name, const std::string& treeNodeName, glm::fvec3& pos, const float minR, const float maxR);
     void createRotationSliders(const std::string& name,glm::fvec3& pos,const float minR,const float maxR);
     void createSizeSliders(const std::string& name, glm::fvec3& pos, const float minR, const float maxR);
 
@@ -63,6 +46,7 @@ private:
     void uploadFonts(const VkQueue& graphicsQueue);
     void applyStyle();
 
+    std::vector<VkClearValue>       m_clearValues;
     std::vector<VkFramebuffer>      m_framebuffers;
 
     VkCommandPool                   m_commandPool;
@@ -70,7 +54,4 @@ private:
 
     VkDescriptorPool                m_descriptorPool;
     RenderPass                      m_renderPass;
-
-    // Observer pointers
-    const Swapchain*                m_opSwapchain;
 };

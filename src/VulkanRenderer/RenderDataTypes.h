@@ -136,5 +136,30 @@ struct TextureToLoadInfo
 struct MaterialDataInfo
 {
     std::vector<TextureToLoadInfo> info;
+    float autoRoughness;
+    float autoMetallic;
 };
 
+
+struct SwapChainDesc
+{
+    VkExtent2D  extent;
+    VkFormat    image_format;
+    VkViewport* viewport;
+    VkRect2D*   scissor;
+    std::vector<VkImageView*> imageViews;
+};
+
+struct DepthImageDesc
+{
+    VkImage*        depth_image = VK_NULL_HANDLE;
+    VkImageView*    depth_image_view = VK_NULL_HANDLE;
+    VkFormat        depth_image_format;
+};
+
+struct MSAADesc
+{
+    VkImage*                msaa_image = VK_NULL_HANDLE;
+    VkImageView*            msaa_image_view = VK_NULL_HANDLE;
+    VkSampleCountFlagBits   msaa_sampleCount;
+};

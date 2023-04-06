@@ -16,6 +16,7 @@ public:
     );
     ~MSAA();
 
+    std::shared_ptr<TextureBase> getTexture() { return m_image; }
     const VkSampleCountFlagBits& getSamplesCount() const;
     const VkImageView& getImageView() const;
 

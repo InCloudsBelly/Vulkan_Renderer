@@ -5,7 +5,7 @@
 
 struct UBOinfo
 {
-	const glm::vec4& cameraPos;
+	const glm::vec3& cameraPos;
 	const glm::mat4& view;
 	const glm::mat4& proj;
 	const glm::mat4& lightSpace;

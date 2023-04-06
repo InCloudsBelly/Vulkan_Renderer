@@ -23,12 +23,7 @@ class PrefilteredIrradiance
 {
 public:
 
-    PrefilteredIrradiance(
-        const VkQueue& graphicsQueue,
-        const VkCommandPool& commandBuffer,
-        const uint32_t dim,
-        const std::shared_ptr<TextureBase>& envMap
-    );
+    PrefilteredIrradiance(const uint32_t dim);
     ~PrefilteredIrradiance();
 
     void destroy();
@@ -38,23 +33,17 @@ public:
 private:
 
     void createPipeline();
-    void createOffscreenFramebuffer(
-        const VkQueue& graphicsQueue
-    );
+    void createOffscreenFramebuffer();
     void createRenderPass();
     void createTargetImage();
-    void createDescriptorPool();
-    void createDescriptorSet(const std::shared_ptr<TextureBase>& envMap);
+    void createDescriptorSet();
     void copyRegionOfImage(
         float face,
         float mipLevel,
         float viewportDim,
         const VkCommandBuffer& commandBuffer
     );
-    void recordCommandBuffer(
-        const VkCommandPool& commandBuffer,
-        const VkQueue& graphicsQueue
-    );
+    void recordCommandBuffer();
 
 
     uint32_t                         m_dim;
@@ -67,7 +56,6 @@ private:
     RenderPass                       m_renderPass;
 
     VkDescriptorSet                  m_descriptorSet;
-    VkDescriptorPool                 m_descriptorPool;
 
     VkFramebuffer                    m_framebuffer;
 

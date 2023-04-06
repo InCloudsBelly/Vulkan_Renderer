@@ -12,7 +12,7 @@
 
 #include "VulkanRenderer/Texture/Texture.h"
 
-template<typename T>
+
 class ShadowMap
 {
 public:
@@ -29,10 +29,7 @@ public:
 
 	void updateUBO();
 
-	void bindData(
-		const VkCommandBuffer& commandBuffer,
-		const uint32_t currentFrame
-	);
+	void draw(uint32_t imageIndex, uint32_t frameIndex);
 
 	const std::shared_ptr<TextureBase> get() const;
 	const VkImageView& getShadowMapView() const;
@@ -50,10 +47,13 @@ private:
 	void createGraphicsPipeline(const VkExtent2D& extent);
 	void createRenderPass(const VkFormat& depthBufferFormat);
 	void createFramebuffer(const uint32_t& imagesCount);
-
+	void createUBOs();
+	void createDescriptorSets();
 
 	uint32_t                         m_width;
 	uint32_t                         m_height;
+
+	std::vector<VkClearValue>		m_clearValuesShadowMap;
 
 	std::shared_ptr<TextureBase>	 m_texture;
 

@@ -6,7 +6,7 @@
 namespace MathUtils
 {
     glm::mat4 getUpdatedModelMatrix(
-        const glm::fvec4 actualPos,
+        const glm::fvec3 actualPos,
         const glm::fvec3 actualRot,
         const glm::fvec3 actualSize
     );

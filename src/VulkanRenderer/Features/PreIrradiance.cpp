@@ -18,41 +18,29 @@
 
 
 PrefilteredIrradiance::PrefilteredIrradiance(
-    const VkQueue& graphicsQueue,
-    const VkCommandPool& commandPool,
-    const uint32_t dim,
-    const std::shared_ptr<TextureBase>& envMap
+    const uint32_t dim
 ) : m_dim(dim), m_format(VK_FORMAT_R32G32B32A32_SFLOAT)
 {
     m_mipLevels = MipmapUtils::getAmountOfSupportedMipLevels(dim, dim);
 
     createTargetImage();
     createRenderPass();
-    createOffscreenFramebuffer(graphicsQueue);
+    createOffscreenFramebuffer();
     createPipeline();
-    createDescriptorPool();
-    createDescriptorSet(envMap);
-    recordCommandBuffer(commandPool, graphicsQueue);
+    createDescriptorSet();
+    recordCommandBuffer();
 }
 
 
-void PrefilteredIrradiance::createDescriptorPool()
+
+
+void PrefilteredIrradiance::createDescriptorSet()
 {
-    std::vector<VkDescriptorPoolSize> poolSizes = {
-       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1}
-    };
-
-    DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPool);
-}
-
-
-void PrefilteredIrradiance::createDescriptorSet(const std::shared_ptr<TextureBase>& envMap)
-{
-    DescriptorManager::allocDescriptorSet(m_descriptorPool, m_graphicsPipeline.getDescriptorSetLayout(), &m_descriptorSet);
+    DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_graphicsPipeline.getDescriptorSetLayout(), &m_descriptorSet);
 
     DescriptorManager::createDescriptorSet(
         GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::DESCRIPTORS_INFO,
-        { envMap },
+        { getRenderResource()->m_skyboxCubeMap},
         {},
         {},
         & m_descriptorSet
@@ -61,10 +49,8 @@ void PrefilteredIrradiance::createDescriptorSet(const std::shared_ptr<TextureBas
 }
 
 
-void PrefilteredIrradiance::recordCommandBuffer(
-    const VkCommandPool& commandPool,
-    const VkQueue& graphicsQueue
-) {
+void PrefilteredIrradiance::recordCommandBuffer() 
+{
     VkClearValue clearValues;
     clearValues.color = { {0.0f, 0.0f, 0.2f, 0.0f} };
 
@@ -99,7 +85,7 @@ void PrefilteredIrradiance::recordCommandBuffer(
             //float viewportDim = static_cast<float>(m_dim * std::pow(0.5f, m));
             uint32_t viewportDim = static_cast<uint32_t>(m_dim * std::pow(0.5f, m));
 
-            VkCommandBuffer commandBuffer = CommandManager::cmdBeginSingleTimeCommands(getRendererPointer()->getDevice(), commandPool);
+            VkCommandBuffer commandBuffer = CommandManager::cmdBeginSingleTimeCommands(getRendererPointer()->getDevice(), getRendererPointer()->getCommandPool());
 
             //---------------------------------CMDs----------------------------
                 // Set Dynamic States
@@ -183,7 +169,7 @@ void PrefilteredIrradiance::recordCommandBuffer(
                 );
             }
 
-            CommandManager::cmdEndSingleTimeCommands(getRendererPointer()->getDevice(), graphicsQueue, commandPool, commandBuffer);
+            CommandManager::cmdEndSingleTimeCommands(getRendererPointer()->getDevice(), getRendererPointer()->getGraphicsQueue(), getRendererPointer()->getCommandPool(), commandBuffer);
         }
     }
 
@@ -260,9 +246,8 @@ void PrefilteredIrradiance::createPipeline()
 
 
 
-void PrefilteredIrradiance::createOffscreenFramebuffer(
-    const VkQueue& graphicsQueue
-) {
+void PrefilteredIrradiance::createOffscreenFramebuffer() 
+{
     
     m_offscreenImage = std::make_shared<NormalTexture>("Offscreen");
     m_offscreenImage->getExtent() = VkExtent2D({ m_dim ,m_dim });
@@ -307,7 +292,7 @@ void PrefilteredIrradiance::createOffscreenFramebuffer(
         m_dim,
         m_dim,
         1,
-        m_framebuffer
+        &m_framebuffer
     );
 
 
@@ -439,7 +424,6 @@ PrefilteredIrradiance::~PrefilteredIrradiance() {}
 void PrefilteredIrradiance::destroy()
 {
     m_graphicsPipeline.destroy();
-    vkDestroyDescriptorPool(getRendererPointer()->getDevice(), m_descriptorPool, nullptr);
 
     m_targetImage->destroy();
     m_offscreenImage->destroy();

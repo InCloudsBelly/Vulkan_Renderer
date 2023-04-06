@@ -13,6 +13,6 @@ namespace FramebufferManager
         const uint32_t width,
         const uint32_t height,
         const uint32_t layersCount,
-        VkFramebuffer& framebuffer
+        VkFramebuffer* framebuffer
     );
 };

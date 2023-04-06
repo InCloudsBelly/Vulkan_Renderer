@@ -21,27 +21,30 @@
 #include "VulkanRenderer/Device/Device.h"
 #include "VulkanRenderer/Texture/Texture.h"
 #include "VulkanRenderer/Camera/Camera.h"
-#include "VulkanRenderer/Camera/Types/Arcball.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 #include "VulkanRenderer/VKinstance/VKinstance.h"
-#include "VulkanRenderer/Scene/Scene.h"
+#include "VulkanRenderer/Scene/ForwardPBR.h"
 #include "VulkanRenderer/Guid_Allocator.h"
 
 #include "VulkanRenderer/RenderResource.h"
-
+#include "VulkanRenderer/InputManager.h"
 
 #ifndef getRendererPointer
 #define getRendererPointer() g_RendererSingleton
 #endif
 
-
 #ifndef getRenderResource
 #define getRenderResource() g_RenderResource
 #endif
 
-extern RenderResource* g_RenderResource;
+#ifndef getInputManager
+#define getInputManager() g_InputManager
+#endif
 
 class Renderer;
+
+extern RenderResource* g_RenderResource;
+extern InputManager* g_InputManager;
 extern Renderer* g_RendererSingleton ;
 
 class Renderer
@@ -50,113 +53,55 @@ public:
 
 	void run();
 
-	
-
-	void addObjectPBR(const std::string& name, 
-		const std::string& folderName,
-		const std::string& fileName,
-		const glm::fvec3& pos = glm::fvec3(0.0f),
-		const glm::fvec3& rot = glm::fvec3(0.0f),
-		const glm::fvec3& size = glm::fvec3(1.0f)
-	);
+	void addObjectPBR(const std::string& name, const std::string& folderName,const std::string& fileName,const glm::fvec3& pos = glm::fvec3(0.0f),const glm::fvec3& rot = glm::fvec3(0.0f),const glm::fvec3& size = glm::fvec3(1.0f));
 
 	void addSkybox(const std::string& fileName, const std::string& textureFolderName);
 
-	void addDirectionalLight(const std::string& name, 
-		const std::string& folderName,
-		const std::string& fileName,
-		const glm::fvec3& color,
-		const glm::fvec3& pos,
-		const glm::fvec3& endPos,
-		const glm::fvec3& size
-	);
-	void addSpotLight(
-		const std::string& name,
-		const std::string& folderName,
-		const std::string& fileName,
-		const glm::fvec3& color,
-		const glm::fvec3& pos,
-		const glm::fvec3& endPos,
-		const glm::fvec3& rot,
-		const glm::fvec3& size
-	);
+	void addDirectionalLight(const std::string& name, const std::string& folderName,const std::string& fileName,const glm::fvec3& color,const glm::fvec3& pos,const glm::fvec3& endPos,const glm::fvec3& size);
+	void addSpotLight(const std::string& name,const std::string& folderName,const std::string& fileName,const glm::fvec3& color,const glm::fvec3& pos,const glm::fvec3& endPos,const glm::fvec3& rot,const glm::fvec3& size);
+	void addPointLight(const std::string& name,const std::string& folderName,const std::string& fileName,const glm::fvec3& color,const glm::fvec3& pos,const glm::fvec3& size);
 
-	void addPointLight(
-		const std::string& name,
-		const std::string& folderName,
-		const std::string& fileName,
-		const glm::fvec3& color,
-		const glm::fvec3& pos,
-		const glm::fvec3& size
-	);
+	const VkInstance& getVKinstance()const 					{ return m_vkInstance->get(); };
+	const std::shared_ptr<Window>	getWindow()const		{ return m_window; }
+	const std::shared_ptr<Swapchain> getSwapchain() const	{ return m_swapchain; }
+	const MSAA* getMSAA() const								{ return &m_msaa; }
+	const DepthBuffer* getDepthBuffer() const				{ return &m_depthBuffer; }
+	virtual VkDevice getDevice()							{ return m_device->getLogicalDevice();};
+	virtual VkPhysicalDevice getPhysicalDevice()			{ return m_device->getPhysicalDevice();};
+	virtual VmaAllocator& getVmaAllocator()					{ return m_vmaAllocator;};
+	virtual VkQueue& getGraphicsQueue()						{ return m_qfHandles.graphicsQueue;};
+	virtual QueueFamilyIndices& getQueueFamilyIndices()		{ return m_qfIndices; }
+	virtual VkCommandPool getCommandPool()					{ return m_commandPoolForGraphics;};
+	virtual VkDescriptorPool& getDescriptorPool()			{ return m_descriptorPool; }
+	
+	
+	const double& getMicroSecondPerFrame() const			{ return m_mpf; }
+	const std::string& getDeviceName() const				{ return m_device->getDeviceName(); }
+	const uint32_t& getApiVersion()const					{ return m_device->getApiVersion(); }
 
-	virtual VkDevice getDevice()
-	{
-		return m_device->getLogicalDevice();
-	};
+	VkCommandBuffer& getGraphicsCommandBuffer(uint32_t index) { return m_commandBuffersForGraphics[index]; }
+	VkCommandBuffer& getComputeCommandBuffer(uint32_t index) { return m_commandBuffersForCompute[index]; }
 
-	virtual VkPhysicalDevice getPhysicalDevice()
-	{
-		return m_device->getPhysicalDevice();
-	};
-
-	virtual VmaAllocator& getVmaAllocator()
-	{
-		return m_vmaAllocator;
-	};
-
-	virtual VkQueue& getGraphicsQueue()
-	{
-		return m_qfHandles.graphicsQueue;
-	};
-
-	///returns the thread command pool
-	virtual VkCommandPool getCommandPool()
-	{
-		return m_commandPoolForGraphics1;
-	};
-
-	virtual QueueFamilyIndices& getQueueFamilyIndices()
-	{
-		return m_qfIndices;
-	}
-
-	//GuidAllocator<Mesh>& getMeshIdAllocator() { return m_Mesh_id_allocator; };
-	//GuidAllocator<MaterialSourceDesc>& getMaterialAssetdAllocator() { return m_material_asset_id_allocator; };
+	SwapChainDesc getSwapchainInfo();
+	DepthImageDesc getDepthImageInfo();
+	MSAADesc getMSAAInfo();
 
 private:
-	void initWindow();
 	void doComputations();
-	void handleInput();
 	void calculateFrames(double& lastTime, int& framesCounter);
-	static void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 
 	void initVulkan();
 	void mainLoop();
 	void cleanup();
-
-	void configureUserInputs();
-
-	void recordCommandBuffer(
-		const VkFramebuffer& framebuffer,
-		const RenderPass& renderPass,
-		const VkExtent2D& extent,
-		const std::vector<const Graphics*>& graphicsPipelines,
-		const uint32_t currentFrame,
-		const VkCommandBuffer& commandBuffer,
-		const std::vector<VkClearValue>& clearValues
-	);
 
 	void drawFrame(uint8_t& currentFrame);
 
 	void createSyncObjects();
 	void destroySyncObjects();
 
-	VkResult vhMemCreateVMAAllocator(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VmaAllocator& allocator);
+	VkResult createVMAAllocator(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VmaAllocator& allocator);
 	
 	std::shared_ptr<Window>             m_window;
-	std::unique_ptr<GUI>                m_GUI;
-	std::shared_ptr<Camera>             m_camera;
 
 	std::unique_ptr<VKinstance>         m_vkInstance;
 	std::unique_ptr<Device>             m_device;
@@ -168,7 +113,7 @@ private:
 
 	std::shared_ptr<Swapchain>          m_swapchain;
 	
-	Scene                               m_scene;
+	std::unique_ptr<ForwardPBRPass>			m_scene;
 
 	//std::vector<VkCommandPool>			m_commandPools = {}; ///<Array of command pools so that each thread in the thread pool has its own pool
 	//std::vector<VkCommandBuffer>		m_commandBuffers = {}; ///<the main command buffers for recording draw commands
@@ -180,24 +125,21 @@ private:
 	std::vector<ModelInfo>              m_modelsToLoadInfo;
 
 	// Command Pool for main drawing commands.
-	VkCommandPool						m_commandPoolForGraphics1;
-	VkCommandPool						m_commandPoolForCompute1;
+	VkCommandPool						m_commandPoolForGraphics;
+	VkCommandPool						m_commandPoolForCompute;
+
 	std::vector<VkCommandBuffer>		m_commandBuffersForGraphics;
 	std::vector<VkCommandBuffer>		m_commandBuffersForCompute;
 
-	VkDescriptorPool                    m_descriptorPoolForGraphics;
-	VkDescriptorPool                    m_descriptorPoolForComputations;
+	VkDescriptorPool                    m_descriptorPool;
 
 
-	std::vector<VkClearValue>			m_clearValues;
-	std::vector<VkClearValue>			m_clearValuesShadowMap;
 	bool								m_isMouseInMotion;
 
 
 	// milliseconds per frame
-	double								m_mpf;
+	double												m_mpf;
 	//---------------------------Features--------------------------------------
 	DepthBuffer											m_depthBuffer;
 	MSAA												m_msaa;
-	std::shared_ptr<ShadowMap<MeshVertex>> m_shadowMap;
 };

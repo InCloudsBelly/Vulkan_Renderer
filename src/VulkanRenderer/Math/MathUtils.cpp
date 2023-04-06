@@ -6,11 +6,11 @@
 /*
  * Remember that the correct order is SRT!
  */
-glm::mat4 MathUtils::getUpdatedModelMatrix(const glm::fvec4 actualPos,const glm::fvec3 actualRot,const glm::fvec3 actualSize) 
+glm::mat4 MathUtils::getUpdatedModelMatrix(const glm::fvec3 actualPos,const glm::fvec3 actualRot,const glm::fvec3 actualSize) 
 {
     glm::mat4 model = glm::mat4(1.0);
 
-    model = glm::translate(model,glm::vec3(actualPos));
+    model = glm::translate(model,actualPos);
 
     model = glm::rotate(model,actualRot.x,glm::vec3(1.0f, 0.0f, 0.0f));
 

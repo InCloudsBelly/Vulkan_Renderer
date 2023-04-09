@@ -42,16 +42,61 @@ namespace DescriptorManager
         VkWriteDescriptorSet& descriptorWrite
     );
 
-    VkResult createDescriptorSet(
-        const std::vector<DescriptorInfo>& descriptorInfos,
-        const std::vector<std::shared_ptr<TextureBase>>& textures,
-        const std::vector<VkDescriptorImageInfo*>& additionalTextureInfos,
-        const std::vector<VkBuffer>& UBOs,
-        VkDescriptorSet* descriptorset
-    );
 
     VkResult createDescriptorPool(std::vector<VkDescriptorPoolSize> poolSizes, VkDescriptorPool* descriptorPool);
 
     VkResult allocDescriptorSet(const VkDescriptorPool& pool,const VkDescriptorSetLayout& layout, VkDescriptorSet* descriptorSet);
 
+
+	inline VkDescriptorImageInfo descriptorImageInfo(VkSampler sampler, VkImageView imageView, VkImageLayout imageLayout)
+	{
+		VkDescriptorImageInfo descriptorImageInfo{};
+		descriptorImageInfo.sampler = sampler;
+		descriptorImageInfo.imageView = imageView;
+		descriptorImageInfo.imageLayout = imageLayout;
+		return descriptorImageInfo;
+	}
+
+	inline VkDescriptorBufferInfo descriptorBufferInfo(const VkBuffer& buffer)
+	{
+		VkDescriptorBufferInfo descriptorBufferInfo{};
+		descriptorBufferInfo.buffer = buffer;
+		descriptorBufferInfo.offset = 0;
+		descriptorBufferInfo.range = VK_WHOLE_SIZE;
+		return descriptorBufferInfo;
+	}
+
+	inline VkWriteDescriptorSet writeDescriptorSet(
+		VkDescriptorSet& dstSet,
+		VkDescriptorType type,
+		uint32_t binding,
+		VkDescriptorBufferInfo* bufferInfo,
+		uint32_t descriptorCount = 1)
+	{
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = dstSet;
+		writeDescriptorSet.descriptorType = type;
+		writeDescriptorSet.dstBinding = binding;
+		writeDescriptorSet.pBufferInfo = bufferInfo;
+		writeDescriptorSet.descriptorCount = descriptorCount;
+		return writeDescriptorSet;
+	}
+
+	inline VkWriteDescriptorSet writeDescriptorSet(
+		VkDescriptorSet dstSet,
+		VkDescriptorType type,
+		uint32_t binding,
+		VkDescriptorImageInfo* imageInfo,
+		uint32_t descriptorCount = 1)
+	{
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = dstSet;
+		writeDescriptorSet.descriptorType = type;
+		writeDescriptorSet.dstBinding = binding;
+		writeDescriptorSet.pImageInfo = imageInfo;
+		writeDescriptorSet.descriptorCount = descriptorCount;
+		return writeDescriptorSet;
+	}
 };

@@ -4,11 +4,11 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Pipeline/Graphics.h"
+
 
 namespace FeaturesUtils
 {
-	void createDepthStencilStateInfo(const GraphicsPipelineType& type,VkPipelineDepthStencilStateCreateInfo& depthStencil);
+	//void createDepthStencilStateInfo(const GraphicsPipelineType& type,VkPipelineDepthStencilStateCreateInfo& depthStencil);
 
     VkFormat findSupportedFormat(const VkPhysicalDevice& phyisicalDevice,
         const std::vector<VkFormat>& candidates,

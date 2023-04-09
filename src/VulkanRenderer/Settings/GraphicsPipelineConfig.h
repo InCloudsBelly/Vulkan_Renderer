@@ -58,7 +58,7 @@ namespace GRAPHICS_PIPELINE
     namespace LIGHT
     {
         inline const std::vector<DescriptorInfo> DESCRIPTORS_INFO = {
-            {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)},
+           {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)},
 
            {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)}
         };
@@ -105,7 +105,45 @@ namespace GRAPHICS_PIPELINE
         inline const uint32_t UBOS_COUNT = 0;
         inline const uint32_t SAMPLERS_COUNT = 1;
     };
+
+    ///////////////////////////////Deferred Rendering///////////////////////////////////
+    namespace DEFERRED_OFF
+    {
+        inline const std::vector<DescriptorInfo> DESCRIPTORS_INFO = {
+            {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)},
+
+            // Now only Color & Normal Texture
+            {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+            {2,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)}
+        };
+
+        // We don't count the shadow , BRDF, prefilteredEnvMap and irradiance map.
+        inline const uint32_t TEXTURES_PER_MESH_COUNT = 2;
+
+        inline const uint32_t SAMPLERS_PER_MESH_COUNT = 2;
+
+        inline const uint32_t UBOS_PER_MESH_COUNT = 1;
+    };
+
+    namespace DEFERRED_ON
+    {
+        inline const std::vector<DescriptorInfo> DESCRIPTORS_INFO = {
+            // Lights infos
+            {0,VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+
+            // POSITION & NORMAL & ALBEDO Attachment 
+            {1,VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+            {2,VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)},
+            {3,VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,(VkShaderStageFlagBits)(VK_SHADER_STAGE_FRAGMENT_BIT)}
+        };
+
+        // We don't count the shadow , BRDF, prefilteredEnvMap and irradiance map.
+        inline const uint32_t TEXTURES_PER_MESH_COUNT = 3;
+
+        inline const uint32_t SAMPLERS_PER_MESH_COUNT = 3;
+
+        inline const uint32_t UBOS_PER_MESH_COUNT = 1;
+    }
 };
 
 
-    

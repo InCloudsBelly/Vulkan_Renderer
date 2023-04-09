@@ -199,16 +199,10 @@ VkResult BufferManager::bufferCreateOffscreenResources(
 		)
 	);
 
-	if (usage & VK_IMAGE_USAGE_SAMPLED_BIT)
+	if ((usage & VK_IMAGE_USAGE_SAMPLED_BIT))
 	{
 		CHECKRESULT(
-			BufferManager::bufferCreateTextureSampler(
-				device,
-				miplevels,
-				VK_FILTER_LINEAR,
-				VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-				&texture->getSampler()
-			)
+			BufferManager::bufferCreateTextureSampler(device,miplevels,VK_FILTER_LINEAR,VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,&texture->getSampler())
 		);
 	}
 

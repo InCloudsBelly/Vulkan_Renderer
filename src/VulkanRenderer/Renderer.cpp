@@ -76,7 +76,8 @@ void Renderer::run()
     initVulkan();
 
     // -------------------------------Main Pass-----------------------------------
-    m_scene = std::make_unique<ForwardPBRPass>();
+    m_scene = std::make_unique<DeferredRenderPass>();
+    //m_scene = std::make_unique<ForwardPBRPass>();
     // ---------------------------------------------------------------------------
 
     doComputations();
@@ -176,6 +177,7 @@ void Renderer::initVulkan()
     std::vector<VkDescriptorPoolSize> poolSizes = {
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 },
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(m_modelsToLoadInfo.size()) * Config::MAX_FRAMES_IN_FLIGHT * 100 },
+        {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 10},
         {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2}
     };
     DescriptorManager::createDescriptorPool(poolSizes, &m_descriptorPool);
@@ -289,59 +291,59 @@ void Renderer::mainLoop()
 
 void Renderer::doComputations()
 {
-    std::vector<Computation> computations = { m_scene->getComputation() };
+    //std::vector<Computation> computations = { m_scene->getComputation() };
 
-    std::cout << "Doing computations.\n";
+    //std::cout << "Doing computations.\n";
 
-    const VkCommandBuffer& commandBuffer = (m_commandBuffersForCompute[0]);
+    //const VkCommandBuffer& commandBuffer = (m_commandBuffersForCompute[0]);
 
-    for (auto& computation : computations)
-    {
-        // Resets the command buffer to be able to be recorded.
-        vkResetCommandBuffer(commandBuffer, 0);
-        // Specifies some details about the usage of this specific command buffer.
-        CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits) 0);
-
-
-        computation.execute(commandBuffer);
-
-        // To make sure that the buffer is ready to be accessed.
-        VkMemoryBarrier readBarrier = {
-           VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-           nullptr,
-           // Specifies that we'll wait for the shader to finish writing to the
-           // buffer.
-           VK_ACCESS_SHADER_WRITE_BIT,
-           VK_ACCESS_HOST_READ_BIT
-        };
+    //for (auto& computation : computations)
+    //{
+    //    // Resets the command buffer to be able to be recorded.
+    //    vkResetCommandBuffer(commandBuffer, 0);
+    //    // Specifies some details about the usage of this specific command buffer.
+    //    CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits) 0);
 
 
-        vkCmdPipelineBarrier(
-            commandBuffer,
-            // Pipeline stage in which operations occur that should happen before the barrier.
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            // Pipeline stage in which operations will wait on the barrier.
-            VK_PIPELINE_STAGE_HOST_BIT,
-            // 0 or VK_DEPENDENCY_BY_REGION_BIT(per-region condition)
-            0,
-            // References arrays of pipeline barries of the three available
-            // types: memory barriers, buffer memory barriers, and image memory
-            // barriers.
-            1,  &readBarrier,
-            0, {},
-            0, {}
-        );
+    //    computation.execute(commandBuffer);
 
-        vkEndCommandBuffer(commandBuffer);
+    //    // To make sure that the buffer is ready to be accessed.
+    //    VkMemoryBarrier readBarrier = {
+    //       VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+    //       nullptr,
+    //       // Specifies that we'll wait for the shader to finish writing to the
+    //       // buffer.
+    //       VK_ACCESS_SHADER_WRITE_BIT,
+    //       VK_ACCESS_HOST_READ_BIT
+    //    };
 
-        CommandManager::cmdSubmitCommandBuffer(
-            m_qfHandles.computeQueue, 
-            { commandBuffer }, 
-            true
-        );
-    }
 
-    std::cout << "All the computations have been completed.\n";
+    //    vkCmdPipelineBarrier(
+    //        commandBuffer,
+    //        // Pipeline stage in which operations occur that should happen before the barrier.
+    //        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+    //        // Pipeline stage in which operations will wait on the barrier.
+    //        VK_PIPELINE_STAGE_HOST_BIT,
+    //        // 0 or VK_DEPENDENCY_BY_REGION_BIT(per-region condition)
+    //        0,
+    //        // References arrays of pipeline barries of the three available
+    //        // types: memory barriers, buffer memory barriers, and image memory
+    //        // barriers.
+    //        1,  &readBarrier,
+    //        0, {},
+    //        0, {}
+    //    );
+
+    //    vkEndCommandBuffer(commandBuffer);
+
+    //    CommandManager::cmdSubmitCommandBuffer(
+    //        m_qfHandles.computeQueue, 
+    //        { commandBuffer }, 
+    //        true
+    //    );
+    //}
+
+    //std::cout << "All the computations have been completed.\n";
 
 }
 

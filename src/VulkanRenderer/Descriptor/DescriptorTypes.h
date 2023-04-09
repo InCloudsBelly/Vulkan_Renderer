@@ -52,5 +52,12 @@ namespace DescriptorTypes
             glm::mat4 model;
             glm::mat4 lightSpace;
         };
+
+        struct alignas(16) MVP
+        {
+            glm::mat4 model;
+            glm::mat4 view;
+            glm::mat4 proj;
+        };
     };
 };

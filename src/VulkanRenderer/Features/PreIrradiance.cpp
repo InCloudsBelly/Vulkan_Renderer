@@ -14,6 +14,8 @@
 #include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
+#include "VulkanRenderer/Pipeline/PipelineManager.h"
+#include "VulkanRenderer/Shader/ShaderManager.h"
 #include "VulkanRenderer/Renderer.h"
 
 
@@ -36,15 +38,14 @@ PrefilteredIrradiance::PrefilteredIrradiance(
 
 void PrefilteredIrradiance::createDescriptorSet()
 {
-    DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_graphicsPipeline.getDescriptorSetLayout(), &m_descriptorSet);
+    DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSet);
 
-    DescriptorManager::createDescriptorSet(
-        GRAPHICS_PIPELINE::PREFILTER_ENV_MAP::DESCRIPTORS_INFO,
-        { getRenderResource()->m_skyboxCubeMap},
-        {},
-        {},
-        & m_descriptorSet
-    );
+    VkDescriptorImageInfo SkyboxCubeMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_skyboxCubeMap->getSampler(), getRenderResource()->m_skyboxCubeMap->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+        DescriptorManager::writeDescriptorSet(m_descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0,&SkyboxCubeMap)
+    };
+    vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+
 
 }
 
@@ -104,20 +105,20 @@ void PrefilteredIrradiance::recordCommandBuffer()
 
             vkCmdPushConstants(
                 commandBuffer,
-                m_graphicsPipeline.getPipelineLayout(),
+                m_pipelineLayout,
                 VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                 0,
                 sizeof(PushBlockIrradiance),
                 &m_pushBlock
             );
 
-            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline.get());
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
             const std::vector<VkDescriptorSet> sets = { m_descriptorSet };
             vkCmdBindDescriptorSets(
                 commandBuffer,
                 VK_PIPELINE_BIND_POINT_GRAPHICS,
-                m_graphicsPipeline.getPipelineLayout(),
+                m_pipelineLayout,
                 // Index of the first descriptor set.
                 0,
                 sets.size(), sets.data(),
@@ -230,18 +231,114 @@ void PrefilteredIrradiance::copyRegionOfImage(
 
 void PrefilteredIrradiance::createPipeline()
 {
-    m_graphicsPipeline = Graphics(
-        GraphicsPipelineType::PREFILTER_ENV_MAP,
-        { m_dim,m_dim },
-        m_renderPass,
-        { {shaderType::VERTEX,"preIrradiance"},{shaderType::FRAGMENT,"preIrradiance"} },
-        VK_SAMPLE_COUNT_1_BIT,
-        // It uses the same attributes as the skybox shader.
-        Attributes::SKYBOX::getBindingDescription(),
-        Attributes::SKYBOX::getAttributeDescriptions(),
-        GRAPHICS_PIPELINE::PREFILTER_IRRADIANCE::DESCRIPTORS_INFO,
-        { {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(PushBlockIrradiance)} }
-    );
+    //-------------------------------- PrefilteredEnvMap  Pipeline --------------------------------------
+    {
+        const std::vector<DescriptorInfo>& descriptorInfo = GRAPHICS_PIPELINE::PREFILTER_IRRADIANCE::DESCRIPTORS_INFO;
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings(descriptorInfo.size());
+        for (uint32_t i = 0; i < descriptorInfo.size(); i++)
+        {
+            bindings[i].binding = descriptorInfo[i].bindingNumber;
+            bindings[i].descriptorType = descriptorInfo[i].descriptorType;
+            bindings[i].descriptorCount = 1;
+            bindings[i].stageFlags = descriptorInfo[i].shaderStage;
+            bindings[i].pImmutableSamplers = nullptr;
+        }
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create descriptor set layout!");
+
+
+        // -------------------Shader Modules--------------------
+        const std::vector<ShaderInfo>& shaderInfos = { {shaderType::VERTEX,"preIrradiance"},{shaderType::FRAGMENT,"preIrradiance"} };
+
+        std::vector<VkShaderModule> shaderModules(shaderInfos.size());
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
+        for (uint32_t i = 0; i < shaderInfos.size(); i++)
+        {
+            PipelineManager::createShaderModule(shaderInfos[i], shaderModules[i]);
+            PipelineManager::createShaderStageInfo(shaderModules[i], shaderInfos[i].type, shaderStagesInfos[i]);
+        }
+
+
+        // Dynamic states
+        std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dynamicState = PipelineManager::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), dynamicStateEnables.size());
+
+
+        // Viewport state info
+        VkPipelineViewportStateCreateInfo viewportState = PipelineManager::pipelineViewportStateCreateInfo(1, 1, 0);
+        // Vertex input(attributes)
+        std::vector<VkVertexInputAttributeDescription> attribDescription = Attributes::SKYBOX::getAttributeDescriptions();
+        VkVertexInputBindingDescription bindingDescription = Attributes::SKYBOX::getBindingDescription();
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        PipelineManager::createVertexShaderInputInfo(bindingDescription, attribDescription, vertexInputInfo);
+        // Input assembly
+        VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = PipelineManager::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+        // Rasterizer
+        VkPipelineRasterizationStateCreateInfo rasterizationState = PipelineManager::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_NONE, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0, VK_FALSE);
+        // Multisampling 
+        VkPipelineMultisampleStateCreateInfo multisampleState = PipelineManager::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+        // Color blending(attachment)
+        VkPipelineColorBlendAttachmentState blendAttachmentState = PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+        // Color blending(global)
+        VkPipelineColorBlendStateCreateInfo colorBlendState = PipelineManager::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+
+        // Pipeline layout
+        std::vector<VkPushConstantRange> pushConstantRanges{ {VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,0,sizeof(PushBlockIrradiance)} };
+
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
+        pipelineLayoutInfo.pushConstantRangeCount = pushConstantRanges.size();
+        pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
+
+        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+        if (status != VK_SUCCESS)
+            throw std::runtime_error("Failed to create pipeline layout!");
+
+        // Depth and stencil
+        VkPipelineDepthStencilStateCreateInfo depthStencilState = PipelineManager::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+        depthStencilState.front = depthStencilState.back;
+        depthStencilState.back.compareOp = VK_COMPARE_OP_ALWAYS;
+
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = shaderInfos.size();
+        pipelineInfo.pStages = shaderStagesInfos.data();
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssemblyState;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizationState;
+        pipelineInfo.pMultisampleState = &multisampleState;
+        pipelineInfo.pDepthStencilState = &depthStencilState;
+        pipelineInfo.pColorBlendState = &colorBlendState;
+        pipelineInfo.pDynamicState = &dynamicState;
+        pipelineInfo.pTessellationState = nullptr;
+        pipelineInfo.pNext = nullptr;
+        pipelineInfo.layout = m_pipelineLayout;
+        pipelineInfo.renderPass = m_renderPass.get();
+        pipelineInfo.subpass = 0;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        pipelineInfo.basePipelineIndex = -1;
+
+        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+        if (status != VK_SUCCESS)
+            throw std::runtime_error("Failed to create graphics pipeline!");
+
+        for (auto& shaderModule : shaderModules)
+        {
+            ShaderManager::destroyShaderModule(shaderModule);
+        }
+    }
+
 }
 
 
@@ -423,7 +520,9 @@ PrefilteredIrradiance::~PrefilteredIrradiance() {}
 
 void PrefilteredIrradiance::destroy()
 {
-    m_graphicsPipeline.destroy();
+    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout, nullptr);
+    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);
+    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout, nullptr);
 
     m_targetImage->destroy();
     m_offscreenImage->destroy();

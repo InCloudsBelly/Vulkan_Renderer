@@ -7,7 +7,7 @@
 #include <glm/glm.hpp>
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
-#include "VulkanRenderer/Pipeline/Graphics.h"
+
 #include "VulkanRenderer/Texture/Texture.h"
 
 struct PushBlockPrefilterEnv
@@ -57,7 +57,10 @@ private:
     VkDescriptorSet                  m_descriptorSet;
 
     VkFramebuffer                    m_framebuffer;
-    Graphics                         m_graphicsPipeline;
+
+    VkPipeline                       m_pipeline;
+    VkDescriptorSetLayout            m_descriptorSetLayout;
+    VkPipelineLayout                 m_pipelineLayout;
 
     PushBlockPrefilterEnv            m_pushBlock;
 };

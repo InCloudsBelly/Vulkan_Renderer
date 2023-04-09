@@ -6,6 +6,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <stdexcept>
 
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Settings/Config.h"
@@ -18,6 +19,8 @@
 #include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
+#include "VulkanRenderer/Pipeline/PipelineManager.h"
+#include "VulkanRenderer/Shader/ShaderManager.h"
 
 #include "VulkanRenderer/Model/ModelManager.h"
 #include "VulkanRenderer/Renderer.h" 
@@ -94,17 +97,107 @@ ShadowMap::ShadowMap(
 
 void ShadowMap::createGraphicsPipeline(const VkExtent2D& extent)
 {
-    m_graphicsPipeline = Graphics(
-        GraphicsPipelineType::SHADOWMAP,
-        extent,
-        m_renderPass,
-        { {shaderType::VERTEX, "shadowMap"} },
-        VK_SAMPLE_COUNT_1_BIT,
-        Attributes::PBR::getBindingDescription(),
-        Attributes::SHADOWMAP::getAttributeDescriptions(),
-        GRAPHICS_PIPELINE::SHADOWMAP::DESCRIPTORS_INFO,
-        {}
-    );
+    //-------------------------------- Shadow Pipeline --------------------------------------
+    {
+        const std::vector<DescriptorInfo>& descriptorInfo = GRAPHICS_PIPELINE::SHADOWMAP::DESCRIPTORS_INFO;
+
+        std::vector<VkDescriptorSetLayoutBinding> bindings(descriptorInfo.size());
+        for (uint32_t i = 0; i < descriptorInfo.size(); i++)
+        {
+            bindings[i].binding = descriptorInfo[i].bindingNumber;
+            bindings[i].descriptorType = descriptorInfo[i].descriptorType;
+            bindings[i].descriptorCount = 1;
+            bindings[i].stageFlags = descriptorInfo[i].shaderStage;
+            bindings[i].pImmutableSamplers = nullptr;
+        }
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+        layoutInfo.pBindings = bindings.data();
+
+        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create descriptor set layout!");
+
+
+        // -------------------Shader Modules--------------------
+        const std::vector<ShaderInfo>& shaderInfos = { {shaderType::VERTEX, "shadowMap"} };
+
+        std::vector<VkShaderModule> shaderModules(shaderInfos.size());
+        std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
+        for (uint32_t i = 0; i < shaderInfos.size(); i++)
+        {
+            PipelineManager::createShaderModule(shaderInfos[i], shaderModules[i]);
+            PipelineManager::createShaderStageInfo(shaderModules[i], shaderInfos[i].type, shaderStagesInfos[i]);
+        }
+
+
+        // Dynamic states
+        std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+        VkPipelineDynamicStateCreateInfo dynamicState = PipelineManager::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), dynamicStateEnables.size());
+
+
+        // Viewport state info
+        VkPipelineViewportStateCreateInfo viewportState = PipelineManager::pipelineViewportStateCreateInfo(1, 1, 0);
+        // Vertex input(attributes)
+        std::vector<VkVertexInputAttributeDescription> attribDescription = Attributes::SHADOWMAP::getAttributeDescriptions();
+        VkVertexInputBindingDescription bindingDescription = Attributes::PBR::getBindingDescription();
+        VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+        PipelineManager::createVertexShaderInputInfo(bindingDescription, attribDescription, vertexInputInfo);
+        // Input assembly
+        VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = PipelineManager::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
+        // Rasterizer
+        VkPipelineRasterizationStateCreateInfo rasterizationState = PipelineManager::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0, VK_TRUE, 4.0f, 1.5f);
+        // Multisampling 
+        VkPipelineMultisampleStateCreateInfo multisampleState = PipelineManager::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
+        // Color blending(attachment)
+        VkPipelineColorBlendAttachmentState blendAttachmentState = PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE);
+        // Color blending(global)
+        VkPipelineColorBlendStateCreateInfo colorBlendState = PipelineManager::pipelineColorBlendStateCreateInfo(1, &blendAttachmentState);
+
+        // Pipeline layout
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+        pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        pipelineLayoutInfo.setLayoutCount = 1;
+        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
+        pipelineLayoutInfo.pushConstantRangeCount = 0;
+        pipelineLayoutInfo.pPushConstantRanges = nullptr;
+        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+        if (status != VK_SUCCESS)
+            throw std::runtime_error("Failed to create pipeline layout!");
+
+        // Depth and stencil
+        VkPipelineDepthStencilStateCreateInfo depthStencilState = PipelineManager::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+
+        VkGraphicsPipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipelineInfo.stageCount = shaderInfos.size();
+        pipelineInfo.pStages = shaderStagesInfos.data();
+        pipelineInfo.pVertexInputState = &vertexInputInfo;
+        pipelineInfo.pInputAssemblyState = &inputAssemblyState;
+        pipelineInfo.pViewportState = &viewportState;
+        pipelineInfo.pRasterizationState = &rasterizationState;
+        pipelineInfo.pMultisampleState = &multisampleState;
+        pipelineInfo.pDepthStencilState = &depthStencilState;
+        pipelineInfo.pColorBlendState = &colorBlendState;
+        pipelineInfo.pDynamicState = &dynamicState;
+        pipelineInfo.pTessellationState = nullptr;
+        pipelineInfo.pNext = nullptr;
+        pipelineInfo.layout = m_pipelineLayout;
+        pipelineInfo.renderPass = m_renderPass.get();
+        pipelineInfo.subpass = 0;
+        pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        pipelineInfo.basePipelineIndex = -1;
+
+        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+        if (status != VK_SUCCESS)
+            throw std::runtime_error("Failed to create graphics pipeline!");
+
+        for (auto& shaderModule : shaderModules)
+        {
+            ShaderManager::destroyShaderModule(shaderModule);
+        }
+    }
 }
 
 
@@ -150,7 +243,7 @@ void ShadowMap::draw(uint32_t imageIndex, uint32_t currentFrame)
     //--------------------------------RenderPass-----------------------------
     m_renderPass.begin(m_framebuffers[imageIndex], VkExtent2D({ m_width,m_height }), m_clearValuesShadowMap, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline.get());
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
     // Set Dynamic States
     VkViewport viewport{ 0.0f, 0.0f,m_width,m_height, 0.0f, 1.0f };
@@ -173,7 +266,7 @@ void ShadowMap::draw(uint32_t imageIndex, uint32_t currentFrame)
                 vkCmdBindDescriptorSets(
                     commandBuffer,
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    m_graphicsPipeline.getPipelineLayout(),
+                    m_pipelineLayout,
                     0,
                     sets.size(), sets.data(),
                     0, {}
@@ -234,11 +327,6 @@ const RenderPass& ShadowMap::getRenderPass() const
 }
 
 
-const Graphics& ShadowMap::getGraphicsPipeline() const
-{
-    return m_graphicsPipeline;
-}
-
 
 void ShadowMap::createFramebuffer(const uint32_t& imagesCount)
 {
@@ -272,21 +360,25 @@ void ShadowMap::createUBOs()
 
 void ShadowMap::createDescriptorSets()
 {
+    //------------------------------- DescriptorSets  ----------------------------------
     for (auto ptr : getRenderResource()->m_normalModels)
     {
         for (uint32_t meshIndex : ptr->getMeshIndices())
         {
-            //create DescriptorSet PerMesh
-            DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_graphicsPipeline.getDescriptorSetLayout(), &m_descriptorSetsMap[meshIndex]);
+            m_descriptorSetsMap[meshIndex];
+            {
+                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSetsMap[meshIndex]);
 
-            DescriptorManager::createDescriptorSet(
-                GRAPHICS_PIPELINE::SHADOWMAP::DESCRIPTORS_INFO,
-                {}, {},
-                { m_ubosMap[meshIndex] },
-                &m_descriptorSetsMap[meshIndex]
-            );
+                VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex]);
+       
+                std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),
+                };
+                vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+            }
         }
     }
+
 }
 
 
@@ -294,8 +386,11 @@ void ShadowMap::createDescriptorSets()
 
 void ShadowMap::destroy()
 {
-    m_graphicsPipeline.destroy();
-    
+    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout, nullptr);
+    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);
+    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout, nullptr);
+
+
     m_texture->destroy();
 
 

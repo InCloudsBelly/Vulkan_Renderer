@@ -5,9 +5,7 @@
 #include <vulkan/vulkan.h>
 #include <VMA/vk_mem_alloc.h>
 
-#include "VulkanRenderer/Pipeline/Compute.h"
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
-
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"
 
 class Computation
@@ -35,7 +33,11 @@ public:
     void destroy();
 
 private:
-    Compute                 m_pipeline;
+    VkPipeline                 m_pipeline;
+    VkDescriptorSetLayout      m_descriptorSetLayout;
+    VkPipelineLayout           m_pipelineLayout;
+
+
     VkDescriptorSet         m_descriptorSet;
 
     VkBuffer       m_inBuffer;

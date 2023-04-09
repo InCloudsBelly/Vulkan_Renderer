@@ -32,41 +32,6 @@ VkResult DescriptorManager::createDescriptorWriteInfo(
 }
 
 
-VkResult DescriptorManager::createDescriptorSet(
-    const std::vector<DescriptorInfo>& descriptorInfos,
-    const std::vector<std::shared_ptr<TextureBase>>& textures,
-    const std::vector<VkDescriptorImageInfo*>& additionalTextureInfos,
-    const std::vector<VkBuffer>& UBOs,
-    VkDescriptorSet* descriptorset
-)
-{
-    std::vector<VkDescriptorBufferInfo> bufferInfos(UBOs.size());
-    std::vector<VkDescriptorImageInfo> imageInfos(descriptorInfos.size() - UBOs.size());
-
-    // UBOs  / Samplers of textures / Sampler of additional textures 
-    {
-        for (uint32_t j = 0; j < bufferInfos.size(); ++j)
-            createDescriptorBufferInfo(UBOs[j], bufferInfos[j]);
-        for (uint32_t j = 0; j < textures.size(); j++)
-            createDescriptorImageInfo(textures[j]->getImageView(), textures[j]->getSampler(), imageInfos[j]);
-        for (uint32_t j = 0; j < additionalTextureInfos.size(); j++)
-            createDescriptorImageInfo(additionalTextureInfos[j]->imageView, additionalTextureInfos[j]->sampler, imageInfos[textures.size() + j]);
-    }
-
-    std::vector<VkWriteDescriptorSet> descriptorWrites(descriptorInfos.size());
-
-    // UBOs  / Samplers
-    {
-        for (uint32_t j = 0; j < bufferInfos.size(); j++)
-            createDescriptorWriteInfo(bufferInfos[j], *descriptorset, descriptorInfos[j].bindingNumber, 0, descriptorInfos[j].descriptorType, descriptorWrites[j]);
-        for (uint32_t j = 0; j < imageInfos.size(); j++)
-            createDescriptorWriteInfo(imageInfos[j], *descriptorset, descriptorInfos[bufferInfos.size() + j].bindingNumber, 0, descriptorInfos[bufferInfos.size() + j].descriptorType, descriptorWrites[bufferInfos.size() + j]);
-    }
-
-    vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-
-    return VK_SUCCESS;
-}
 
 
 VkResult DescriptorManager::createDescriptorPool(std::vector<VkDescriptorPoolSize> poolSizes, VkDescriptorPool* descriptorPool)

@@ -7,7 +7,7 @@
 #include <unordered_map>
 
 #include "VulkanRenderer/Descriptor/DescriptorTypes.h"
-#include "VulkanRenderer/Pipeline/Graphics.h"
+
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 
 #include "VulkanRenderer/Texture/Texture.h"
@@ -40,7 +40,6 @@ public:
 	const VkCommandBuffer& getCommandBuffer(const uint32_t index) const;
 
 	const VkCommandPool& getCommandPool() const;
-	const Graphics& getGraphicsPipeline() const;
 	const RenderPass& getRenderPass() const;
 
 private:
@@ -67,7 +66,9 @@ private:
 
 	std::vector<VkFramebuffer>       m_framebuffers;
 
-	Graphics                         m_graphicsPipeline;
+	VkPipeline                       m_pipeline;
+	VkDescriptorSetLayout            m_descriptorSetLayout;
+	VkPipelineLayout                 m_pipelineLayout;
 
 	DescriptorTypes::UniformBufferObject::ShadowMap m_basicInfo;
 

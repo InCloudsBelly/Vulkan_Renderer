@@ -7,7 +7,6 @@
 #include <glm/glm.hpp>
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
-#include "VulkanRenderer/Pipeline/Graphics.h"
 #include "VulkanRenderer/Texture/Texture.h"
 
 #define M_PI       3.14159265358979323846
@@ -59,7 +58,9 @@ private:
 
     VkFramebuffer                    m_framebuffer;
 
-    Graphics                         m_graphicsPipeline;
+    VkPipeline                       m_pipeline;
+    VkDescriptorSetLayout            m_descriptorSetLayout;
+    VkPipelineLayout                 m_pipelineLayout;
 
-    PushBlockIrradiance             m_pushBlock;
+    PushBlockIrradiance              m_pushBlock;
 };

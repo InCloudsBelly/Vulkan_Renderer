@@ -33,4 +33,16 @@ namespace Attributes
         VkVertexInputBindingDescription getBindingDescription();
         std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
     };
+
+    namespace DEFERRED_OFF
+    {
+        VkVertexInputBindingDescription getBindingDescription();
+        std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+    };
+
+    namespace DEFERRED_ON
+    {
+        VkVertexInputBindingDescription getBindingDescription();
+        std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions();
+    };
 };

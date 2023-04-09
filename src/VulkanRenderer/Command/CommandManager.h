@@ -7,8 +7,6 @@
 #include <optional>
 #include <VMA/vk_mem_alloc.h>
 
-#include "VulkanRenderer/Pipeline/Pipeline.h"
-
 namespace CommandManager
 {
     //--------------------------------------------------------------------------------------------------------------------------------

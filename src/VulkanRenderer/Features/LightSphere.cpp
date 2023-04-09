@@ -1,4 +1,4 @@
-#include "Skybox.h"
+#include "LightSphere.h"
 
 #include <stdexcept>
 
@@ -8,16 +8,16 @@
 #include "VulkanRenderer/Shader/ShaderManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 
-SkyBox::SkyBox(const VkRenderPass& renderPass, VkSampleCountFlagBits multisampleBits, uint32_t subPassIndex)
+LightSphere::LightSphere(const VkRenderPass& renderPass, VkSampleCountFlagBits multisampleBits, uint32_t subPassIndex)
 {
-	createPipeline(renderPass, multisampleBits, subPassIndex);
+    createPipeline(renderPass, multisampleBits, subPassIndex);
     createUBO();
     createDescriptorSet();
 }
 
-void SkyBox::createPipeline(const VkRenderPass& renderPass, VkSampleCountFlagBits multisampleBits, uint32_t subPassIndex)
+void LightSphere::createPipeline(const VkRenderPass& renderPass, VkSampleCountFlagBits multisampleBits, uint32_t subPassIndex)
 {
-    const std::vector<DescriptorInfo>& descriptorInfo = GRAPHICS_PIPELINE::SKYBOX::DESCRIPTORS_INFO;
+    const std::vector<DescriptorInfo>& descriptorInfo = GRAPHICS_PIPELINE::LIGHT::DESCRIPTORS_INFO;
 
     std::vector<VkDescriptorSetLayoutBinding> bindings(descriptorInfo.size());
     for (uint32_t i = 0; i < descriptorInfo.size(); i++)
@@ -39,7 +39,7 @@ void SkyBox::createPipeline(const VkRenderPass& renderPass, VkSampleCountFlagBit
 
 
     // -------------------Shader Modules--------------------
-    const std::vector<ShaderInfo>& shaderInfos = { {shaderType::VERTEX, "skybox"}, {shaderType::FRAGMENT, "skybox"} };
+    const std::vector<ShaderInfo>& shaderInfos = { {shaderType::VERTEX, "light"},{shaderType::FRAGMENT,"light"} };
 
     std::vector<VkShaderModule> shaderModules(shaderInfos.size());
     std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
@@ -54,18 +54,18 @@ void SkyBox::createPipeline(const VkRenderPass& renderPass, VkSampleCountFlagBit
     std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
     VkPipelineDynamicStateCreateInfo dynamicState = PipelineManager::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), dynamicStateEnables.size());
 
- 
+
     // Viewport state info
     VkPipelineViewportStateCreateInfo viewportState = PipelineManager::pipelineViewportStateCreateInfo(1, 1, 0);
     // Vertex input(attributes)
-    std::vector<VkVertexInputAttributeDescription> attribDescription = Attributes::SKYBOX::getAttributeDescriptions();
-    VkVertexInputBindingDescription bindingDescription = Attributes::SKYBOX::getBindingDescription();
+    std::vector<VkVertexInputAttributeDescription> attribDescription = Attributes::LIGHT::getAttributeDescriptions();
+    VkVertexInputBindingDescription bindingDescription = Attributes::LIGHT::getBindingDescription();
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     PipelineManager::createVertexShaderInputInfo(bindingDescription, attribDescription, vertexInputInfo);
     // Input assembly
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyState = PipelineManager::pipelineInputAssemblyStateCreateInfo(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, 0, VK_FALSE);
     // Rasterizer
-    VkPipelineRasterizationStateCreateInfo rasterizationState = PipelineManager::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0, VK_FALSE);
+    VkPipelineRasterizationStateCreateInfo rasterizationState = PipelineManager::pipelineRasterizationStateCreateInfo(VK_POLYGON_MODE_FILL, VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_COUNTER_CLOCKWISE, 0, VK_FALSE);
     // Multisampling 
     VkPipelineMultisampleStateCreateInfo multisampleState = PipelineManager::pipelineMultisampleStateCreateInfo(multisampleBits, 0);
     // Color blending(attachment)
@@ -86,7 +86,7 @@ void SkyBox::createPipeline(const VkRenderPass& renderPass, VkSampleCountFlagBit
         throw std::runtime_error("Failed to create pipeline layout!");
 
     // Depth and stencil
-    VkPipelineDepthStencilStateCreateInfo depthStencilState = PipelineManager::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS_OR_EQUAL);
+    VkPipelineDepthStencilStateCreateInfo depthStencilState = PipelineManager::pipelineDepthStencilStateCreateInfo(VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS);
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -118,64 +118,70 @@ void SkyBox::createPipeline(const VkRenderPass& renderPass, VkSampleCountFlagBit
     }
 }
 
-void SkyBox::createDescriptorSet()
+void LightSphere::createDescriptorSet()
 {
-    auto skyboxModel = getRenderResource()->m_skybox;
-    uint32_t meshIndex = skyboxModel->getMeshIndices()[0];
-
-    DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSet);
-
-    VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_ubo);
-    VkDescriptorImageInfo skybox = DescriptorManager::descriptorImageInfo(getRenderResource()->m_skyboxCubeMap->getSampler(), getRenderResource()->m_skyboxCubeMap->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-        DescriptorManager::writeDescriptorSet(m_descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),
-        DescriptorManager::writeDescriptorSet(m_descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,&skybox)
-    };
-    vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
-
-}
-
-void SkyBox::createUBO()
-{
-    //Skybox
-    auto skybox = getRenderResource()->m_skybox;
-    size_t uboSizeInfos =  sizeof(DescriptorTypes::UniformBufferObject::Skybox) ;
-
-    uint32_t meshIndex = skybox->getMeshIndices()[0];
+    //-------------------------------  Light DescriptorSet  ----------------------------------
+    for (auto ptr : getRenderResource()->m_lightModels)
     {
-        BufferManager::bufferCreateBuffer(
-            getRendererPointer()->getVmaAllocator(),
-            uboSizeInfos,
-            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            VMA_MEMORY_USAGE_CPU_TO_GPU,
-            &m_ubo,
-            &m_uboAllocation
-        );
+        uint32_t meshIndex = ptr->getMeshIndices()[0];
+        {
+            DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSetsMap[meshIndex]);
+
+            VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex]);
+            VkDescriptorImageInfo defaultTex = DescriptorManager::descriptorImageInfo(getRenderResource()->m_defaultTexture->getSampler(), getRenderResource()->m_defaultTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+            std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
+                DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),
+                DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1,&defaultTex)
+            };
+            vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+        }
     }
 }
 
-void SkyBox::updateUBO()
+void LightSphere::createUBO()
 {
-    VkExtent2D extent = getRendererPointer()->getSwapchainInfo().extent;
-
-    auto skybox = getRenderResource()->m_skybox;
-    for (uint32_t meshIndex : skybox->getMeshIndices())
+    //Light Models
+    for (auto ptr : getRenderResource()->m_lightModels)
     {
-        DescriptorTypes::UniformBufferObject::Skybox newUBO;
+        size_t uboSizeInfos = sizeof(DescriptorTypes::UniformBufferObject::Light) ;
 
-        newUBO.model = glm::translate(glm::mat4(1.0f), glm::vec3(getRenderResource()->m_camera.getCameraPos()));
+        for (uint32_t meshIndex : ptr->getMeshIndices())
+        {
+            // create UBO PerMesh
+            BufferManager::bufferCreateBuffer(
+                getRendererPointer()->getVmaAllocator(),
+                uboSizeInfos,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+                VMA_MEMORY_USAGE_CPU_TO_GPU,
+                &m_ubosMap[meshIndex],
+                &m_uboAllocationsMap[meshIndex]
+            );
+        }
+    }
+}
+
+void LightSphere::updateUBO()
+{
+    for (auto ptr : getRenderResource()->m_lightModels)
+    {
+        uint32_t meshIndex = ptr->getMeshIndices()[0];
+
+        DescriptorTypes::UniformBufferObject::Light newUBO;
+        newUBO.model = ptr->getModelMatrix();
+
         newUBO.view = getRenderResource()->m_camera.getViewMatrix();
-        newUBO.proj = MathUtils::getUpdatedProjMatrix(glm::radians(75.0f), extent.width / (float)extent.height, 0.01f, 40.0f);
+        newUBO.proj = getRenderResource()->m_camera.getProjectionMatrix();
+        newUBO.lightColor = glm::fvec4(1.0f);
 
         void* data;
-        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocation, &data);
+        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex], &data);
         memcpy(data, &newUBO, sizeof(newUBO));
-        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocation);
+        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex]);
     }
 }
 
-void SkyBox::draw(VkCommandBuffer & commandBuffer)
+void LightSphere::draw(VkCommandBuffer& commandBuffer)
 {
     VkExtent2D extent = getRendererPointer()->getSwapchainInfo().extent;
 
@@ -188,33 +194,41 @@ void SkyBox::draw(VkCommandBuffer & commandBuffer)
     VkRect2D scissor{ {0,0}, {extent.width,extent.height} };
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    uint32_t meshIndex = getRenderResource()->m_skybox->getMeshIndices()[0];
+    for (auto& ptr : getRenderResource()->m_lightModels)
     {
-        RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
+        if (ptr->isHidden() == false)
+        {
+            uint32_t meshIndex = ptr->getMeshIndices()[0];
+            
+            RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
 
-        std::vector<VkDeviceSize> offsets = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, renderMeshInfo.ref_mesh->vertexBuffer, offsets.data());
-        vkCmdBindIndexBuffer(commandBuffer, *renderMeshInfo.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+            std::vector<VkDeviceSize> offsets = { 0 };
+            vkCmdBindVertexBuffers(commandBuffer, 0, 1, renderMeshInfo.ref_mesh->vertexBuffer, offsets.data());
+            vkCmdBindIndexBuffer(commandBuffer, *renderMeshInfo.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        const std::vector<VkDescriptorSet> sets = { m_descriptorSet };
-        vkCmdBindDescriptorSets(
-            commandBuffer,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            m_pipelineLayout,
-            0,
-            sets.size(), sets.data(),
-            0, {}
-        );
+            const std::vector<VkDescriptorSet> sets = { m_descriptorSetsMap[meshIndex] };
+            vkCmdBindDescriptorSets(
+                commandBuffer,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                m_pipelineLayout,
+                0,
+                sets.size(), sets.data(),
+                0, {}
+            );
 
-        vkCmdDrawIndexed(commandBuffer, renderMeshInfo.ref_mesh->meshIndexCount, 1, 0, 0, 0);
+            vkCmdDrawIndexed(commandBuffer, renderMeshInfo.ref_mesh->meshIndexCount, 1, 0, 0, 0);
+            
+        }
     }
-  
-    
+
 }
 
-void SkyBox::destroy()
+void LightSphere::destroy()
 {
-    vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), m_ubo, m_uboAllocation);
+    for (auto& uboInfo : m_ubosMap)
+    {
+        vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), uboInfo.second, m_uboAllocationsMap[uboInfo.first]);
+    }
 
     vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout, nullptr);
     vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);

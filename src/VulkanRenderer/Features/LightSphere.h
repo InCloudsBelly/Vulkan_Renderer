@@ -4,13 +4,13 @@
 #include <unordered_map>
 #include <VMA/vk_mem_alloc.h>
 
-class SkyBox
+class LightSphere
 {
 public:
-	SkyBox();
-	SkyBox(const VkRenderPass& renderPass, VkSampleCountFlagBits multisampleBits, uint32_t subPassIndex);
+	LightSphere();
+	LightSphere(const VkRenderPass& renderPass, VkSampleCountFlagBits multisampleBits, uint32_t subPassIndex);
 
-	~SkyBox() {};
+	~LightSphere() {};
 
 	void updateUBO();
 	void draw(VkCommandBuffer& commandBuffer);
@@ -27,8 +27,8 @@ private:
 
 	VkDescriptorSet			m_descriptporSet;
 
-	VkBuffer				m_ubo;
-	VmaAllocation			m_uboAllocation;
-	VkDescriptorSet			m_descriptorSet;
+	std::unordered_map<uint32_t, VkBuffer>			m_ubosMap;
+	std::unordered_map<uint32_t, VmaAllocation>		m_uboAllocationsMap;
+	std::unordered_map<uint32_t, VkDescriptorSet>	m_descriptorSetsMap;
 };
 

@@ -1,4 +1,4 @@
-#include "VulkanRenderer/Scene/ForwardPBR.h"
+#include "VulkanRenderer/Scene/Spherical_Harmonic_Lighting.h"
 
 #include <iostream>
 
@@ -8,7 +8,7 @@
 #include "VulkanRenderer/Shader/ShaderManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
 
-ForwardPBRPass::ForwardPBRPass() 
+SHLightingPass::SHLightingPass()
 {
     m_extent = getRendererPointer()->getSwapchainInfo().extent;
     // Clear Color
@@ -25,34 +25,21 @@ ForwardPBRPass::ForwardPBRPass()
     createUBOs();
     createDescriptorSets();
 
-    initComputations();
 
     createSwapchainFramebuffers();
 }
 
-void ForwardPBRPass::initComputations() 
-{
-    m_BRDFcomp = Computation(
-        "BRDF",
-        sizeof(float),
-        2 * sizeof(float) * Config::BRDF_HEIGHT * Config::BRDF_WIDTH,
-        getRendererPointer()->getQueueFamilyIndices(),
-        getRendererPointer()->getDescriptorPool(),
-        COMPUTE_PIPELINE::BRDF::BUFFERS_INFO
-    );
-}
-
-ForwardPBRPass::~ForwardPBRPass() {}
+SHLightingPass::~SHLightingPass() {}
 
 
-void ForwardPBRPass::createRenderPass()
+void SHLightingPass::createRenderPass()
 {
     VkFormat format = getRendererPointer()->getSwapchainInfo().image_format;
     VkFormat depthBufferFormat = getRendererPointer()->getDepthImageInfo().depth_image_format;
     VkSampleCountFlagBits msaaSamplesCount = getRendererPointer()->getMSAAInfo().msaa_sampleCount;
 
     // - Attachments
-    
+
     // Color Attachment
     VkAttachmentDescription colorAttachment{};
     AttachmentUtils::createAttachmentDescription(
@@ -136,7 +123,7 @@ void ForwardPBRPass::createRenderPass()
         0,
         (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT),
         (VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT),
-        (VkDependencyFlagBits) 0,
+        (VkDependencyFlagBits)0,
         dependency
     );
 
@@ -149,7 +136,7 @@ void ForwardPBRPass::createRenderPass()
     );
 }
 
-void ForwardPBRPass::createSwapchainFramebuffers()
+void SHLightingPass::createSwapchainFramebuffers()
 {
     m_swapchain_framebuffers.resize(getRendererPointer()->getSwapchainInfo().imageViews.size());
 
@@ -176,35 +163,22 @@ void ForwardPBRPass::createSwapchainFramebuffers()
     }
 }
 
-void ForwardPBRPass::createSecondaryFeatures()
+void SHLightingPass::createSecondaryFeatures()
 {
-    //ShadowMap
-    const VkExtent2D swapChainExtent = getRendererPointer()->getSwapchainInfo().extent;
-    const VkExtent2D shadowExtent = { 2 * swapChainExtent.height, 2 * swapChainExtent.width };
-
-    m_shadowMap = std::make_shared<ShadowMap>(
-        shadowExtent,
-        getRendererPointer()->getSwapchainInfo().imageViews.size(),
-        getRendererPointer()->getDepthImageInfo().depth_image_format,
-        Config::MAX_FRAMES_IN_FLIGHT
-        );
+   
 
     uint32_t subPassIndex = 0;
     m_skyBox = std::make_shared<SkyBox>(m_renderPass.get(), getRendererPointer()->getMSAAInfo().msaa_sampleCount, subPassIndex);
-    m_lightSphere = std::make_shared<LightSphere>(m_renderPass.get(), getRendererPointer()->getMSAAInfo().msaa_sampleCount, subPassIndex);
-    
+
     //GUI
     m_GUI = std::make_unique<GUI>();
 
     // IBL
-    loadBRDFlut();
-    m_prefilteredIrradiance = std::make_shared<PrefilteredIrradiance>(Config::PREF_IRRADIANCE_DIM);
-    m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap>(Config::PREF_ENV_MAP_DIM);
-
-    getRenderResource()->updateIBLResource(m_BRDFlut, m_prefilteredIrradiance->get(), m_prefilteredEnvMap->get());
+    loadSHBRDFlut();
+    
 }
 
-void ForwardPBRPass::createUniformBuffer(const std::shared_ptr<Model> modelPtr, std::vector<size_t>& uboSizeInfos)
+void SHLightingPass::createUniformBuffer(const std::shared_ptr<Model> modelPtr, std::vector<size_t>& uboSizeInfos)
 {
     for (uint32_t meshIndex : modelPtr->getMeshIndices())
     {
@@ -228,13 +202,13 @@ void ForwardPBRPass::createUniformBuffer(const std::shared_ptr<Model> modelPtr, 
 
 
 
-void ForwardPBRPass::createPipelines()
+void SHLightingPass::createPipelines()
 {
     VkSampleCountFlagBits msaaSamplesCount = getRendererPointer()->getMSAAInfo().msaa_sampleCount;
 
     //-------------------------------- PBR Pipeline --------------------------------------
     {
-        const std::vector<DescriptorInfo>& descriptorInfo = GRAPHICS_PIPELINE::PBR::DESCRIPTORS_INFO;
+        const std::vector<DescriptorInfo>& descriptorInfo = GRAPHICS_PIPELINE::SH_LIGHTING::DESCRIPTORS_INFO;
 
         std::vector<VkDescriptorSetLayoutBinding> bindings(descriptorInfo.size());
         for (uint32_t i = 0; i < descriptorInfo.size(); i++)
@@ -251,12 +225,12 @@ void ForwardPBRPass::createPipelines()
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayoutPBR) != VK_SUCCESS)
+        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS)
             throw std::runtime_error("Failed to create descriptor set layout!");
 
 
         // -------------------Shader Modules--------------------
-        const std::vector<ShaderInfo>& shaderInfos = { {shaderType::VERTEX, "scene"}, {shaderType::FRAGMENT, "scene"} };
+        const std::vector<ShaderInfo>& shaderInfos = { {shaderType::VERTEX, "shLighting"}, {shaderType::FRAGMENT, "shLighting"} };
 
         std::vector<VkShaderModule> shaderModules(shaderInfos.size());
         std::vector<VkPipelineShaderStageCreateInfo> shaderStagesInfos(shaderInfos.size());
@@ -299,10 +273,10 @@ void ForwardPBRPass::createPipelines()
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayoutPBR;
+        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
         pipelineLayoutInfo.pushConstantRangeCount = 0;
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
-        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayoutPBR);
+        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
         if (status != VK_SUCCESS)
             throw std::runtime_error("Failed to create pipeline layout!");
 
@@ -323,13 +297,13 @@ void ForwardPBRPass::createPipelines()
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.pTessellationState = nullptr;
         pipelineInfo.pNext = nullptr;
-        pipelineInfo.layout = m_pipelineLayoutPBR;
+        pipelineInfo.layout = m_pipelineLayout;
         pipelineInfo.renderPass = m_renderPass.get();
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
         pipelineInfo.basePipelineIndex = -1;
 
-        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipelinePBR);
+        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
         if (status != VK_SUCCESS)
             throw std::runtime_error("Failed to create graphics pipeline!");
 
@@ -341,26 +315,22 @@ void ForwardPBRPass::createPipelines()
 }
 
 
-void ForwardPBRPass::updateUBO(
+void SHLightingPass::updateUBO(
     const VkExtent2D& extent,
     const uint32_t& currentFrame
 ) {
-    m_shadowMap->updateUBO();
-    m_lightSphere->updateUBO();
     m_skyBox->updateUBO();
-
-    const glm::mat4 lightSpace1 = m_shadowMap->getLightSpace();
 
     UBOinfo uboInfo = {
         getRenderResource()->m_camera.getCameraPos(),
         getRenderResource()->m_camera.getViewMatrix(),
         getRenderResource()->m_camera.getProjectionMatrix(),
-        lightSpace1,
+        glm::mat4(1.0f),
         getRenderResource()->m_lightsInfo.size(),
         extent
     };
 
-    // ForwardPBRPass
+    // SHLightingPass
 
     for (auto ptr : getRenderResource()->m_normalModels)
     {
@@ -383,32 +353,25 @@ void ForwardPBRPass::updateUBO(
                 vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0]);
             }
 
-
-            // update lights UBO
+            // SH UBOs
             {
-                DescriptorTypes::UniformBufferObject::LightInfo uboData2[Config::LIGHTS_COUNT];
+                glm::vec4 coefficentData[Config::SH_COEF_NUM];
 
-                for (uint32_t i = 0; i < getRenderResource()->m_lightsInfo.size(); i++)
+                for (uint32_t i = 0; i < Config::SH_COEF_NUM; i++)
                 {
-                    LightInfo info = getRenderResource()->m_lightsInfo[i];
-                    uboData2[i].pos = glm::vec4(info.pos, 1.0f);
-                    uboData2[i].color = glm::vec4(info.m_color, 1.0f);
-                    uboData2[i].dir = glm::vec4(info.m_targetPos - info.pos, 1.0f);
-                    uboData2[i].intensity = info.m_intensity;
-                    uboData2[i].type = (int)info.m_lightType;
+                    coefficentData[i] = glm::vec4(getRenderResource()->m_coefficient[i], 1.0f);
                 }
 
                 void* data;
                 vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][1], &data);
-                memcpy(data, &uboData2, sizeof(uboData2[0]) * 10);
+                memcpy(data, &coefficentData, sizeof(coefficentData[0]) * Config::SH_COEF_NUM);
                 vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][1]);
             }
-
         }
     }
 }
 
-void ForwardPBRPass::draw(uint32_t imageIndex, uint32_t currentFrame)
+void SHLightingPass::draw(uint32_t imageIndex, uint32_t currentFrame)
 {
     VkCommandBuffer& commandBuffer = getRendererPointer()->getGraphicsCommandBuffer(currentFrame);
     // Resets the command buffer to be able to be recorded.
@@ -417,19 +380,16 @@ void ForwardPBRPass::draw(uint32_t imageIndex, uint32_t currentFrame)
     // Specifies some details about the usage of this specific command buffer.
     CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits)0);
 
-    //ShadowMap
-    m_shadowMap->draw(imageIndex, currentFrame);
+
 
     //--------------------------------RenderPass-----------------------------
     VkExtent2D extent = getRendererPointer()->getSwapchainInfo().extent;
-    m_renderPass.begin(*m_swapchain_framebuffers[imageIndex],extent , m_clearValues, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
-    
-    drawPipeline(commandBuffer, m_pipelinePBR, m_pipelineLayoutPBR, getRenderResource()->m_normalModels);
+    m_renderPass.begin(*m_swapchain_framebuffers[imageIndex], extent, m_clearValues, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
+    drawPipeline(commandBuffer, m_pipeline, m_pipelineLayout, getRenderResource()->m_normalModels);
 
-    m_lightSphere->draw(commandBuffer);
     m_skyBox->draw(commandBuffer);
-    
+
     m_renderPass.end(commandBuffer);
 
     //GUI
@@ -438,20 +398,20 @@ void ForwardPBRPass::draw(uint32_t imageIndex, uint32_t currentFrame)
     vkEndCommandBuffer(commandBuffer);
 }
 
-void ForwardPBRPass::createUBOs()
+void SHLightingPass::createUBOs()
 {
     //Normal models
     for (auto ptr : getRenderResource()->m_normalModels)
     {
         std::vector<size_t> uboSizeInfos = {
                sizeof(DescriptorTypes::UniformBufferObject::NormalPBR),
-               sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10
+               sizeof(glm::vec4) * Config::SH_COEF_NUM
         };
         createUniformBuffer(ptr, uboSizeInfos);
     }
 }
 
-void ForwardPBRPass::createDescriptorSets()
+void SHLightingPass::createDescriptorSets()
 {
     //-------------------------------  PBR DescriptorSet  ----------------------------------
     for (auto ptr : getRenderResource()->m_normalModels)
@@ -461,29 +421,28 @@ void ForwardPBRPass::createDescriptorSets()
             m_descriptorSetsMap[meshIndex].resize(1);
 
             {
-                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayoutPBR, &m_descriptorSetsMap[meshIndex][0]);
+                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSetsMap[meshIndex][0]);
 
                 RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
 
                 VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex][0]);
-                VkDescriptorBufferInfo uniformBufferLightsInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex][1]);
+                VkDescriptorBufferInfo uniformBufferSHcoefficientInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex][1]);
 
-                VkDescriptorImageInfo baseColor         = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->colorTexture->getSampler(),               renderMeshInfo.ref_material->colorTexture->getImageView(),              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo metallicRoughness = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->metallic_RoughnessTexture->getSampler(),  renderMeshInfo.ref_material->metallic_RoughnessTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo emissiveColor     = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->emissiveTexture->getSampler(),            renderMeshInfo.ref_material->emissiveTexture->getImageView(),           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo AO                = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->AOTexture->getSampler(),                  renderMeshInfo.ref_material->AOTexture->getImageView(),                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo normal            = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->normalTexture->getSampler(),              renderMeshInfo.ref_material->normalTexture->getImageView(),             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                
-                VkDescriptorImageInfo irradianceMap     = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.irradiance->getSampler(),           getRenderResource()->m_IBLResource.irradiance->getImageView(),          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo BRDFlut           = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.brdfLUT->getSampler(),              getRenderResource()->m_IBLResource.brdfLUT->getImageView(),             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo prefilteredEnvMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.prefiltered_Env->getSampler(),      getRenderResource()->m_IBLResource.prefiltered_Env->getImageView(),     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-                VkDescriptorImageInfo shadowMap         = DescriptorManager::descriptorImageInfo(m_shadowMap->get()->getSampler(),                                      m_shadowMap->get()->getImageView(),                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                // SH Lighting with PBR info semms to be 
+                VkDescriptorImageInfo baseColor = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->colorTexture->getSampler(), renderMeshInfo.ref_material->colorTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VkDescriptorImageInfo metallicRoughness = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->metallic_RoughnessTexture->getSampler(), renderMeshInfo.ref_material->metallic_RoughnessTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VkDescriptorImageInfo emissiveColor = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->emissiveTexture->getSampler(), renderMeshInfo.ref_material->emissiveTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VkDescriptorImageInfo AO = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->AOTexture->getSampler(), renderMeshInfo.ref_material->AOTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VkDescriptorImageInfo normal = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->normalTexture->getSampler(), renderMeshInfo.ref_material->normalTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+                VkDescriptorImageInfo SHBRDFlut = DescriptorManager::descriptorImageInfo(getRenderResource()->m_SHBRDFlut->getSampler(), getRenderResource()->m_SHBRDFlut->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+               
 
 
                 std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
                     DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferLightsInfo),  
+                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferSHcoefficientInfo),
 
                     DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &baseColor),
                     DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &metallicRoughness),
@@ -491,11 +450,7 @@ void ForwardPBRPass::createDescriptorSets()
                     DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &AO),
                     DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, &normal),
 
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 7, &irradianceMap),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, &BRDFlut),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9,&prefilteredEnvMap),
-
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10,&shadowMap)
+                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 7,&SHBRDFlut)
                 };
 
                 vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
@@ -505,13 +460,13 @@ void ForwardPBRPass::createDescriptorSets()
 }
 
 
-const RenderPass& ForwardPBRPass::getRenderPass() const
+const RenderPass& SHLightingPass::getRenderPass() const
 {
     return m_renderPass;
 }
 
 
-void ForwardPBRPass::destroy()
+void SHLightingPass::destroy()
 {
     for (auto& framebuffer : m_swapchain_framebuffers)
         vkDestroyFramebuffer(getRendererPointer()->getDevice(), *framebuffer, nullptr);
@@ -526,39 +481,26 @@ void ForwardPBRPass::destroy()
 
     // ImGui
     m_GUI->destroy();
-    m_shadowMap->destroy();
     m_skyBox->destroy();
-    m_lightSphere->destroy();
 
-    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayoutPBR, nullptr);
-    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipelinePBR, nullptr);
-    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayoutPBR, nullptr);
+    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout, nullptr);
+    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);
+    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout, nullptr);
 
     m_renderPass.destroy();
-
-    // IBL
-    m_BRDFcomp.destroy();
-    m_BRDFlut->destroy();
-    m_prefilteredIrradiance->destroy();
-    m_prefilteredEnvMap->destroy();
-}
-
-// In the future, it'll return a vector of computations.
-const Computation& ForwardPBRPass::getComputation() const
-{
-    return m_BRDFcomp;
 }
 
 
-void ForwardPBRPass::loadBRDFlut() 
+
+void SHLightingPass::loadSHBRDFlut()
 {
-    std::string TextureName = "BRDF_LUT.png";
+    std::string TextureName = "SH_BRDF_LUT.png";
     TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4 };
 
-    m_BRDFlut = std::make_shared<NormalTexture>(TextureName,std::string(MODEL_DIR) + info.folderName,info.format);
+    getRenderResource()->m_SHBRDFlut = std::make_shared<NormalTexture>(TextureName, std::string(MODEL_DIR) + info.folderName, info.format);
 }
 
-void ForwardPBRPass::drawPipeline(const VkCommandBuffer& commandBuffer, const VkPipeline& pipeline, const VkPipelineLayout& pipelineLayout, std::vector<std::shared_ptr<Model>> models)
+void SHLightingPass::drawPipeline(const VkCommandBuffer& commandBuffer, const VkPipeline& pipeline, const VkPipelineLayout& pipelineLayout, std::vector<std::shared_ptr<Model>> models)
 {
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);

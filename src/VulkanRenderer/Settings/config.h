@@ -39,4 +39,7 @@ namespace Config
 	// Prefiltered Env. Map
 	inline const VkFormat PREF_ENV_MAP_FORMAT = VK_FORMAT_R16G16B16A16_SFLOAT;
 	inline const uint32_t PREF_ENV_MAP_DIM = 512;
+
+	//SH
+	inline const uint32_t SH_COEF_NUM = 25;
 }

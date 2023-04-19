@@ -27,6 +27,7 @@ layout(std140, binding = 1) uniform Lights
     Light lights[10];
 };
 
+
 layout(binding = 2) uniform sampler2D   baseColorSampler;
 layout(binding = 3) uniform sampler2D   metallicRoughnessSampler;
 layout(binding = 4) uniform sampler2D   emissiveColorSampler;
@@ -114,6 +115,9 @@ float filterPCF(vec3 shadowCoords);
 float calculateShadow(vec3 shadowCoords, vec2 off);
 
 vec3 getIBLcontribution(PBRinfo pbrInfo, IBLinfo iblInfo, Material material);
+
+vec3 getSHIrradianceContribution(vec3 dir);
+
 float ambient = 0.5;
 
 
@@ -169,11 +173,11 @@ void main()
         float mipCount = float(textureQueryLevels(prefilteredEnvMapSampler));
         float lod = pbrInfo.perceptualRoughness * mipCount;
 
-        iblInfo.brdf = texture(BRDFlutSampler, vec2( max(pbrInfo.NdotV, 0.0), 1.0 - pbrInfo.perceptualRoughness)).rg;
+        iblInfo.brdf = texture(BRDFlutSampler, vec2( max(pbrInfo.NdotV, 0.0), pbrInfo.perceptualRoughness)).rg;
         iblInfo.specularLight = textureLod(prefilteredEnvMapSampler,reflection.xyz,lod).rgb;
    }
 
-    vec3 color = getIBLcontribution(pbrInfo, iblInfo, material);;
+    vec3 color = getIBLcontribution(pbrInfo, iblInfo, material);
 
     for(int i = 0 ; i < ubo.lightsCount; ++i)
     {
@@ -208,6 +212,7 @@ void main()
 
 //    outColor =  vec4(iblInfo.specularLight * (pbrInfo.specularColor* iblInfo.brdf.x + iblInfo.brdf.y) , 1.0);
     
+
 //    vec3 shadowCoords = inShadowCoords.xyz / inShadowCoords.w;
 //    shadowCoords.xy = shadowCoords.xy * 0.5 + 0.5;
 //    outColor = vec4( shadowCoords.z - texture(shadowMapSampler, shadowCoords.xy).r); 

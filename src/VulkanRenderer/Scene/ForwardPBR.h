@@ -86,16 +86,8 @@ private:
 	std::vector<VkCommandBuffer>	m_commandBuffers;
 
 	VkPipeline						m_pipelinePBR;
-	//VkPipeline						m_pipelineSkybox;
-	VkPipeline						m_pipelineLight;
-
 	VkDescriptorSetLayout			m_descriptorSetLayoutPBR;
-	//VkDescriptorSetLayout			m_descriptorSetLayoutSkybox;
-	VkDescriptorSetLayout			m_descriptorSetLayoutLight;
-
 	VkPipelineLayout				m_pipelineLayoutPBR;
-	//VkPipelineLayout				m_pipelineLayoutSkybox;
-	VkPipelineLayout				m_pipelineLayoutLight;
 
 
 	VkExtent2D						m_extent;
@@ -109,6 +101,7 @@ private:
 	std::unique_ptr<GUI>					m_GUI;
 	// IBL
 	Computation								m_BRDFcomp;
+
 	std::shared_ptr<NormalTexture>			m_BRDFlut;
 	std::shared_ptr<PrefilteredEnvMap>		m_prefilteredEnvMap;
 	std::shared_ptr<PrefilteredIrradiance>	m_prefilteredIrradiance;

@@ -41,19 +41,19 @@ struct Bitmap
 	static int getBytesPerComponent(eBitmapFormat fmt);
 
 	void setPixel(int x, int y, const glm::vec4& c);
-	glm::vec4 getPixel(int x, int y) const;
+	glm::vec4 getPixel(int x, int y, int d = 0) const;
 
 private:
 
 	using setPixel_t = void(Bitmap::*)(int, int, const glm::vec4&);
-	using getPixel_t = glm::vec4(Bitmap::*)(int, int) const;
+	using getPixel_t = glm::vec4(Bitmap::*)(int, int, int) const;
 	setPixel_t setPixelFunc = &Bitmap::setPixelUnsignedByte;
 	getPixel_t getPixelFunc = &Bitmap::getPixelUnsignedByte;
 
 	void initGetSetFuncs();
 	void setPixelFloat(int x, int y, const glm::vec4& c);
-	glm::vec4 getPixelFloat(int x, int y) const;
+	glm::vec4 getPixelFloat(int x, int y, int d = 0) const;
 
 	void setPixelUnsignedByte(int x, int y, const glm::vec4& c);
-	glm::vec4 getPixelUnsignedByte(int x, int y) const;
+	glm::vec4 getPixelUnsignedByte(int x, int y, int d = 0) const;
 };

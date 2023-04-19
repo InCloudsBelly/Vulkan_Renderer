@@ -7,6 +7,7 @@
 
 #include <string.h>
 #include <vector>
+#include <stdexcept>
 
 #include <glm/glm.hpp>
 
@@ -54,9 +55,9 @@ void Bitmap::setPixel(int x, int y, const glm::vec4& c)
 	(*this.*setPixelFunc)(x, y, c);
 }
 
-glm::vec4 Bitmap::getPixel(int x, int y) const
+glm::vec4 Bitmap::getPixel(int x, int y, int d) const
 {
-	return ((*this.*getPixelFunc)(x, y));
+	return ((*this.*getPixelFunc)(x, y, d));
 }
 
 void Bitmap::initGetSetFuncs()
@@ -84,9 +85,13 @@ void Bitmap::setPixelFloat(int x, int y, const glm::vec4& c)
 	if (comp_ > 3) data[ofs + 3] = c.w;
 }
 
-glm::vec4 Bitmap::getPixelFloat(int x, int y) const
+
+glm::vec4 Bitmap::getPixelFloat(int x, int y, int d) const
 {
-	const int ofs = comp_ * (y * w_ + x);
+	if (d > 0 && d_ <= 1)
+		throw(std::runtime_error("BitMap Depth is not fitable!"));
+
+	const int ofs = comp_ * (d * w_ * h_ + (y * w_ + x));
 	const float* data = reinterpret_cast<const float*>(data_.data());
 	return glm::vec4(
 		comp_ > 0 ? data[ofs + 0] : 0.0f,
@@ -104,9 +109,12 @@ void Bitmap::setPixelUnsignedByte(int x, int y, const glm::vec4& c)
 	if (comp_ > 3) data_[ofs + 3] = uint8_t(c.w * 255.0f);
 }
 
-glm::vec4 Bitmap::getPixelUnsignedByte(int x, int y) const
+glm::vec4 Bitmap::getPixelUnsignedByte(int x, int y, int d) const
 {
-	const int ofs = comp_ * (y * w_ + x);
+	if (d > 0 && d_ <= 1)
+		throw(std::runtime_error("BitMap Depth is not fitable!"));
+
+	const int ofs = comp_ * (d* w_*h_ +(y * w_ + x));
 	return glm::vec4(
 		comp_ > 0 ? float(data_[ofs + 0]) / 255.0f : 0.0f,
 		comp_ > 1 ? float(data_[ofs + 1]) / 255.0f : 0.0f,

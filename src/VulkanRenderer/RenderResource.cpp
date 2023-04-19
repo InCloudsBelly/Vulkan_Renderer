@@ -107,4 +107,7 @@ void RenderResource::destroy()
 		m_skyboxCubeMap->destroy();
 	if (m_defaultTexture != nullptr)
 		m_defaultTexture->destroy();
+
+    if (m_SHBRDFlut != nullptr)
+        m_SHBRDFlut->destroy();
 }

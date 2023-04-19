@@ -29,6 +29,7 @@
 
 #include "VulkanRenderer/Scene/ForwardPBR.h"
 #include "VulkanRenderer/Scene/DeferredRenderPass.h"
+#include "VulkanRenderer/Scene/Spherical_Harmonic_Lighting.h"
 
 #ifndef getRendererPointer
 #define getRendererPointer() g_RendererSingleton
@@ -114,8 +115,9 @@ private:
 
 	std::shared_ptr<Swapchain>          m_swapchain;
 	
-	std::unique_ptr<DeferredRenderPass>			m_scene;
+	//std::unique_ptr<DeferredRenderPass>			m_scene;
 	//std::unique_ptr<ForwardPBRPass>			m_scene;
+	std::unique_ptr<SHLightingPass>			m_scene;
 
 	//std::vector<VkCommandPool>			m_commandPools = {}; ///<Array of command pools so that each thread in the thread pool has its own pool
 	//std::vector<VkCommandBuffer>		m_commandBuffers = {}; ///<the main command buffers for recording draw commands

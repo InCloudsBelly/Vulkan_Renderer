@@ -137,7 +137,7 @@ public:
 
     IBLResource                                         m_IBLResource;
 
-    Camera                                           m_camera;
+    Camera                                              m_camera;
 
     std::unordered_map<uint32_t, RenderMeshInfo>        m_meshInfoMap;
     std::shared_ptr<TextureBase>                        m_skyboxCubeMap;
@@ -160,4 +160,8 @@ public:
     // Global Features
     std::shared_ptr<PrefilteredIrradiance>             m_prefilteredIrradiance;
     std::shared_ptr<PrefilteredEnvMap>                 m_prefilteredEnv;
+
+    //SH
+    std::shared_ptr<NormalTexture>			            m_SHBRDFlut;
+    glm::vec3                                           m_coefficient[Config::SH_COEF_NUM];
 };

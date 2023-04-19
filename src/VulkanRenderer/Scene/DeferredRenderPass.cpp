@@ -12,21 +12,20 @@ DeferredRenderPass::DeferredRenderPass()
 {
     m_extent = getRendererPointer()->getSwapchainInfo().extent;
     // Clear Color
-    m_clearValues.resize(5);
+    m_clearValues.resize(8);
     m_clearValues[0].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
     m_clearValues[1].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
     m_clearValues[2].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
     m_clearValues[3].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
-    m_clearValues[4].color = { 1.0f, 0.0f };
-
-    //GUI
-    m_GUI = std::make_unique<GUI>();
+    m_clearValues[4].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    m_clearValues[5].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    m_clearValues[6].color = { {0.0f, 0.0f, 0.0f, 1.0f} };
+    m_clearValues[7].color = { 1.0f, 0.0f };
 
     createRenderPass();
 
-    uint32_t finalPassIndex = 1;
-    m_skyBox = std::make_shared<SkyBox>(m_renderPass.get(), VK_SAMPLE_COUNT_1_BIT, finalPassIndex);
-    m_lightSphere = std::make_shared<LightSphere>(m_renderPass.get(), VK_SAMPLE_COUNT_1_BIT, finalPassIndex);
+    //Secondary Features
+    createSecondaryFeatures();
 
     createPipelines();
     
@@ -106,6 +105,66 @@ void DeferredRenderPass::createRenderPass()
         &m_attachmentAlbedo->getAllocation(),
         m_attachmentAlbedo
     );
+    m_attachmentMetallicRoughness = std::make_shared<NormalTexture>("metallicRoughness");
+    m_attachmentMetallicRoughness->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
+    m_attachmentMetallicRoughness->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+    BufferManager::bufferCreateOffscreenResources(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getVmaAllocator(),
+        getRendererPointer()->getGraphicsQueue(),
+        m_attachmentMetallicRoughness->getExtent(),
+        m_attachmentMetallicRoughness->getFormat(),
+        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        1,
+        1,
+        0,
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_IMAGE_VIEW_TYPE_2D,
+        &m_attachmentMetallicRoughness->getAllocation(),
+        m_attachmentMetallicRoughness
+    );
+
+    m_attachmentEmissiveColor = std::make_shared<NormalTexture>("emissive");
+    m_attachmentEmissiveColor->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
+    m_attachmentEmissiveColor->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+    BufferManager::bufferCreateOffscreenResources(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getVmaAllocator(),
+        getRendererPointer()->getGraphicsQueue(),
+        m_attachmentEmissiveColor->getExtent(),
+        m_attachmentEmissiveColor->getFormat(),
+        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        1,
+        1,
+        0,
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_IMAGE_VIEW_TYPE_2D,
+        &m_attachmentEmissiveColor->getAllocation(),
+        m_attachmentEmissiveColor
+    );
+
+    m_attachmentAO = std::make_shared<NormalTexture>("AO");
+    m_attachmentAO->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
+    m_attachmentAO->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
+
+    BufferManager::bufferCreateOffscreenResources(
+        getRendererPointer()->getDevice(),
+        getRendererPointer()->getVmaAllocator(),
+        getRendererPointer()->getGraphicsQueue(),
+        m_attachmentAO->getExtent(),
+        m_attachmentAO->getFormat(),
+        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        1,
+        1,
+        0,
+        VK_SAMPLE_COUNT_1_BIT,
+        VK_IMAGE_VIEW_TYPE_2D,
+        &m_attachmentAO->getAllocation(),
+        m_attachmentAO
+    );
+
 
     m_attachmentDepth = std::make_shared<NormalTexture>("depth");
     m_attachmentDepth->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
@@ -126,7 +185,7 @@ void DeferredRenderPass::createRenderPass()
 
 
     // - Attachments
-    std::array<VkAttachmentDescription, 5> attachments{};
+    std::array<VkAttachmentDescription, 8> attachments{};
 
     // 场景颜色附件
     attachments[0].format = format;
@@ -166,27 +225,59 @@ void DeferredRenderPass::createRenderPass()
     attachments[3].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[3].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachments[3].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    // Depth attachment
-    attachments[4].format = depthBufferFormat;
+
+    // Metallic & roughness
+    attachments[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
     attachments[4].samples = VK_SAMPLE_COUNT_1_BIT;
     attachments[4].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachments[4].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[4].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachments[4].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachments[4].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[4].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    attachments[4].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    // Emissive
+    attachments[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    attachments[5].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[5].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[5].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[5].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[5].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[5].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[5].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    // AO
+    attachments[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    attachments[6].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[6].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[6].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[6].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[6].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[6].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[6].finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // Depth attachment
+    attachments[7].format = depthBufferFormat;
+    attachments[7].samples = VK_SAMPLE_COUNT_1_BIT;
+    attachments[7].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachments[7].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[7].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachments[7].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachments[7].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachments[7].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 
     // 三通道
     std::array<VkSubpassDescription, 2> subpassDescriptions{};
     // 第一通道: 写入G-Buffer
     // ----------------------------------------------------------------------------------------
-    std::vector<VkAttachmentReference> colorReferences(4);
+    std::vector<VkAttachmentReference> colorReferences(7);
     colorReferences[0] = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
     colorReferences[1] = { 1, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
     colorReferences[2] = { 2, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
     colorReferences[3] = { 3, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
-    VkAttachmentReference depthReference = { 4, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+    colorReferences[4] = { 4, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+    colorReferences[5] = { 5, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+    colorReferences[6] = { 6, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
+    VkAttachmentReference depthReference = { 7, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 
     subpassDescriptions[0].pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpassDescriptions[0].colorAttachmentCount = colorReferences.size();
@@ -198,10 +289,13 @@ void DeferredRenderPass::createRenderPass()
 
     VkAttachmentReference colorReference = { 0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL };
 
-    VkAttachmentReference inputReferences[3];
+    VkAttachmentReference inputReferences[6];
     inputReferences[0] = { 1, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
     inputReferences[1] = { 2, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
     inputReferences[2] = { 3, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    inputReferences[3] = { 4, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    inputReferences[4] = { 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+    inputReferences[5] = { 6, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
 
     uint32_t preserveAttachmentIndex = 1;
 
@@ -210,7 +304,7 @@ void DeferredRenderPass::createRenderPass()
     subpassDescriptions[1].pColorAttachments = &colorReference;
     subpassDescriptions[1].pDepthStencilAttachment = &depthReference;
     //使用第一轮中填充的颜色附件作为输入附件
-    subpassDescriptions[1].inputAttachmentCount = 3;
+    subpassDescriptions[1].inputAttachmentCount = 6;
     subpassDescriptions[1].pInputAttachments = inputReferences;
 
     //// 第三通道: 前向透明
@@ -293,7 +387,7 @@ void DeferredRenderPass::createRenderPass()
     renderPassInfo.pDependencies = dependencies.data();
 
     m_renderPass = RenderPass(
-        { attachments[0], attachments[1], attachments[2],attachments[3],attachments[4]},
+        { attachments[0], attachments[1], attachments[2],attachments[3],attachments[4],attachments[5] ,attachments[6] ,attachments[7] },
         { subpassDescriptions[0],subpassDescriptions[1]},
         { dependencies[0],dependencies[1],dependencies[2]}
     );
@@ -313,6 +407,9 @@ void DeferredRenderPass::createSwapchainFramebuffers()
             m_attachmentPos->getImageView(),
             m_attachmentNormal->getImageView(),
             m_attachmentAlbedo->getImageView(),
+            m_attachmentMetallicRoughness->getImageView(),
+            m_attachmentEmissiveColor->getImageView(),
+            m_attachmentAO->getImageView(),
             m_attachmentDepth->getImageView()
      
         };
@@ -327,6 +424,39 @@ void DeferredRenderPass::createSwapchainFramebuffers()
             m_swapchain_framebuffers[i]
         );
     }
+}
+
+
+void DeferredRenderPass::createSecondaryFeatures()
+{
+    //ShadowMap
+    const VkExtent2D swapChainExtent = getRendererPointer()->getSwapchainInfo().extent;
+    const VkExtent2D shadowExtent = { 2 * swapChainExtent.height, 2 * swapChainExtent.width };
+
+    m_shadowMap = std::make_shared<ShadowMap>(
+        shadowExtent,
+        getRendererPointer()->getSwapchainInfo().imageViews.size(),
+        getRendererPointer()->getDepthImageInfo().depth_image_format,
+        Config::MAX_FRAMES_IN_FLIGHT
+        );
+
+    uint32_t finalPassIndex = 1;
+    m_skyBox = std::make_shared<SkyBox>(m_renderPass.get(), VK_SAMPLE_COUNT_1_BIT, finalPassIndex);
+    m_lightSphere = std::make_shared<LightSphere>(m_renderPass.get(), VK_SAMPLE_COUNT_1_BIT, finalPassIndex);
+
+    //GUI
+    m_GUI = std::make_unique<GUI>();
+
+    // IBL
+    std::string TextureName = "BRDF_LUT.png";
+    TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4 };
+
+    m_BRDFlut = std::make_shared<NormalTexture>(TextureName, std::string(MODEL_DIR) + info.folderName, info.format);
+    m_prefilteredIrradiance = std::make_shared<PrefilteredIrradiance>(Config::PREF_IRRADIANCE_DIM);
+    m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap>(Config::PREF_ENV_MAP_DIM);
+
+    getRenderResource()->updateIBLResource(m_BRDFlut, m_prefilteredIrradiance->get(), m_prefilteredEnvMap->get());
+
 }
 
 
@@ -414,7 +544,10 @@ void DeferredRenderPass::createPipelines()
         // Multisampling 
         VkPipelineMultisampleStateCreateInfo multisampleState = PipelineManager::pipelineMultisampleStateCreateInfo(VK_SAMPLE_COUNT_1_BIT, 0);
         // Color blending(attachment)
-        std::array<VkPipelineColorBlendAttachmentState, 4> blendAttachmentStates = {
+        std::array<VkPipelineColorBlendAttachmentState, 7> blendAttachmentStates = {
+                PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
+                PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
+                PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
                 PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
                 PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
                 PipelineManager::pipelineColorBlendAttachmentState(0xf, VK_FALSE),
@@ -559,8 +692,8 @@ void DeferredRenderPass::updateUBO(
     const VkExtent2D& extent,
     const uint32_t& currentFrame
 ) {
- /*   m_shadowMap->updateUBO();
-    const glm::mat4 lightSpace1 = m_shadowMap->getLightSpace();*/
+    m_shadowMap->updateUBO();
+    const glm::mat4 lightSpace = m_shadowMap->getLightSpace();
 
     m_lightSphere->updateUBO();
     m_skyBox->updateUBO();
@@ -584,22 +717,40 @@ void DeferredRenderPass::updateUBO(
     }
 
     // OnScreen SubPass
-    DescriptorTypes::UniformBufferObject::LightInfo uboData2[Config::LIGHTS_COUNT];
-
-    for (uint32_t i = 0; i < getRenderResource()->m_lightsInfo.size(); i++)
+    // Normal Infos
     {
-        LightInfo info = getRenderResource()->m_lightsInfo[i];
-        uboData2[i].pos = glm::vec4(info.pos, 1.0f);
-        uboData2[i].color = glm::vec4(info.m_color, 1.0f);
-        uboData2[i].dir = glm::vec4(info.m_targetPos - info.pos, 1.0f);
-        uboData2[i].intensity = info.m_intensity;
-        uboData2[i].type = (int)info.m_lightType;
-    }
+        DescriptorTypes::UniformBufferObject::Deferred uboData;
+        uboData.cameraPos = glm::vec4(getRenderResource()->m_camera.getCameraPos(), 1.0f);
+        uboData.lightsCount = getRenderResource()->m_lightsInfo.size();
+        uboData.lightSpace = lightSpace;
 
-    void* data;
-    vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation, &data);
-    memcpy(data, &uboData2, sizeof(uboData2[0]) * 10);
-    vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation);
+        void* data;
+        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[0], &data);
+        memcpy(data, &uboData, sizeof(uboData) );
+        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[0]);
+    }
+    
+
+    // Light Infos
+    {
+        DescriptorTypes::UniformBufferObject::LightInfo uboData[Config::LIGHTS_COUNT];
+
+        for (uint32_t i = 0; i < getRenderResource()->m_lightsInfo.size(); i++)
+        {
+            LightInfo info = getRenderResource()->m_lightsInfo[i];
+            uboData[i].pos = glm::vec4(info.pos, 1.0f);
+            uboData[i].color = glm::vec4(info.m_color, 1.0f);
+            uboData[i].dir = glm::vec4(info.m_targetPos - info.pos, 1.0f);
+            uboData[i].radius = 200.0f;
+            uboData[i].intensity = info.m_intensity;
+            uboData[i].type = (int)info.m_lightType;
+        }
+
+        void* data;
+        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[1], &data);
+        memcpy(data, &uboData, sizeof(uboData[0]) * 10);
+        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[1]);
+    }
 }
 
 void DeferredRenderPass::draw(uint32_t imageIndex, uint32_t currentFrame)
@@ -612,7 +763,7 @@ void DeferredRenderPass::draw(uint32_t imageIndex, uint32_t currentFrame)
     CommandManager::cmdBeginCommandBuffer(commandBuffer, (VkCommandBufferUsageFlagBits)0);
 
     ////ShadowMap
-    //m_shadowMap->draw(imageIndex, currentFrame);
+    m_shadowMap->draw(imageIndex, currentFrame);
 
     //--------------------------------RenderPass-----------------------------
     VkExtent2D extent = getRendererPointer()->getSwapchainInfo().extent;
@@ -656,15 +807,35 @@ void DeferredRenderPass::createUBOs()
     }
 
 
-    std::vector<size_t> uboSizeInfos = {sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10};
 
+    // --------------------  onscreen pass -------------------------
+
+    std::vector<size_t> uboSizeInfo = { 
+        sizeof(DescriptorTypes::UniformBufferObject::Deferred),
+        sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10
+    };
+   
+    m_screenUBO.resize(uboSizeInfo.size());
+    m_screenUBOAllocation.resize(uboSizeInfo.size());
+
+    //Normal
     BufferManager::bufferCreateBuffer(
         getRendererPointer()->getVmaAllocator(),
-        uboSizeInfos[0],
+        uboSizeInfo[0],
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU,
-        &m_screenUBO,
-        &m_screenUBOAllocation
+        &m_screenUBO[0],
+        &m_screenUBOAllocation[0]
+    );
+
+    //Lights
+    BufferManager::bufferCreateBuffer(
+        getRendererPointer()->getVmaAllocator(),
+        uboSizeInfo[1],
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+        VMA_MEMORY_USAGE_CPU_TO_GPU,
+        &m_screenUBO[1],
+        &m_screenUBOAllocation[1]
     );
 
 }
@@ -685,16 +856,26 @@ void DeferredRenderPass::createDescriptorSets()
 
                 VkDescriptorBufferInfo uniformBufferMVP = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex][0]);
                 VkDescriptorImageInfo texDescriptorColor = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->colorTexture->getSampler(), renderMeshInfo.ref_material->colorTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VkDescriptorImageInfo texDescriptorMR = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->metallic_RoughnessTexture->getSampler(), renderMeshInfo.ref_material->metallic_RoughnessTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VkDescriptorImageInfo texDescriptorEmissive = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->emissiveTexture->getSampler(), renderMeshInfo.ref_material->emissiveTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                VkDescriptorImageInfo texDescriptorAO = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->AOTexture->getSampler(), renderMeshInfo.ref_material->AOTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 VkDescriptorImageInfo texDescriptorNormal = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->normalTexture->getSampler(), renderMeshInfo.ref_material->normalTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
+                
                 std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
                     // Binding 0: MVP
                     DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferMVP),
                     // Binding 1: Position texture target
                     DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptorColor),
-                    // Binding 2: Normals texture target
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texDescriptorNormal),
+                    // Binding 2: metallic & Rougness texture target
+                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texDescriptorMR),
+                    // Binding 3: Emissive texture target
+                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texDescriptorEmissive),
+                    // Binding 4: AO texture target
+                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texDescriptorAO),
+                    // Binding 5: Normals texture target
+                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &texDescriptorNormal),
                 };
+
                 vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
             }
         }
@@ -704,21 +885,45 @@ void DeferredRenderPass::createDescriptorSets()
     {
         DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout_Onscreen, &m_screenDescriptorSet);
 
-        VkDescriptorBufferInfo uniformBufferLights = DescriptorManager::descriptorBufferInfo(m_screenUBO);
+        VkDescriptorBufferInfo uniformBufferNormal = DescriptorManager::descriptorBufferInfo(m_screenUBO[0]);
+        VkDescriptorBufferInfo uniformBufferLights = DescriptorManager::descriptorBufferInfo(m_screenUBO[1]);
         VkDescriptorImageInfo texDescriptorPosition = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentPos->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         VkDescriptorImageInfo texDescriptorNormal = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentNormal->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         VkDescriptorImageInfo texDescriptorAlbedo = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentAlbedo->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorMR = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentMetallicRoughness->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorEmissive = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentEmissiveColor->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorAO = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentAO->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
+        VkDescriptorImageInfo irradianceMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.irradiance->getSampler(), getRenderResource()->m_IBLResource.irradiance->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo BRDFlut = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.brdfLUT->getSampler(), getRenderResource()->m_IBLResource.brdfLUT->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo prefilteredEnvMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.prefiltered_Env->getSampler(), getRenderResource()->m_IBLResource.prefiltered_Env->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+        VkDescriptorImageInfo shadowMap = DescriptorManager::descriptorImageInfo(m_shadowMap->get()->getSampler(), m_shadowMap->get()->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-            // Binding 0: Lights
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferLights),
-            // Binding 1: Position texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1, &texDescriptorPosition),
-            // Binding 2: Normals texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, &texDescriptorNormal),
-            // Binding 3: Albedo texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3, &texDescriptorAlbedo)
+            // Binding 0: Normal Info
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferNormal),
+            // Binding 1: Lights
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferLights),
+            // Binding 2: Position texture target
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, &texDescriptorPosition),
+            // Binding 3: Normals texture target
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3, &texDescriptorNormal),
+            // Binding 4: Albedo texture target
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4, &texDescriptorAlbedo),
+            // Binding 5: MR texture target
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 5, &texDescriptorMR),
+            // Binding 6: Emissive texture target
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 6, &texDescriptorEmissive),
+            // Binding 7: AO texture target
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 7, &texDescriptorAO),
+
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, &irradianceMap),
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9, &BRDFlut),
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10, &prefilteredEnvMap),
+
+            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 11,&shadowMap)
+
         };
 
         vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
@@ -744,16 +949,22 @@ void DeferredRenderPass::destroy()
             vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), uboInfo.second[i], m_uboAllocationsMap[uboInfo.first][i]);
         }
     }
-    vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(),m_screenUBO, m_screenUBOAllocation);
+
+    for(int i = 0 ; i < m_screenUBO.size(); i++)
+        vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(),m_screenUBO[i], m_screenUBOAllocation[i]);
 
 
     m_attachmentAlbedo->destroy();
     m_attachmentDepth->destroy();
     m_attachmentNormal->destroy();
     m_attachmentPos->destroy();
+    m_attachmentMetallicRoughness->destroy();
+    m_attachmentEmissiveColor->destroy();
+    m_attachmentAO->destroy();
 
     // ImGui
     m_GUI->destroy();
+    m_shadowMap->destroy();
     m_skyBox->destroy();
     m_lightSphere->destroy();
 
@@ -765,6 +976,9 @@ void DeferredRenderPass::destroy()
     vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline_Onscreen, nullptr);
     vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout_Onscreen, nullptr);
 
+    m_BRDFlut->destroy();
+    m_prefilteredIrradiance->destroy();
+    m_prefilteredEnvMap->destroy();
 
 
     m_renderPass.destroy();

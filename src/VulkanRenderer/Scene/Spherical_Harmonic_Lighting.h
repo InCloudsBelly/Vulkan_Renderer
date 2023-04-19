@@ -7,6 +7,7 @@
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
+#include "VulkanRenderer/Settings/Config.h"
 #include "VulkanRenderer/Settings/GraphicsPipelineConfig.h"
 #include "VulkanRenderer/Settings/ComputePipelineConfig.h"
 #include "VulkanRenderer/Computation/Computation.h"
@@ -25,12 +26,12 @@
 #include "VulkanRenderer/Features/LightSphere.h"
 
 
-class DeferredRenderPass
+class SHLightingPass
 {
 public:
-	DeferredRenderPass();
+	SHLightingPass();
 
-	~DeferredRenderPass();
+	~SHLightingPass();
 
 	void updateUBO(
 		const VkExtent2D& extent,
@@ -40,10 +41,7 @@ public:
 	void draw(uint32_t imageIndex, uint32_t frameIndex);
 
 	const RenderPass& getRenderPass() const;
-
-
 	const VkFramebuffer& getSwapchainFramebuffer(uint32_t index) const { return *m_swapchain_framebuffers[index]; }
-	const std::shared_ptr<ShadowMap> getShadowMap() const { return m_shadowMap; }
 
 	const std::vector<VkDescriptorSet>& getMeshDescriptorSet(uint32_t meshIndex) const
 	{
@@ -72,6 +70,8 @@ private:
 
 	void createUniformBuffer(const std::shared_ptr<Model> modelPtr, std::vector<size_t>& uboSizeInfos);
 
+	void loadSHBRDFlut();
+
 	void drawPipeline(const VkCommandBuffer& commandBuffer, const VkPipeline& pipeline, const VkPipelineLayout& pipelineLayout, std::vector<std::shared_ptr<Model>> models);
 
 	std::vector<VkFramebuffer*>		m_swapchain_framebuffers;
@@ -81,47 +81,21 @@ private:
 	std::vector<VkClearValue>       m_clearValues;
 	std::vector<VkCommandBuffer>	m_commandBuffers;
 
+	VkPipeline						m_pipeline;
+	VkDescriptorSetLayout			m_descriptorSetLayout;
+	VkPipelineLayout				m_pipelineLayout;
 
-	VkPipeline						m_pipeline_Offscreen;
-	VkPipeline						m_pipeline_Onscreen;
 
 	VkExtent2D						m_extent;
 
-	std::shared_ptr<NormalTexture>	m_attachmentPos;
-	std::shared_ptr<NormalTexture>	m_attachmentNormal;
-	std::shared_ptr<NormalTexture>	m_attachmentAlbedo;
-	std::shared_ptr<NormalTexture>	m_attachmentMetallicRoughness;
-	std::shared_ptr<NormalTexture>	m_attachmentEmissiveColor;
-	std::shared_ptr<NormalTexture>	m_attachmentAO;
-
-	std::shared_ptr<NormalTexture>	m_attachmentDepth;
-
-
-	VkDescriptorSetLayout			m_descriptorSetLayout_Offscreen;
-	VkDescriptorSetLayout			m_descriptorSetLayout_Onscreen;
-
-	VkPipelineLayout				m_pipelineLayout_Offscreen;
-	VkPipelineLayout				m_pipelineLayout_Onscreen;
-
-	//Shadow Map
-	std::shared_ptr<ShadowMap>				m_shadowMap;
 
 	std::shared_ptr<SkyBox>					m_skyBox;
-	std::shared_ptr<LightSphere>			m_lightSphere;
-
-	//Secondary Features
+	//GUI
 	std::unique_ptr<GUI>					m_GUI;
-	std::shared_ptr<NormalTexture>			m_BRDFlut;
-	std::shared_ptr<PrefilteredEnvMap>		m_prefilteredEnvMap;
-	std::shared_ptr<PrefilteredIrradiance>	m_prefilteredIrradiance;
 
-	// PerMesh
+	
 	std::unordered_map<uint32_t, std::vector<VkBuffer>>			m_ubosMap;
 	std::unordered_map<uint32_t, std::vector<VmaAllocation>>	m_uboAllocationsMap;
 	std::unordered_map<uint32_t, std::vector<VkDescriptorSet>>	m_descriptorSetsMap;
 
-	// OnScreen
-	std::vector <VkBuffer>					m_screenUBO;
-	std::vector <VmaAllocation>				m_screenUBOAllocation;
-	VkDescriptorSet							m_screenDescriptorSet;
 };

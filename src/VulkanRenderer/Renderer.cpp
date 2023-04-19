@@ -76,8 +76,9 @@ void Renderer::run()
     initVulkan();
 
     // -------------------------------Main Pass-----------------------------------
-    m_scene = std::make_unique<DeferredRenderPass>();
+    //m_scene = std::make_unique<DeferredRenderPass>();
     //m_scene = std::make_unique<ForwardPBRPass>();
+    m_scene = std::make_unique<SHLightingPass>();
     // ---------------------------------------------------------------------------
 
     doComputations();

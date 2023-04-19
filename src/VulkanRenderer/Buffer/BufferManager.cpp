@@ -5,11 +5,17 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+#include <stb_image_write.h>
 
 #define VMA_IMPLEMENTATION 
 #include <VMA/vk_mem_alloc.h>
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+#include <random>
+
 #include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <vulkan/vulkan.h>
 
@@ -22,6 +28,8 @@
 
 #include "VulkanRenderer/Renderer.h"
 
+const float PI = (float)M_PI;
+
 #define CHECKRESULT(x)          \
     {                             \
         VkResult retval = (x);    \
@@ -30,6 +38,17 @@
             return retval;        \
         }                         \
     }
+
+struct Face
+{
+	float* data;
+	int width;
+	int height;
+	// for mem copy purposes only
+	int currentOffset;
+};
+
+
 
 VkResult BufferManager::bufferCreateBuffer(
 	VmaAllocator allocator,
@@ -760,6 +779,86 @@ BufferManager::bufferCreateTextureImage(
 }
 
 
+
+inline float NormalRandom(float mu = 0.f, float sigma = 1.f)
+{
+	static std::default_random_engine generator;
+	static std::normal_distribution<float> distribution(mu, sigma);
+	return distribution(generator);
+}
+
+std::vector<float> Basis(const glm::vec3& pos)
+{
+	int n = (5) * (5);
+	std::vector<float> Y(n);
+	glm::vec3 normal = glm::normalize(pos);
+	float x = normal.x;
+	float y = normal.y;
+	float z = normal.z;
+
+	Y[0] = 1.f / 2.f * sqrt(1.f / PI);
+
+	Y[1] = sqrt(3.f / (4.f * PI)) * (-x);
+	Y[2] = sqrt(3.f / (4.f * PI)) * y;
+	Y[3] = sqrt(3.f / (4.f * PI)) * (-z);
+
+	Y[4] = 1.f / 2.f * sqrt(15.f / PI) * x * z;
+	Y[5] = 1.f / 2.f * sqrt(15.f / PI) * (-x * y);
+	Y[6] = 1.f / 4.f * sqrt(5.f / PI) * (3 * y * y - 1);
+	Y[7] = 1.f / 2.f * sqrt(15.f / PI) * (-y * z);
+	Y[8] = 1.f / 4.f * sqrt(15.f / PI) * (z * z - x * x);
+
+	Y[9] = -1.f / 8.f * sqrt(2.f * 35.f / PI) * x * (3 * z * z - x * x);
+	Y[10] = 1.f / 2.f * sqrt(105.f / PI) * (x * z * y);
+	Y[11] = -1.f / 8.f * sqrt(2.f * 21.f / PI) * x * (-1 + 5 * y * y);
+	Y[12] = 1.f / 4.f * sqrt(7.f / PI) * y * (5 * y * y - 3);
+	Y[13] = -1.f / 8.f * sqrt(2.f * 21.f / PI) * z* (-1 + 5 * y * y);
+	Y[14] = 1.f / 4.f * sqrt(105.f / PI) * (z * z - x * x) * y;
+	Y[15] = -1.f / 8.f * sqrt(2.f * 35.f / PI) * z * ( z * z - 3 * x * x);
+
+	Y[16] = 2.503343 * z * x * (z * z - x * x);
+	Y[17] = -1.770131 * x * y * (3.0 * z * z - x * x);
+	Y[18] = -0.946175 * z * x * (7.0 * y * y - 1.0);;
+	Y[19] = -0.669047 * x * y * (7.0 * y * y - 3.0);
+	Y[20] = 0.105786 * (35.0 * y*y * y*y - 30.0 * y*y + 3.0);
+	Y[21] = -0.669047 * z * y * (7.0 * y * y - 3.0);
+	Y[22] = 0.473087 * (z * z - x * x)* (7.0 * y * y - 1.0);
+	Y[23] = -1.770131 * z * y * (z * z - 3.0 * x * x);
+	Y[24] = 0.625836 * (z*z * (z*z - 3.0 * x*x) - x*x * (3.0 * z*z - x*x));
+	
+	return Y;
+}
+
+void testWriteHdrSkybox(Bitmap* cubemap)
+{
+	uint8_t* allData = cubemap->data_.data();
+
+	//unsigned char* mappedData = new unsigned char[imageSize];
+	//memcpy(mappedData, allData , static_cast<uint32_t>(imageSize));
+
+	uint32_t size = cubemap->w_ * cubemap->h_ * 4;
+	float* mappedData = new float[size];
+	for (int k = 0; k < 6; k++)
+	{
+		for (int i = 0; i < cubemap->w_; i++)
+		{
+			for (int j = 0; j < cubemap->h_; j++)
+			{
+				glm::vec4 pixData = cubemap->getPixel(i, j, k);
+
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 0) = pixData.r;
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 1) = pixData.g;
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 2) = pixData.b;
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 3) = pixData.a;
+			}
+		}
+
+		std::string savePtah = std::to_string(k) + ".hdr";
+		stbi_write_hdr(savePtah.c_str(), cubemap->w_, cubemap->h_, cubemap->comp_, (const float*)mappedData);
+	}
+}
+
+
 VkResult
 BufferManager::bufferCreateTextureCubeMap(
 	VkDevice device,
@@ -810,8 +909,116 @@ BufferManager::bufferCreateTextureCubeMap(
 
 	Bitmap in(imageData.texWidth, imageData.texHeight, 4, eBitmapFormat_Float, img32.data());
 	Bitmap out = cubemapUtils::convertEquirectangularMapToVerticalCross(in);
+	stbi_write_hdr("screenshot.hdr", out.w_, out.h_, out.comp_, (const float*)out.data_.data());
 
 	Bitmap cubemap = cubemapUtils::convertVerticalCrossToCubeMapFaces(out);
+
+
+	testWriteHdrSkybox(&cubemap);
+
+	//PRT
+	std::string path = pathToTexture + "/coefficients.txt";
+	std::ifstream ifs(path);
+	if(ifs)
+	{
+		int i = 0;
+		float r, g, b;
+		while (ifs >> r >> g >> b)
+		{
+			getRenderResource()->m_coefficient[i] = glm::vec3(r, g, b);
+			i++;
+		}
+	}
+	else
+	{
+		int pixelSize = (
+			cubemap.comp_ * Bitmap::getBytesPerComponent(cubemap.fmt_)
+			);
+
+		
+
+		int samplenum = 1000000;
+		std::vector<glm::vec3> pos(samplenum);
+		std::vector<glm::vec3> color(samplenum);
+
+		for (int i = 0; i < samplenum; i++)
+		{
+			// Position
+			
+			float x, y, z;
+			do {
+				x = NormalRandom();
+				y = NormalRandom();
+				z = NormalRandom();
+			} while (x == 0 && y == 0 && z == 0);
+			pos[i] = glm::vec3(x, y, z);
+			
+
+			// Sample Color
+			int index;
+			glm::vec2 uv;
+
+			float ax = std::abs(x);
+			float ay = std::abs(y);
+			float az = std::abs(z);
+
+			if (ax >= ay && ax >= az)	// x face
+			{
+				index = x >= 0 ? 0 : 1;
+				uv = {  z / x,  - y / ax };
+			}
+			else if (ay >= az)	// y face
+			{
+				index = y >= 0 ? 2 : 3;
+				uv = {  - x / ay, z /y };
+			}
+			else // z face
+			{
+				index = z >= 0 ? 4 : 5;
+				uv = {  - x / z,  - y / az };
+			}
+
+			uv = uv * 0.5f + 0.5f;
+
+
+			int w = (int)(uv[0] * (cubemap.w_ - 1));
+			int h = (int)(uv[1] * (cubemap.h_ - 1));
+
+			glm::vec4 pixData = cubemap.getPixel(w, h, index);
+				
+			color[i] = glm::vec3(pixData.r, pixData.g, pixData.b);
+		}
+
+
+		//Evaluate
+		int n = (5) * (5);
+		std::vector<glm::vec3> coefs = std::vector<glm::vec3>(n, glm::vec3());
+
+		for (int i = 0; i < samplenum; i++)
+		{
+			std::vector<float> Y = Basis(pos[i]);
+			for (int j = 0; j < n; j++)
+			{
+				coefs[j] = coefs[j] + Y[j] * color[i];
+			}
+		}
+		for (glm::vec3& coef : coefs)
+		{
+			coef = 4 * PI * coef / (float)samplenum;
+		}
+
+		int offset = 0;
+
+		std::ofstream coeffile(pathToTexture + "/coefficients.txt");
+		for (const glm::vec3& c : coefs)
+		{
+			coeffile << c.r << "\t" << c.g << "\t" << c.b << std::endl;
+			std::cout << "coef[" << offset << "] = " << coefs[offset].x << ", " << coefs[offset].y << ", " << coefs[offset].z << std::endl;
+			getRenderResource()->m_coefficient[offset] = coefs[offset];
+			offset++;
+		}
+	}
+
 
 
 	uint8_t* allData = cubemap.data_.data();
@@ -908,117 +1115,6 @@ BufferManager::bufferCreateTextureCubeMap(
 	return VK_SUCCESS;
 }
 
-/**
-* \brief Create an image that is also a cubemap
-*
-* \param[in] device Logical Vulkan device
-* \param[in] allocator VMA allocator
-* \param[in] graphicsQueue Device queue for submitting commands
-* \param[in] commandPool Command pool for allocating command bbuffers
-* \param[in] texCube The GLI cubemap information
-* \param[out] textureImage The new image
-* \param[out] textureImageAllocation VMA allocation information
-* \param[out] pFormat The image format (fixed)
-* \returns VK_SUCCESS or a Vulkan error code
-*
-*/
-//VkResult BufferManager::bufferCreateTexturecubeImage(VkDevice device, VmaAllocator allocator, VkQueue graphicsQueue, VkCommandPool commandPool,
-//								gli::texture_cube &texCube, VkImage *textureImage, VmaAllocation *textureImageAllocation,
-//								VkFormat *pFormat) {
-//
-//	VkDeviceSize imageSize = texCube.size();
-//	void *pixels = texCube.data();
-//
-//	*pFormat = VK_FORMAT_R8G8B8A8_UNORM;
-//	gli::texture::format_type type = texCube.format();
-//
-//	switch (type) {
-//	case gli::texture::format_type::FORMAT_RGBA_BP_UNORM_BLOCK16:
-//		*pFormat = VkFormat::VK_FORMAT_BC7_UNORM_BLOCK;
-//		break;
-//	case gli::texture::format_type::FORMAT_RGBA_DXT3_UNORM_BLOCK16:
-//		*pFormat = VkFormat::VK_FORMAT_BC2_UNORM_BLOCK;
-//		break;
-//	case gli::texture::format_type::FORMAT_RG_ATI2N_UNORM_BLOCK16:
-//		*pFormat = VkFormat::VK_FORMAT_BC5_UNORM_BLOCK;
-//		break;
-//	case gli::texture::format_type::FORMAT_R_ATI1N_UNORM_BLOCK8:
-//		*pFormat = VkFormat::VK_FORMAT_BC4_UNORM_BLOCK;
-//		break;
-//	case gli::texture::format_type::FORMAT_RGBA_DXT5_UNORM_BLOCK16:
-//		*pFormat = VkFormat::VK_FORMAT_BC3_UNORM_BLOCK;
-//		break;
-//	case gli::texture::format_type::FORMAT_RGBA_DXT1_UNORM_BLOCK8:
-//		*pFormat = VkFormat::VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
-//		break;
-//	}
-//
-//	if (!pixels) {
-//		assert(false);
-//		exit(1);
-//	}
-//
-//	uint32_t texWidth  = texCube.extent().x;
-//	uint32_t texHeight = texCube.extent().y;
-//	uint32_t mipLevels = (uint32_t)texCube.levels();
-//
-//	VkBuffer stagingBuffer;
-//	VmaAllocation stagingBufferAllocation;
-//	CHECKRESULT( BufferManager::bufferCreateBuffer(	allocator, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-//										VMA_MEMORY_USAGE_CPU_ONLY, &stagingBuffer, &stagingBufferAllocation ) );
-//
-//	void* mappedData;
-//	vmaMapMemory(allocator, stagingBufferAllocation, &mappedData);
-//	memcpy(mappedData, pixels, static_cast<uint32_t>(imageSize));
-//	vmaUnmapMemory(allocator, stagingBufferAllocation);
-//
-//	CHECKRESULT( BufferManager::bufferCreateImage(allocator, texWidth, texHeight, mipLevels, 6, *pFormat,
-//									VK_IMAGE_TILING_OPTIMAL,
-//									VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-//									VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
-//									textureImage, textureImageAllocation ) );
-//
-//	// Setup buffer copy regions for each face including all of it's miplevels
-//	std::vector<VkBufferImageCopy> bufferCopyRegions;
-//	uint32_t offset = 0;
-//
-//	for (uint32_t face = 0; face < 6; face++)
-//	{
-//		for (uint32_t level = 0; level < mipLevels; level++)
-//		{
-//			VkBufferImageCopy bufferCopyRegion = {};
-//			bufferCopyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-//			bufferCopyRegion.imageSubresource.mipLevel = level;
-//			bufferCopyRegion.imageSubresource.baseArrayLayer = face;
-//			bufferCopyRegion.imageSubresource.layerCount = 1;
-//			bufferCopyRegion.imageExtent.width = texCube[face][level].extent().x;
-//			bufferCopyRegion.imageExtent.height = texCube[face][level].extent().y;
-//			bufferCopyRegion.imageExtent.depth = 1;
-//			bufferCopyRegion.bufferOffset = offset;
-//
-//			bufferCopyRegions.push_back(bufferCopyRegion);
-//
-//			// Increase offset into staging buffer for next level / face
-//			offset += (uint32_t)texCube[face][level].size();
-//		}
-//	}
-//
-//	CHECKRESULT( BufferManager::bufferTransitionImageLayout(	device, graphicsQueue, commandPool, *textureImage,
-//												*pFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, 6,
-//												VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL));
-//
-//	CHECKRESULT(BufferManager::bufferCopyBufferToImage(	device, graphicsQueue, commandPool, stagingBuffer,
-//											*textureImage, bufferCopyRegions,
-//											static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight)));
-//
-//	CHECKRESULT(BufferManager::bufferTransitionImageLayout(	device, graphicsQueue, commandPool, *textureImage,
-//												*pFormat, VK_IMAGE_ASPECT_COLOR_BIT, mipLevels, 6,
-//												VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-//												VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
-//
-//	vmaDestroyBuffer(allocator, stagingBuffer, stagingBufferAllocation);
-//	return VK_SUCCESS;
-//}
 
 /**
 * \brief Create an image sampler for samplign textures in shaders

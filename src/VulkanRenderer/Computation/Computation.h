@@ -3,7 +3,7 @@
 #include <string>
 
 #include <vulkan/vulkan.h>
-#include <VMA/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
 #include "VulkanRenderer/Queue/QueueFamilyIndices.h"

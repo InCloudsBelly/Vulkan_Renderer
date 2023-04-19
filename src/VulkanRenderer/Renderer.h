@@ -6,7 +6,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include <VMA/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include "VulkanRenderer/Window/Window.h"
 #include "VulkanRenderer/GUI/GUI.h"

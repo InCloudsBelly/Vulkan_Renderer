@@ -1,6 +1,6 @@
 #pragma once
 
-#include <VMA/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 #include <glm/glm.hpp>
 #include <map>
 #include <array>

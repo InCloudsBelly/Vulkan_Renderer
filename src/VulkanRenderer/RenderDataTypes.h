@@ -7,7 +7,7 @@
 #include <functional>
 
 #include <vulkan/vulkan.h>
-#include <VMA/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include <glm/glm.hpp>
 

@@ -90,7 +90,7 @@ set(GLI_DIR "${PROJECT_LIBRARIES_DIR}/gli")
 add_subdirectory(${GLI_DIR} EXCLUDE_FROM_ALL)
 
 # - VMA
-set(VMA_DIR "${PROJECT_LIBRARIES_DIR}/VMA")
+set(VMA_DIR "${PROJECT_LIBRARIES_DIR}/VulkanMemoryAllocator")
 add_subdirectory(${VMA_DIR} EXCLUDE_FROM_ALL)
 
 # - Tracy

@@ -8,7 +8,7 @@
 #include <stb_image_write.h>
 
 #define VMA_IMPLEMENTATION 
-#include <VMA/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #define _USE_MATH_DEFINES
 #include <cmath>

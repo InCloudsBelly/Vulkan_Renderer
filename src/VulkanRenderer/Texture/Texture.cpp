@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <iostream>
 
-#include <VMA/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include "VulkanRenderer/Renderer.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"

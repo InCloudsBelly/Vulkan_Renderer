@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 #include <unordered_map>
-#include <VMA/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 class SkyBox
 {

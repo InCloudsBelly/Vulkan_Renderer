@@ -45,126 +45,18 @@ void DeferredRenderPass::createRenderPass()
     VkFormat depthBufferFormat = getRendererPointer()->getDepthImageInfo().depth_image_format;
     VkSampleCountFlagBits msaaSamplesCount = getRendererPointer()->getMSAAInfo().msaa_sampleCount;
 
+    VkExtent2D extent = getRendererPointer()->getSwapchainInfo().extent;
+    std::vector<ColorAttachmentInfo> colorAttachmentInfos =
+    {
+        {"position",            extent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_SAMPLE_COUNT_1_BIT},
+        {"normal",              extent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_SAMPLE_COUNT_1_BIT},
+        {"albedo",              extent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_SAMPLE_COUNT_1_BIT},
+        {"metallicRoughness",   extent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_SAMPLE_COUNT_1_BIT},
+        {"emissive",            extent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_SAMPLE_COUNT_1_BIT},
+        {"ao",                  extent, VK_FORMAT_R32G32B32A32_SFLOAT, VK_SAMPLE_COUNT_1_BIT},
 
-    m_attachmentPos = std::make_shared<NormalTexture>("position");
-    m_attachmentPos->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
-    m_attachmentPos->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_attachmentPos->getExtent(),
-        m_attachmentPos->getFormat(),
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        1,
-        1,
-        0,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_attachmentPos->getAllocation(),
-        m_attachmentPos
-    );
-
-    m_attachmentNormal = std::make_shared<NormalTexture>("normal");
-    m_attachmentNormal->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
-    m_attachmentNormal->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_attachmentNormal->getExtent(),
-        m_attachmentNormal->getFormat(),
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        1,
-        1,
-        0,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_attachmentNormal->getAllocation(),
-        m_attachmentNormal
-    );
-
-    m_attachmentAlbedo = std::make_shared<NormalTexture>("albedo");
-    m_attachmentAlbedo->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
-    m_attachmentAlbedo->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_attachmentAlbedo->getExtent(),
-        m_attachmentAlbedo->getFormat(),
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        1,
-        1,
-        0,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_attachmentAlbedo->getAllocation(),
-        m_attachmentAlbedo
-    );
-    m_attachmentMetallicRoughness = std::make_shared<NormalTexture>("metallicRoughness");
-    m_attachmentMetallicRoughness->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
-    m_attachmentMetallicRoughness->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_attachmentMetallicRoughness->getExtent(),
-        m_attachmentMetallicRoughness->getFormat(),
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        1,
-        1,
-        0,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_attachmentMetallicRoughness->getAllocation(),
-        m_attachmentMetallicRoughness
-    );
-
-    m_attachmentEmissiveColor = std::make_shared<NormalTexture>("emissive");
-    m_attachmentEmissiveColor->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
-    m_attachmentEmissiveColor->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_attachmentEmissiveColor->getExtent(),
-        m_attachmentEmissiveColor->getFormat(),
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        1,
-        1,
-        0,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_attachmentEmissiveColor->getAllocation(),
-        m_attachmentEmissiveColor
-    );
-
-    m_attachmentAO = std::make_shared<NormalTexture>("AO");
-    m_attachmentAO->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
-    m_attachmentAO->getFormat() = VK_FORMAT_R32G32B32A32_SFLOAT;
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_attachmentAO->getExtent(),
-        m_attachmentAO->getFormat(),
-        VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        1,
-        1,
-        0,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_attachmentAO->getAllocation(),
-        m_attachmentAO
-    );
-
+    };
+    createColorAttachments(colorAttachmentInfos);
 
     m_attachmentDepth = std::make_shared<NormalTexture>("depth");
     m_attachmentDepth->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
@@ -404,12 +296,12 @@ void DeferredRenderPass::createSwapchainFramebuffers()
 
         std::vector<VkImageView> attachments = {
             *getRendererPointer()->getSwapchainInfo().imageViews[i],
-            m_attachmentPos->getImageView(),
-            m_attachmentNormal->getImageView(),
-            m_attachmentAlbedo->getImageView(),
-            m_attachmentMetallicRoughness->getImageView(),
-            m_attachmentEmissiveColor->getImageView(),
-            m_attachmentAO->getImageView(),
+            m_colorAttachments[0]->getImageView(),
+            m_colorAttachments[1]->getImageView(),
+            m_colorAttachments[2]->getImageView(),
+            m_colorAttachments[3]->getImageView(),
+            m_colorAttachments[4]->getImageView(),
+            m_colorAttachments[5]->getImageView(),
             m_attachmentDepth->getImageView()
      
         };
@@ -456,35 +348,15 @@ void DeferredRenderPass::createSecondaryFeatures()
     m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap>(Config::PREF_ENV_MAP_DIM);
 
     getRenderResource()->updateIBLResource(m_BRDFlut, m_prefilteredIrradiance->get(), m_prefilteredEnvMap->get());
-
-}
-
-
-void DeferredRenderPass::createUniformBuffer(const std::shared_ptr<Model> modelPtr, std::vector<size_t>& uboSizeInfos)
-{
-    for (uint32_t meshIndex : modelPtr->getMeshIndices())
-    {
-        // create UBO PerMesh
-        m_ubosMap[meshIndex].resize(uboSizeInfos.size());
-        m_uboAllocationsMap[meshIndex].resize(uboSizeInfos.size());
-
-        for (uint32_t i = 0; i < uboSizeInfos.size(); ++i)
-        {
-            BufferManager::bufferCreateBuffer(
-                getRendererPointer()->getVmaAllocator(),
-                uboSizeInfos[i],
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                VMA_MEMORY_USAGE_CPU_TO_GPU,
-                &m_ubosMap[meshIndex][i],
-                &m_uboAllocationsMap[meshIndex][i]
-            );
-        }
-    }
 }
 
 
 void DeferredRenderPass::createPipelines()
 {
+    m_pipelines.resize(PIPELINE_NUM);
+    m_descriptorSetLayouts.resize(PIPELINE_NUM);
+    m_pipelineLayouts.resize(PIPELINE_NUM);
+
     //-------------------------------- Pipeline OffScreen --------------------------------------
     {
         const std::vector<DescriptorInfo>& descriptorInfo = GRAPHICS_PIPELINE::DEFERRED_OFF::DESCRIPTORS_INFO;
@@ -504,7 +376,7 @@ void DeferredRenderPass::createPipelines()
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout_Offscreen) != VK_SUCCESS)
+        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayouts[scene_gbuffer]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create descriptor set layout!");
 
 
@@ -560,10 +432,10 @@ void DeferredRenderPass::createPipelines()
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout_Offscreen;
+        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayouts[scene_gbuffer];
         pipelineLayoutInfo.pushConstantRangeCount = 0;
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
-        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout_Offscreen);
+        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayouts[scene_gbuffer]);
         if (status != VK_SUCCESS)
             throw std::runtime_error("Failed to create pipeline layout!");
 
@@ -585,13 +457,13 @@ void DeferredRenderPass::createPipelines()
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.pTessellationState = nullptr;
         pipelineInfo.pNext = nullptr;
-        pipelineInfo.layout = m_pipelineLayout_Offscreen;
+        pipelineInfo.layout = m_pipelineLayouts[scene_gbuffer];
         pipelineInfo.renderPass = m_renderPass.get();
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
         pipelineInfo.basePipelineIndex = -1;
 
-        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline_Offscreen);
+        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipelines[scene_gbuffer]);
         if (status != VK_SUCCESS)
             throw std::runtime_error("Failed to create graphics pipeline!");
 
@@ -620,7 +492,7 @@ void DeferredRenderPass::createPipelines()
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout_Onscreen) != VK_SUCCESS)
+        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayouts[composition]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create descriptor set layout!");
 
 
@@ -651,8 +523,8 @@ void DeferredRenderPass::createPipelines()
         std::vector<VkDynamicState> dynamicStateEnables = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
         VkPipelineDynamicStateCreateInfo dynamicState = PipelineManager::pipelineDynamicStateCreateInfo(dynamicStateEnables.data(), dynamicStateEnables.size());
 
-        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = PipelineManager::pipelineLayoutCreateInfo(&m_descriptorSetLayout_Onscreen);
-        vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayout_Onscreen);
+        VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = PipelineManager::pipelineLayoutCreateInfo(&m_descriptorSetLayouts[composition]);
+        vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutCreateInfo, nullptr, &m_pipelineLayouts[composition]);
 
 
         VkGraphicsPipelineCreateInfo pipelineInfo{};
@@ -669,13 +541,13 @@ void DeferredRenderPass::createPipelines()
         pipelineInfo.pDepthStencilState = &depthStencilState;
         pipelineInfo.pColorBlendState = &colorBlendState;
         pipelineInfo.pDynamicState = &dynamicState;
-        pipelineInfo.layout = m_pipelineLayout_Onscreen;
+        pipelineInfo.layout = m_pipelineLayouts[composition];
         pipelineInfo.renderPass = m_renderPass.get();
         pipelineInfo.subpass = 1;       // Important!!
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
         pipelineInfo.basePipelineIndex = -1;
 
-        auto status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline_Onscreen);
+        auto status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipelines[composition]);
 
         if (status != VK_SUCCESS)
             throw std::runtime_error("Failed to create graphics pipeline!");
@@ -710,9 +582,9 @@ void DeferredRenderPass::updateUBO(
             uboData1.proj = getRenderResource()->m_camera.getProjectionMatrix();
     
             void* data;
-            vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0], &data);
+            vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_meshesUBOAllocationMap[meshIndex][0], &data);
             memcpy(data, &uboData1, sizeof(uboData1));
-            vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0]);
+            vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_meshesUBOAllocationMap[meshIndex][0]);
         }
     }
 
@@ -725,9 +597,9 @@ void DeferredRenderPass::updateUBO(
         uboData.lightSpace = lightSpace;
 
         void* data;
-        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[0], &data);
+        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_compositionUBOAllocation[0], &data);
         memcpy(data, &uboData, sizeof(uboData) );
-        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[0]);
+        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_compositionUBOAllocation[0]);
     }
     
 
@@ -747,9 +619,9 @@ void DeferredRenderPass::updateUBO(
         }
 
         void* data;
-        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[1], &data);
+        vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_compositionUBOAllocation[1], &data);
         memcpy(data, &uboData, sizeof(uboData[0]) * 10);
-        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_screenUBOAllocation[1]);
+        vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_compositionUBOAllocation[1]);
     }
 }
 
@@ -772,7 +644,7 @@ void DeferredRenderPass::draw(uint32_t imageIndex, uint32_t currentFrame)
     // 第一子通道
     // 将场景的组件呈现给G-Buffer附件
     {
-        drawPipeline(commandBuffer, m_pipeline_Offscreen, m_pipelineLayout_Offscreen, getRenderResource()->m_normalModels);
+        drawPipeline(commandBuffer, m_pipelines[scene_gbuffer], m_pipelineLayouts[scene_gbuffer], getRenderResource()->m_normalModels);
     }
 
     // 第二子通道
@@ -780,8 +652,8 @@ void DeferredRenderPass::draw(uint32_t imageIndex, uint32_t currentFrame)
     {
         vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline_Onscreen);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout_Onscreen, 0, 1, &m_screenDescriptorSet, 0, NULL);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines[composition]);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayouts[composition], 0, 1, &m_compositionDescriptorSet, 0, NULL);
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
     
         m_lightSphere->draw(commandBuffer);
@@ -815,8 +687,8 @@ void DeferredRenderPass::createUBOs()
         sizeof(DescriptorTypes::UniformBufferObject::LightInfo) * 10
     };
    
-    m_screenUBO.resize(uboSizeInfo.size());
-    m_screenUBOAllocation.resize(uboSizeInfo.size());
+    m_compositionUBO.resize(uboSizeInfo.size());
+    m_compositionUBOAllocation.resize(uboSizeInfo.size());
 
     //Normal
     BufferManager::bufferCreateBuffer(
@@ -824,8 +696,8 @@ void DeferredRenderPass::createUBOs()
         uboSizeInfo[0],
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU,
-        &m_screenUBO[0],
-        &m_screenUBOAllocation[0]
+        &m_compositionUBO[0],
+        &m_compositionUBOAllocation[0]
     );
 
     //Lights
@@ -834,8 +706,8 @@ void DeferredRenderPass::createUBOs()
         uboSizeInfo[1],
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
         VMA_MEMORY_USAGE_CPU_TO_GPU,
-        &m_screenUBO[1],
-        &m_screenUBOAllocation[1]
+        &m_compositionUBO[1],
+        &m_compositionUBOAllocation[1]
     );
 
 }
@@ -846,15 +718,15 @@ void DeferredRenderPass::createDescriptorSets()
     {
         for (uint32_t meshIndex : ptr->getMeshIndices())
         {
-            m_descriptorSetsMap[meshIndex].resize(1);
+            m_meshesDescriptorSetMap[meshIndex].resize(1);
 
             //-------Pass offscreen -----------
             {
-                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout_Offscreen, &m_descriptorSetsMap[meshIndex][0]);
+                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[scene_gbuffer], &m_meshesDescriptorSetMap[meshIndex][scene_gbuffer]);
 
                 RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
 
-                VkDescriptorBufferInfo uniformBufferMVP = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex][0]);
+                VkDescriptorBufferInfo uniformBufferMVP = DescriptorManager::descriptorBufferInfo(m_meshesUBOMap[meshIndex][0]);
                 VkDescriptorImageInfo texDescriptorColor = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->colorTexture->getSampler(), renderMeshInfo.ref_material->colorTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 VkDescriptorImageInfo texDescriptorMR = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->metallic_RoughnessTexture->getSampler(), renderMeshInfo.ref_material->metallic_RoughnessTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 VkDescriptorImageInfo texDescriptorEmissive = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->emissiveTexture->getSampler(), renderMeshInfo.ref_material->emissiveTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -863,17 +735,17 @@ void DeferredRenderPass::createDescriptorSets()
                 
                 std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
                     // Binding 0: MVP
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferMVP),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferMVP),
                     // Binding 1: Position texture target
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptorColor),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptorColor),
                     // Binding 2: metallic & Rougness texture target
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texDescriptorMR),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texDescriptorMR),
                     // Binding 3: Emissive texture target
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texDescriptorEmissive),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texDescriptorEmissive),
                     // Binding 4: AO texture target
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texDescriptorAO),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texDescriptorAO),
                     // Binding 5: Normals texture target
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &texDescriptorNormal),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &texDescriptorNormal),
                 };
 
                 vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
@@ -883,16 +755,16 @@ void DeferredRenderPass::createDescriptorSets()
 
     //-------Pass onscreen -----------
     {
-        DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout_Onscreen, &m_screenDescriptorSet);
+        DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[composition], &m_compositionDescriptorSet);
 
-        VkDescriptorBufferInfo uniformBufferNormal = DescriptorManager::descriptorBufferInfo(m_screenUBO[0]);
-        VkDescriptorBufferInfo uniformBufferLights = DescriptorManager::descriptorBufferInfo(m_screenUBO[1]);
-        VkDescriptorImageInfo texDescriptorPosition = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentPos->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorNormal = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentNormal->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorAlbedo = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentAlbedo->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorMR = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentMetallicRoughness->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorEmissive = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentEmissiveColor->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorAO = DescriptorManager::descriptorImageInfo(VK_NULL_HANDLE, m_attachmentAO->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorBufferInfo uniformBufferNormal = DescriptorManager::descriptorBufferInfo(m_compositionUBO[0]);
+        VkDescriptorBufferInfo uniformBufferLights = DescriptorManager::descriptorBufferInfo(m_compositionUBO[1]);
+        VkDescriptorImageInfo texDescriptorPosition = DescriptorManager::descriptorImageInfo(   VK_NULL_HANDLE,m_colorAttachments[0]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorNormal = DescriptorManager::descriptorImageInfo(     VK_NULL_HANDLE,m_colorAttachments[1]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorAlbedo = DescriptorManager::descriptorImageInfo(     VK_NULL_HANDLE,m_colorAttachments[2]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorMR = DescriptorManager::descriptorImageInfo(         VK_NULL_HANDLE,m_colorAttachments[3]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorEmissive = DescriptorManager::descriptorImageInfo(   VK_NULL_HANDLE,m_colorAttachments[4]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        VkDescriptorImageInfo texDescriptorAO = DescriptorManager::descriptorImageInfo(         VK_NULL_HANDLE,m_colorAttachments[5]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         VkDescriptorImageInfo irradianceMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.irradiance->getSampler(), getRenderResource()->m_IBLResource.irradiance->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         VkDescriptorImageInfo BRDFlut = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.brdfLUT->getSampler(), getRenderResource()->m_IBLResource.brdfLUT->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -902,27 +774,27 @@ void DeferredRenderPass::createDescriptorSets()
 
         std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
             // Binding 0: Normal Info
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferNormal),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferNormal),
             // Binding 1: Lights
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferLights),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferLights),
             // Binding 2: Position texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, &texDescriptorPosition),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, &texDescriptorPosition),
             // Binding 3: Normals texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3, &texDescriptorNormal),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3, &texDescriptorNormal),
             // Binding 4: Albedo texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4, &texDescriptorAlbedo),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4, &texDescriptorAlbedo),
             // Binding 5: MR texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 5, &texDescriptorMR),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 5, &texDescriptorMR),
             // Binding 6: Emissive texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 6, &texDescriptorEmissive),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 6, &texDescriptorEmissive),
             // Binding 7: AO texture target
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 7, &texDescriptorAO),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 7, &texDescriptorAO),
 
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, &irradianceMap),
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9, &BRDFlut),
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10, &prefilteredEnvMap),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, &irradianceMap),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9, &BRDFlut),
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10, &prefilteredEnvMap),
 
-            DescriptorManager::writeDescriptorSet(m_screenDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 11,&shadowMap)
+            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 11,&shadowMap)
 
         };
 
@@ -931,36 +803,31 @@ void DeferredRenderPass::createDescriptorSets()
 }
 
 
-const RenderPass& DeferredRenderPass::getRenderPass() const
-{
-    return m_renderPass;
-}
-
-
 void DeferredRenderPass::destroy()
 {
     for (auto& framebuffer : m_swapchain_framebuffers)
         vkDestroyFramebuffer(getRendererPointer()->getDevice(), *framebuffer, nullptr);
 
-    for (auto& uboInfo : m_ubosMap)
+    for (auto& uboInfo : m_meshesUBOMap)
     {
         for (uint32_t i = 0; i < uboInfo.second.size(); ++i)
         {
-            vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), uboInfo.second[i], m_uboAllocationsMap[uboInfo.first][i]);
+            vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), uboInfo.second[i], m_meshesUBOAllocationMap[uboInfo.first][i]);
         }
     }
 
-    for(int i = 0 ; i < m_screenUBO.size(); i++)
-        vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(),m_screenUBO[i], m_screenUBOAllocation[i]);
+    for(int i = 0 ; i < m_compositionUBO.size(); i++)
+        vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(),m_compositionUBO[i], m_compositionUBOAllocation[i]);
 
 
-    m_attachmentAlbedo->destroy();
+    for (auto attachment : m_colorAttachments)
+        attachment->destroy();
+
     m_attachmentDepth->destroy();
-    m_attachmentNormal->destroy();
-    m_attachmentPos->destroy();
-    m_attachmentMetallicRoughness->destroy();
-    m_attachmentEmissiveColor->destroy();
-    m_attachmentAO->destroy();
+
+    m_BRDFlut->destroy();
+    m_prefilteredEnvMap->destroy();
+    m_prefilteredIrradiance->destroy();
 
     // ImGui
     m_GUI->destroy();
@@ -968,59 +835,13 @@ void DeferredRenderPass::destroy()
     m_skyBox->destroy();
     m_lightSphere->destroy();
 
-    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout_Offscreen, nullptr);
-    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline_Offscreen, nullptr);
-    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout_Offscreen, nullptr);
 
-    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout_Onscreen, nullptr);
-    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline_Onscreen, nullptr);
-    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout_Onscreen, nullptr);
-
-    m_BRDFlut->destroy();
-    m_prefilteredIrradiance->destroy();
-    m_prefilteredEnvMap->destroy();
-
-
-    m_renderPass.destroy();
-}
-
-
-void DeferredRenderPass::drawPipeline(const VkCommandBuffer& commandBuffer, const VkPipeline& pipeline, const VkPipelineLayout& pipelineLayout, std::vector<std::shared_ptr<Model>> models)
-{
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-    // Set Dynamic States
-    VkViewport viewport{ 0.0f, 0.0f, m_extent.width,m_extent.height, 0.0f, 1.0f };
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{ {0,0}, {m_extent.width,m_extent.height} };
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    for (auto& ptr : models)
+    for (int i = 0; i < PIPELINE_NUM; i++)
     {
-        if (ptr->isHidden() == false)
-        {
-            for (uint32_t meshIndex : ptr->getMeshIndices())
-            {
-                RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
-
-                std::vector<VkDeviceSize> offsets = { 0 };
-                vkCmdBindVertexBuffers(commandBuffer, 0, 1, renderMeshInfo.ref_mesh->vertexBuffer, offsets.data());
-                vkCmdBindIndexBuffer(commandBuffer, *renderMeshInfo.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-                const std::vector<VkDescriptorSet> sets = { getMeshDescriptorSet(meshIndex) };
-                vkCmdBindDescriptorSets(
-                    commandBuffer,
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    pipelineLayout,
-                    0,
-                    sets.size(), sets.data(),
-                    0, {}
-                );
-
-                vkCmdDrawIndexed(commandBuffer, renderMeshInfo.ref_mesh->meshIndexCount, 1, 0, 0, 0);
-            }
-        }
+        vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayouts[i], nullptr);
+        vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipelines[i], nullptr);
+        vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayouts[i], nullptr);
     }
+  
+    m_renderPass.destroy();
 }

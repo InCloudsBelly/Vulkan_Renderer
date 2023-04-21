@@ -27,6 +27,7 @@
 #include "VulkanRenderer/RenderResource.h"
 #include "VulkanRenderer/InputManager.h"
 
+#include "VulkanRenderer/Scene/ScenePassBase.h"
 #include "VulkanRenderer/Scene/ForwardPBR.h"
 #include "VulkanRenderer/Scene/DeferredRenderPass.h"
 #include "VulkanRenderer/Scene/Spherical_Harmonic_Lighting.h"
@@ -116,8 +117,8 @@ private:
 	std::shared_ptr<Swapchain>          m_swapchain;
 	
 	//std::unique_ptr<DeferredRenderPass>			m_scene;
-	//std::unique_ptr<ForwardPBRPass>			m_scene;
-	std::unique_ptr<SHLightingPass>			m_scene;
+	std::unique_ptr<ScenePassBase>			m_scene;
+	//std::unique_ptr<SHLightingPass>			m_scene;
 
 	//std::vector<VkCommandPool>			m_commandPools = {}; ///<Array of command pools so that each thread in the thread pool has its own pool
 	//std::vector<VkCommandBuffer>		m_commandBuffers = {}; ///<the main command buffers for recording draw commands

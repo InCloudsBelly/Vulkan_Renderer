@@ -178,32 +178,13 @@ void SHLightingPass::createSecondaryFeatures()
     
 }
 
-void SHLightingPass::createUniformBuffer(const std::shared_ptr<Model> modelPtr, std::vector<size_t>& uboSizeInfos)
-{
-    for (uint32_t meshIndex : modelPtr->getMeshIndices())
-    {
-        // create UBO PerMesh
-        m_ubosMap[meshIndex].resize(uboSizeInfos.size());
-        m_uboAllocationsMap[meshIndex].resize(uboSizeInfos.size());
-
-        for (uint32_t i = 0; i < uboSizeInfos.size(); ++i)
-        {
-            BufferManager::bufferCreateBuffer(
-                getRendererPointer()->getVmaAllocator(),
-                uboSizeInfos[i],
-                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                VMA_MEMORY_USAGE_CPU_TO_GPU,
-                &m_ubosMap[meshIndex][i],
-                &m_uboAllocationsMap[meshIndex][i]
-            );
-        }
-    }
-}
-
-
 
 void SHLightingPass::createPipelines()
 {
+    m_pipelines.resize(PipelineIndex::PIPELINE_NUM);
+    m_descriptorSetLayouts.resize(PipelineIndex::PIPELINE_NUM);
+    m_pipelineLayouts.resize(PipelineIndex::PIPELINE_NUM);
+
     VkSampleCountFlagBits msaaSamplesCount = getRendererPointer()->getMSAAInfo().msaa_sampleCount;
 
     //-------------------------------- PBR Pipeline --------------------------------------
@@ -225,7 +206,7 @@ void SHLightingPass::createPipelines()
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayout) != VK_SUCCESS)
+        if (vkCreateDescriptorSetLayout(getRendererPointer()->getDevice(), &layoutInfo, nullptr, &m_descriptorSetLayouts[PipelineIndex::main_pipeline]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create descriptor set layout!");
 
 
@@ -273,10 +254,10 @@ void SHLightingPass::createPipelines()
         VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
         pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         pipelineLayoutInfo.setLayoutCount = 1;
-        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayout;
+        pipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayouts[PipelineIndex::main_pipeline];
         pipelineLayoutInfo.pushConstantRangeCount = 0;
         pipelineLayoutInfo.pPushConstantRanges = nullptr;
-        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayout);
+        auto status = vkCreatePipelineLayout(getRendererPointer()->getDevice(), &pipelineLayoutInfo, nullptr, &m_pipelineLayouts[PipelineIndex::main_pipeline]);
         if (status != VK_SUCCESS)
             throw std::runtime_error("Failed to create pipeline layout!");
 
@@ -297,13 +278,13 @@ void SHLightingPass::createPipelines()
         pipelineInfo.pDynamicState = &dynamicState;
         pipelineInfo.pTessellationState = nullptr;
         pipelineInfo.pNext = nullptr;
-        pipelineInfo.layout = m_pipelineLayout;
+        pipelineInfo.layout = m_pipelineLayouts[PipelineIndex::main_pipeline];
         pipelineInfo.renderPass = m_renderPass.get();
         pipelineInfo.subpass = 0;
         pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
         pipelineInfo.basePipelineIndex = -1;
 
-        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline);
+        status = vkCreateGraphicsPipelines(getRendererPointer()->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipelines[PipelineIndex::main_pipeline]);
         if (status != VK_SUCCESS)
             throw std::runtime_error("Failed to create graphics pipeline!");
 
@@ -348,9 +329,9 @@ void SHLightingPass::updateUBO(
                 uboData1.lightsCount = uboInfo.lightsCount;
 
                 void* data;
-                vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0], &data);
+                vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_meshesUBOAllocationMap[meshIndex][0], &data);
                 memcpy(data, &uboData1, sizeof(uboData1));
-                vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][0]);
+                vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_meshesUBOAllocationMap[meshIndex][0]);
             }
 
             // SH UBOs
@@ -363,9 +344,9 @@ void SHLightingPass::updateUBO(
                 }
 
                 void* data;
-                vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][1], &data);
+                vmaMapMemory(getRendererPointer()->getVmaAllocator(), m_meshesUBOAllocationMap[meshIndex][1], &data);
                 memcpy(data, &coefficentData, sizeof(coefficentData[0]) * Config::SH_COEF_NUM);
-                vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_uboAllocationsMap[meshIndex][1]);
+                vmaUnmapMemory(getRendererPointer()->getVmaAllocator(), m_meshesUBOAllocationMap[meshIndex][1]);
             }
         }
     }
@@ -386,7 +367,7 @@ void SHLightingPass::draw(uint32_t imageIndex, uint32_t currentFrame)
     VkExtent2D extent = getRendererPointer()->getSwapchainInfo().extent;
     m_renderPass.begin(*m_swapchain_framebuffers[imageIndex], extent, m_clearValues, commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
-    drawPipeline(commandBuffer, m_pipeline, m_pipelineLayout, getRenderResource()->m_normalModels);
+    drawPipeline(commandBuffer, m_pipelines[PipelineIndex::main_pipeline], m_pipelineLayouts[PipelineIndex::main_pipeline], getRenderResource()->m_normalModels);
 
     m_skyBox->draw(commandBuffer);
 
@@ -418,15 +399,15 @@ void SHLightingPass::createDescriptorSets()
     {
         for (uint32_t meshIndex : ptr->getMeshIndices())
         {
-            m_descriptorSetsMap[meshIndex].resize(1);
+            m_meshesDescriptorSetMap[meshIndex].resize(1);
 
             {
-                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSetsMap[meshIndex][0]);
+                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[PipelineIndex::main_pipeline], &m_meshesDescriptorSetMap[meshIndex][0]);
 
                 RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
 
-                VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex][0]);
-                VkDescriptorBufferInfo uniformBufferSHcoefficientInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex][1]);
+                VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_meshesUBOMap[meshIndex][0]);
+                VkDescriptorBufferInfo uniformBufferSHcoefficientInfo = DescriptorManager::descriptorBufferInfo(m_meshesUBOMap[meshIndex][1]);
 
 
                 // SH Lighting with PBR info semms to be 
@@ -441,16 +422,16 @@ void SHLightingPass::createDescriptorSets()
 
 
                 std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferSHcoefficientInfo),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferSHcoefficientInfo),
 
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &baseColor),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &metallicRoughness),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &emissiveColor),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &AO),
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, &normal),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &baseColor),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &metallicRoughness),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &emissiveColor),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &AO),
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, &normal),
 
-                    DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 7,&SHBRDFlut)
+                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][0], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 7,&SHBRDFlut)
                 };
 
                 vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
@@ -460,22 +441,16 @@ void SHLightingPass::createDescriptorSets()
 }
 
 
-const RenderPass& SHLightingPass::getRenderPass() const
-{
-    return m_renderPass;
-}
-
-
 void SHLightingPass::destroy()
 {
     for (auto& framebuffer : m_swapchain_framebuffers)
         vkDestroyFramebuffer(getRendererPointer()->getDevice(), *framebuffer, nullptr);
 
-    for (auto& uboInfo : m_ubosMap)
+    for (auto& uboInfo : m_meshesUBOMap)
     {
         for (uint32_t i = 0; i < uboInfo.second.size(); ++i)
         {
-            vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), uboInfo.second[i], m_uboAllocationsMap[uboInfo.first][i]);
+            vmaDestroyBuffer(getRendererPointer()->getVmaAllocator(), uboInfo.second[i], m_meshesUBOAllocationMap[uboInfo.first][i]);
         }
     }
 
@@ -483,9 +458,9 @@ void SHLightingPass::destroy()
     m_GUI->destroy();
     m_skyBox->destroy();
 
-    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayout, nullptr);
-    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);
-    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout, nullptr);
+    vkDestroyDescriptorSetLayout(getRendererPointer()->getDevice(), m_descriptorSetLayouts[PipelineIndex::main_pipeline], nullptr);
+    vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipelines[PipelineIndex::main_pipeline], nullptr);
+    vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayouts[PipelineIndex::main_pipeline], nullptr);
 
     m_renderPass.destroy();
 }
@@ -498,44 +473,4 @@ void SHLightingPass::loadSHBRDFlut()
     TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4 };
 
     getRenderResource()->m_SHBRDFlut = std::make_shared<NormalTexture>(TextureName, std::string(MODEL_DIR) + info.folderName, info.format);
-}
-
-void SHLightingPass::drawPipeline(const VkCommandBuffer& commandBuffer, const VkPipeline& pipeline, const VkPipelineLayout& pipelineLayout, std::vector<std::shared_ptr<Model>> models)
-{
-
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
-
-    // Set Dynamic States
-    VkViewport viewport{ 0.0f, 0.0f, m_extent.width,m_extent.height, 0.0f, 1.0f };
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{ {0,0}, {m_extent.width,m_extent.height} };
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    for (auto& ptr : models)
-    {
-        if (ptr->isHidden() == false)
-        {
-            for (uint32_t meshIndex : ptr->getMeshIndices())
-            {
-                RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
-
-                std::vector<VkDeviceSize> offsets = { 0 };
-                vkCmdBindVertexBuffers(commandBuffer, 0, 1, renderMeshInfo.ref_mesh->vertexBuffer, offsets.data());
-                vkCmdBindIndexBuffer(commandBuffer, *renderMeshInfo.ref_mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-                const std::vector<VkDescriptorSet> sets = { getMeshDescriptorSet(meshIndex) };
-                vkCmdBindDescriptorSets(
-                    commandBuffer,
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    pipelineLayout,
-                    0,
-                    sets.size(), sets.data(),
-                    0, {}
-                );
-
-                vkCmdDrawIndexed(commandBuffer, renderMeshInfo.ref_mesh->meshIndexCount, 1, 0, 0, 0);
-            }
-        }
-    }
 }

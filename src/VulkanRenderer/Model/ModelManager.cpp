@@ -3,6 +3,7 @@
 #include "VulkanRenderer/Renderer.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
 
+
 #include <stdexcept>
 
 Model::Model(
@@ -41,6 +42,8 @@ void Model::loadModel(const char* pathToModel)
     }
     processNode(scene->mRootNode, scene);
 }
+
+
 
 void Model::processNode(aiNode* node, const aiScene* scene)
 {
@@ -230,13 +233,18 @@ void Model::upload(const VkCommandPool& commandPool, const VkQueue& graphicsQueu
             renderMeshInfo.ref_material = new MaterialInfo;
             MaterialInfo* materialInfo = renderMeshInfo.ref_material;
 
-            materialInfo->colorTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[0].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[0].folderName, m_materialData[meshIndex].info[0].format);
-            materialInfo->metallic_RoughnessTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[1].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[1].folderName, m_materialData[meshIndex].info[1].format);
-            materialInfo->emissiveTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[2].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[2].folderName, m_materialData[meshIndex].info[2].format);
-            materialInfo->AOTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[3].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[3].folderName, m_materialData[meshIndex].info[3].format);
-            materialInfo->normalTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[4].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[4].folderName, m_materialData[meshIndex].info[4].format);
+            //materialInfo->colorTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[0].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[0].folderName, m_materialData[meshIndex].info[0].format);
+            //materialInfo->metallic_RoughnessTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[1].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[1].folderName, m_materialData[meshIndex].info[1].format);
+            //materialInfo->emissiveTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[2].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[2].folderName, m_materialData[meshIndex].info[2].format);
+            //materialInfo->AOTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[3].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[3].folderName, m_materialData[meshIndex].info[3].format);
+            //materialInfo->normalTexture = std::make_shared<NormalTexture>(m_materialData[meshIndex].info[4].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[4].folderName, m_materialData[meshIndex].info[4].format);
 
 
+            materialInfo->colorTexture = loadTexture(m_materialData[meshIndex].info[0].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[0].folderName, m_materialData[meshIndex].info[0].format);
+            materialInfo->metallic_RoughnessTexture = loadTexture(m_materialData[meshIndex].info[1].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[1].folderName, m_materialData[meshIndex].info[1].format);
+            materialInfo->emissiveTexture = loadTexture(m_materialData[meshIndex].info[2].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[2].folderName, m_materialData[meshIndex].info[2].format);
+            materialInfo->AOTexture = loadTexture(m_materialData[meshIndex].info[3].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[3].folderName, m_materialData[meshIndex].info[3].format);
+            materialInfo->normalTexture = loadTexture(m_materialData[meshIndex].info[4].name, std::string(MODEL_DIR) + m_materialData[meshIndex].info[4].folderName, m_materialData[meshIndex].info[4].format);
 
             m_materialData[meshIndex].info.clear();
             m_materialData[meshIndex].info.shrink_to_fit();
@@ -246,15 +254,12 @@ void Model::upload(const VkCommandPool& commandPool, const VkQueue& graphicsQueu
     if (m_type == ModelType::SKYBOX)
     {
         TextureToLoadInfo info = { m_fileName, m_folderName, VK_FORMAT_R32G32B32A32_SFLOAT, 4 };
-        getRenderResource()->m_skyboxCubeMap = (std::make_shared<CubeMapTexture>(info.name, info.folderName, info.format));
+        getRenderResource()->m_skyboxCubeMap = (loadCubeMap(info.name, info.folderName, info.format));
     }
     else if (m_type == ModelType::LIGHT)
     {
         const TextureToLoadInfo info = { "DefaultTexture.png", "defaultTextures",VK_FORMAT_R8G8B8A8_SRGB , 4 };
-        getRenderResource()->m_defaultTexture = (std::make_shared<NormalTexture>(info.name, std::string(MODEL_DIR) + info.folderName, info.format));
+        getRenderResource()->m_defaultTexture = (loadTexture(info.name, std::string(MODEL_DIR) + info.folderName, info.format));
     }
-
 }
-
-
 

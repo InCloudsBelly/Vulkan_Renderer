@@ -1,7 +1,7 @@
 // Code from:
 // https://github.com/PacktPublishing/3D-Graphics-Rendering-Cookbook/blob/master/shared/UtilsCubemap.h
 
-#include "VulkanRenderer/Texture/cubemapUtils.h"
+#include "VulkanRenderer/Image/Utils/cubemapUtils.h"
 
 #include <algorithm>
 #include <string>
@@ -108,6 +108,35 @@ Bitmap cubemapUtils::convertEquirectangularMapToVerticalCross(const Bitmap& b)
 	return result;
 }
 
+void testWriteHdrSkybox(Bitmap* cubemap)
+{
+	uint8_t* allData = cubemap->data_.data();
+
+	//unsigned char* mappedData = new unsigned char[imageSize];
+	//memcpy(mappedData, allData , static_cast<uint32_t>(imageSize));
+
+	uint32_t size = cubemap->w_ * cubemap->h_ * 4;
+	float* mappedData = new float[size];
+	for (int k = 0; k < 6; k++)
+	{
+		for (int i = 0; i < cubemap->w_; i++)
+		{
+			for (int j = 0; j < cubemap->h_; j++)
+			{
+				glm::vec4 pixData = cubemap->getPixel(i, j, k);
+
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 0) = pixData.r;
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 1) = pixData.g;
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 2) = pixData.b;
+				*(mappedData + 4 * (j * cubemap->w_ + i) + 3) = pixData.a;
+			}
+		}
+
+		std::string savePtah = std::to_string(k) + ".hdr";
+		stbi_write_hdr(savePtah.c_str(), cubemap->w_, cubemap->h_, cubemap->comp_, (const float*)mappedData);
+	}
+}
+
 Bitmap cubemapUtils::convertVerticalCrossToCubeMapFaces(const Bitmap& b)
 {
 	const int faceWidth = b.w_ / 3;
@@ -189,6 +218,7 @@ Bitmap cubemapUtils::convertVerticalCrossToCubeMapFaces(const Bitmap& b)
 			}
 		}
 	}
+	testWriteHdrSkybox(&cubemap);
 
 	return cubemap;
 }

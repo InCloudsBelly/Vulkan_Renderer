@@ -37,6 +37,10 @@
 #include <assimp/scene.h>
 
 
+#define CHECKRESULT(x) { \
+        VkResult retval = (x); \
+        assert (retval == VK_SUCCESS); \
+    }
 
 ///need only for start up
 struct SwapChainSupportDetails
@@ -45,3 +49,4 @@ struct SwapChainSupportDetails
 	std::vector<VkSurfaceFormatKHR> formats; ///<Surface formats available
 	std::vector<VkPresentModeKHR> presentModes; ///<Possible present modes
 };
+

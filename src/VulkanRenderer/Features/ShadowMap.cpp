@@ -39,31 +39,29 @@ ShadowMap::ShadowMap(
     m_clearValuesShadowMap[0].depthStencil.stencil = 0.0f;
     m_clearValuesShadowMap[1].depthStencil.stencil = 0.0f;
 
-    m_texture = std::make_shared<NormalTexture>("ShadowMap");
-    m_texture->getFormat() = format;
-    m_texture->getExtent() = VkExtent2D({m_width,m_height});
 
-    BufferManager::bufferCreateDepthResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        getRendererPointer()->getCommandPool(),
-        m_texture->getExtent(),
+    m_image  = Image::Create2DImage(
+        VkExtent2D({ m_width,m_height }),
         format,
-        VK_SAMPLE_COUNT_1_BIT,
-        &m_texture->getImage(),
-        &m_texture->getAllocation(),
-        &m_texture->getImageView()
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_SAMPLE_COUNT_1_BIT
     );
 
-
-    BufferManager::bufferCreateTextureSampler(
-        getRendererPointer()->getDevice(),
-        1,
-        VK_FILTER_LINEAR,
-        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        &m_texture->getSampler()
+    m_imageSampler = new ImageSampler(
+        VK_FILTER_NEAREST,
+        VK_FILTER_NEAREST,
+        VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+        16,
+        VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        1
     );
+
 
     createRenderPass(format);
     createFramebuffer(imagesCount);
@@ -286,21 +284,21 @@ const VkCommandBuffer& ShadowMap::getCommandBuffer(const uint32_t index) const
     return m_commandBuffers[index];
 }
 
-const std::shared_ptr<TextureBase> ShadowMap::get() const
+Image* ShadowMap::getImage() const
 {
-    return m_texture;
+    return m_image;
 }
 
 
 const VkImageView& ShadowMap::getShadowMapView() const
 {
-    return m_texture->getImageView();
+    return m_image->getImageView();
 }
 
 
-const VkSampler& ShadowMap::getSampler() const
+ VkSampler& ShadowMap::getSampler() const
 {
-    return m_texture->getSampler();
+    return m_imageSampler->getSampler();
 }
 
 const VkFramebuffer& ShadowMap::getFramebuffer(const uint32_t imageIndex) const
@@ -332,7 +330,7 @@ void ShadowMap::createFramebuffer(const uint32_t& imagesCount)
 {
 
     m_framebuffers.resize(imagesCount);
-    std::vector<VkImageView> attachments = { m_texture->getImageView() };
+    std::vector<VkImageView> attachments = { m_image->getImageView() };
 
     for (uint32_t i = 0; i < imagesCount; i++)
     {
@@ -390,9 +388,8 @@ void ShadowMap::destroy()
     vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);
     vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout, nullptr);
 
-
-    m_texture->destroy();
-
+    m_image->destroy();
+    m_imageSampler->destroy();
 
     for (auto& uboInfo : m_ubosMap)
     {

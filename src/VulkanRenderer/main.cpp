@@ -106,7 +106,7 @@ int main()
 
 
         // SCENE 2
-        {
+       /* {
             app.addSkybox("neonStudio.hdr", "NeonStudio");
 
             app.addObjectPBR(
@@ -127,33 +127,33 @@ int main()
                 glm::fvec3(1.461f, 2.619f, 57.457f),
                 glm::fvec3(0.125f)
             );
-        }
+        }*/
 
 
         // SCENE 3 Simple SH Lighting Scene
-        //{
-        //    //app.addSkybox("sky.hdr", "DaySky");
-        //    //app.addSkybox("countryClub.hdr", "CountryClub");
-        //    app.addSkybox("neonStudio.hdr", "NeonStudio");
-        //    app.addObjectPBR(
-        //        "stanford-bunny",
-        //        "stanford-bunny",
-        //        "stanford-bunny.obj",
-        //        glm::fvec3(0.0f),
-        //        glm::fvec3(0.0f),
-        //        glm::fvec3(1.0f)
-        //    );
+        {
+            //app.addSkybox("sky.hdr", "DaySky");
+            //app.addSkybox("countryClub.hdr", "CountryClub");
+            app.addSkybox("neonStudio.hdr", "NeonStudio");
+            app.addObjectPBR(
+                "stanford-bunny",
+                "stanford-bunny",
+                "stanford-bunny.obj",
+                glm::fvec3(0.0f),
+                glm::fvec3(0.0f),
+                glm::fvec3(1.0f)
+            );
 
-        //    app.addDirectionalLight(
-        //        "Sun",
-        //        "lightSphereDefault",
-        //        "lightSphere.obj",
-        //        glm::fvec3(1.0f),
-        //        glm::fvec3(1.0f, 32.18f, -49.0f),
-        //        glm::fvec3(1.461f, 2.619f, 57.457f),
-        //        glm::fvec3(0.125f)
-        //    );
-        //}
+            app.addDirectionalLight(
+                "Sun",
+                "lightSphereDefault",
+                "lightSphere.obj",
+                glm::fvec3(1.0f),
+                glm::fvec3(1.0f, 32.18f, -49.0f),
+                glm::fvec3(1.461f, 2.619f, 57.457f),
+                glm::fvec3(0.125f)
+            );
+        }
  
 
         app.run();

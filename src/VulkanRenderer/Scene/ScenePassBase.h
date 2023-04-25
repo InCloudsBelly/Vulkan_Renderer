@@ -13,12 +13,18 @@
 #include "VulkanRenderer/Computation/Computation.h"
 #include "VulkanRenderer/Features/PrefilteredEnvMap.h"
 #include "VulkanRenderer/Features/PreIrradiance.h"
+#include "VulkanRenderer/Descriptor/DescriptorSet.h"
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
+#include "VulkanRenderer/Command/CommandManager.h"
+#include "VulkanRenderer/Buffer/BufferManager.h"
+#include "VulkanRenderer/Pipeline/PipelineManager.h"
+#include "VulkanRenderer/Shader/ShaderManager.h"
 #include "VulkanRenderer/Model/ModelManager.h"
 
 #include "VulkanRenderer/RenderDataTypes.h"
-#include "VulkanRenderer/Texture/Texture.h"
+
+#include "VulkanRenderer/Image/Image.h"
 
 #include "VulkanRenderer/GUI/GUI.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
@@ -49,15 +55,16 @@ public:
 	
 	const VkFramebuffer& getSwapchainFramebuffer(uint32_t index) const { return *m_swapchain_framebuffers[index]; }
 
-	const std::vector<VkDescriptorSet>& getMeshDescriptorSet(uint32_t meshIndex) const
+
+	const VkDescriptorSet& getMeshDescriptorSet(uint32_t meshIndex) 
 	{
 		auto iter = m_meshesDescriptorSetMap.find(meshIndex);
 		if (iter != m_meshesDescriptorSetMap.end())
 		{
-			return iter->second;
+			return iter->second.get();
 		}
 		else
-			return {};
+			return VkDescriptorSet();
 
 	}
 
@@ -99,11 +106,13 @@ protected:
 	std::unique_ptr<GUI>				m_GUI;
 
 
-	std::vector<std::shared_ptr<TextureBase>>	m_colorAttachments;
-	std::shared_ptr<TextureBase>				m_depthAttacment;
+
+	std::vector<Image*>							m_colorAttachments;
+	Image*										m_depthAttacment;
 
 	std::unordered_map<uint32_t, std::vector<VkBuffer>>			m_meshesUBOMap;
 	std::unordered_map<uint32_t, std::vector<VmaAllocation>>	m_meshesUBOAllocationMap;
-	std::unordered_map<uint32_t, std::vector<VkDescriptorSet>>	m_meshesDescriptorSetMap;
+	std::unordered_map<uint32_t, DescriptorSet>					m_meshesDescriptorSetMap;
+
 
 };

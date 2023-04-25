@@ -41,8 +41,8 @@
 #include "VulkanRenderer/Descriptor/DescriptorTypes.h"
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
 
-#include "VulkanRenderer/Texture/Texture.h"
-#include "VulkanRenderer/Texture/Texture.h"
+
+
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
@@ -76,9 +76,9 @@ void Renderer::run()
     initVulkan();
 
     // -------------------------------Main Pass-----------------------------------
-    m_scene = std::make_unique<DeferredRenderPass>();
+    //m_scene = std::make_unique<DeferredRenderPass>();
     //m_scene = std::make_unique<ForwardPBRPass>();
-    //m_scene = std::make_unique<SHLightingPass>();
+    m_scene = std::make_unique<SHLightingPass>();
     // ---------------------------------------------------------------------------
 
     doComputations();
@@ -362,7 +362,7 @@ void Renderer::destroySyncObjects()
         vkDestroyFence(m_device->getLogicalDevice(), m_inFlightFences[i], nullptr);
     }
 }
-
+ 
 void Renderer::cleanup()
 {
 #ifdef RELEASE_MODE_ON

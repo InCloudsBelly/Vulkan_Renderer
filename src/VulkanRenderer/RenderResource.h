@@ -9,7 +9,8 @@
 
 #include "VulkanRenderer/Model/ModelManager.h"
 
-#include "VulkanRenderer/Texture/Texture.h"
+
+#include "VulkanRenderer/Image/Image.h"
 #include "VulkanRenderer/Guid_Allocator.h"
 #include "VulkanRenderer/RenderDataTypes.h"
 #include "VulkanRenderer/Settings/Config.h"
@@ -21,9 +22,9 @@
 
 struct IBLResource
 {
-    std::shared_ptr<TextureBase> brdfLUT;
-    std::shared_ptr<TextureBase> irradiance;
-    std::shared_ptr<TextureBase> prefiltered_Env;
+    Texture brdfLUT;
+    Texture irradiance;
+    Texture prefiltered_Env;
 };
 
 struct UniformBuffer
@@ -66,17 +67,13 @@ struct MeshInfo
 
 struct MaterialInfo
 {
-    std::shared_ptr<TextureBase> colorTexture;
-    std::shared_ptr<TextureBase> metallic_RoughnessTexture;
-    std::shared_ptr<TextureBase> emissiveTexture;
-    std::shared_ptr<TextureBase> AOTexture;
-    std::shared_ptr<TextureBase> normalTexture;
+
+    Texture colorTexture;
+    Texture metallic_RoughnessTexture;
+    Texture emissiveTexture;
+    Texture AOTexture;
+    Texture normalTexture;
     
-    //VkBuffer*       materialUBO;
-    //VmaAllocation   materialUBOAllocation;
-
-    //VkDescriptorSet* materialDescriptorSet;
-
 };
 
 // nodes
@@ -127,7 +124,7 @@ public:
     void loadModel(const uint32_t startI, const uint32_t chunckSize, const std::vector<ModelInfo>& modelsToLoadInfo);
     void uploadModels(const VkQueue& graphicsQueue, const VkCommandPool& commandPool);
 
-    void updateIBLResource(std::shared_ptr<TextureBase> brdfLUT, std::shared_ptr<TextureBase> Irradiance, std::shared_ptr<TextureBase> Env);
+    void RenderResource::updateIBLResource(Texture brdfLUT, Texture irradiance, Texture env);
 
     void destroy();
 
@@ -140,8 +137,9 @@ public:
     Camera                                              m_camera;
 
     std::unordered_map<uint32_t, RenderMeshInfo>        m_meshInfoMap;
-    std::shared_ptr<TextureBase>                        m_skyboxCubeMap;
-    std::shared_ptr<TextureBase>                        m_defaultTexture;
+
+    Texture                                             m_skyboxCubeMap;
+    Texture                                             m_defaultTexture;
 
     uint32_t                                            m_defaultCubeMeshIndex = 0;
     uint32_t                                            m_lightSphericalMeshIndex = 0;
@@ -162,6 +160,6 @@ public:
     std::shared_ptr<PrefilteredEnvMap>                 m_prefilteredEnv;
 
     //SH
-    std::shared_ptr<NormalTexture>			            m_SHBRDFlut;
+    Texture                     			            m_SHBRDFlut;
     glm::vec3                                           m_coefficient[Config::SH_COEF_NUM];
 };

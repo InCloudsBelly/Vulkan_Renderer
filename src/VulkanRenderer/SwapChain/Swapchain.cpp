@@ -130,16 +130,18 @@ void Swapchain::createAllImageViews()
 	{
 		m_imageViews[i] = new VkImageView;
 
-		BufferManager::bufferCreateImageView(
-			getRendererPointer()->getDevice(),
-			m_images[i],
-			m_imageFormat,
-			VK_IMAGE_VIEW_TYPE_2D,
-			1,
-			1,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			m_imageViews[i]
-		);
+		VkImageViewCreateInfo viewInfo = {};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = m_images[i];
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = m_imageFormat;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		vkCreateImageView(getRendererPointer()->getDevice(), &viewInfo, nullptr, m_imageViews[i]);
 	}
 }
 

@@ -17,24 +17,15 @@ MSAA::MSAA(
 ) {
     m_samplesCount = FeaturesUtils::getMaxUsableSampleCount(getRendererPointer()->getPhysicalDevice());
 
-    m_image = std::make_shared<NormalTexture>("MSAA");
-    m_image->getFormat() = swapchainFormat;
-    m_image->getExtent() = VkExtent2D({ swapchainExtent.width,swapchainExtent.height });
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_image->getExtent(),
-        m_image->getFormat(),
+    m_image = Image::Create2DImage(
+        swapchainExtent,
+        swapchainFormat,
         VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        1,
-        1,
-        0,
+        VMA_MEMORY_USAGE_GPU_ONLY,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
         m_samplesCount,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_image->getAllocation(),
-        m_image
+        1
     );
 }
 

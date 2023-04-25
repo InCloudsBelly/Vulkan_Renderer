@@ -11,8 +11,9 @@
 #include <vulkan/vulkan.h> 
 
 #include "VulkanRenderer/RenderDataTypes.h"
-
+#include "VulkanRenderer/Image/Image.h"
 #include "VulkanRenderer/Math/MathUtils.h"
+
 
 enum class ModelType
 {
@@ -81,6 +82,7 @@ public:
 
 private:
 	void loadModel(const char* pathToModel);
+
 	void processNode(aiNode* node, const aiScene* scene);
 	StaticMeshData processMesh(aiMesh* mesh, const aiScene* scene);
 	MaterialDataInfo processMaterial(aiMesh* mesh, const aiScene* scene);

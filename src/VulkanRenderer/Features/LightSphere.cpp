@@ -128,7 +128,7 @@ void LightSphere::createDescriptorSet()
             DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSetsMap[meshIndex]);
 
             VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_ubosMap[meshIndex]);
-            VkDescriptorImageInfo defaultTex = DescriptorManager::descriptorImageInfo(getRenderResource()->m_defaultTexture->getSampler(), getRenderResource()->m_defaultTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            VkDescriptorImageInfo defaultTex = DescriptorManager::descriptorImageInfo(getRenderResource()->m_defaultTexture.sampler->getSampler(), getRenderResource()->m_defaultTexture.image->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
             std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
                 DescriptorManager::writeDescriptorSet(m_descriptorSetsMap[meshIndex], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),

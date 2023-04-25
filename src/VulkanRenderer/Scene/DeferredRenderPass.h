@@ -50,7 +50,6 @@ private:
 	virtual void createUBOs() override;
 	virtual void createDescriptorSets() override;
 
-	std::shared_ptr<NormalTexture>	m_attachmentDepth;
 
 
 	//Shadow Map
@@ -58,7 +57,7 @@ private:
 
 	std::shared_ptr<LightSphere>			m_lightSphere;
 
-	std::shared_ptr<NormalTexture>			m_BRDFlut;
+	Texture									m_BRDFlut;
 	std::shared_ptr<PrefilteredEnvMap>		m_prefilteredEnvMap;
 	std::shared_ptr<PrefilteredIrradiance>	m_prefilteredIrradiance;
 
@@ -66,5 +65,5 @@ private:
 	// composition
 	std::vector <VkBuffer>					m_compositionUBO;
 	std::vector <VmaAllocation>				m_compositionUBOAllocation;
-	VkDescriptorSet							m_compositionDescriptorSet;
+	DescriptorSet							m_compositionDescriptorSet;
 };

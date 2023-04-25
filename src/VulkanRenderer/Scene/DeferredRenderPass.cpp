@@ -3,10 +3,8 @@
 #include <iostream>
 
 #include "VulkanRenderer/Renderer.h"
-#include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Math/MathUtils.h"
-#include "VulkanRenderer/Shader/ShaderManager.h"
-#include "VulkanRenderer/Pipeline/PipelineManager.h"
+
 
 DeferredRenderPass::DeferredRenderPass()
 {
@@ -58,22 +56,17 @@ void DeferredRenderPass::createRenderPass()
     };
     createColorAttachments(colorAttachmentInfos);
 
-    m_attachmentDepth = std::make_shared<NormalTexture>("depth");
-    m_attachmentDepth->getExtent() = getRendererPointer()->getSwapchainInfo().extent;
-    m_attachmentDepth->getFormat() = getRendererPointer()->getDepthBuffer()->getFormat();
-
-    BufferManager::bufferCreateDepthResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        getRendererPointer()->getCommandPool(),
-        m_attachmentDepth->getExtent(),
-        m_attachmentDepth->getFormat(),
-        VK_SAMPLE_COUNT_1_BIT,
-        &m_attachmentDepth->getImage(),
-        &m_attachmentDepth->getAllocation(),
-        &m_attachmentDepth->getImageView()
+    m_depthAttacment = Image::Create2DImage(
+        getRendererPointer()->getSwapchainInfo().extent,
+        getRendererPointer()->getDepthBuffer()->getFormat(),
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT ,
+        VMA_MEMORY_USAGE_GPU_ONLY,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_SAMPLE_COUNT_1_BIT
     );
+
+
 
 
     // - Attachments
@@ -302,7 +295,7 @@ void DeferredRenderPass::createSwapchainFramebuffers()
             m_colorAttachments[3]->getImageView(),
             m_colorAttachments[4]->getImageView(),
             m_colorAttachments[5]->getImageView(),
-            m_attachmentDepth->getImageView()
+            m_depthAttacment->getImageView()
      
         };
 
@@ -343,7 +336,7 @@ void DeferredRenderPass::createSecondaryFeatures()
     std::string TextureName = "BRDF_LUT.png";
     TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4 };
 
-    m_BRDFlut = std::make_shared<NormalTexture>(TextureName, std::string(MODEL_DIR) + info.folderName, info.format);
+    m_BRDFlut = loadTexture(TextureName, std::string(MODEL_DIR) + info.folderName, info.format);
     m_prefilteredIrradiance = std::make_shared<PrefilteredIrradiance>(Config::PREF_IRRADIANCE_DIM);
     m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap>(Config::PREF_ENV_MAP_DIM);
 
@@ -653,7 +646,7 @@ void DeferredRenderPass::draw(uint32_t imageIndex, uint32_t currentFrame)
         vkCmdNextSubpass(commandBuffer, VK_SUBPASS_CONTENTS_INLINE);
 
         vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelines[composition]);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayouts[composition], 0, 1, &m_compositionDescriptorSet, 0, NULL);
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayouts[composition], 0, 1, &m_compositionDescriptorSet.get(), 0, NULL);
         vkCmdDraw(commandBuffer, 3, 1, 0, 0);
     
         m_lightSphere->draw(commandBuffer);
@@ -718,87 +711,51 @@ void DeferredRenderPass::createDescriptorSets()
     {
         for (uint32_t meshIndex : ptr->getMeshIndices())
         {
-            m_meshesDescriptorSetMap[meshIndex].resize(1);
-
             //-------Pass offscreen -----------
             {
-                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[scene_gbuffer], &m_meshesDescriptorSetMap[meshIndex][scene_gbuffer]);
+                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[scene_gbuffer], &m_meshesDescriptorSetMap[meshIndex].get());
 
                 RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
 
-                VkDescriptorBufferInfo uniformBufferMVP = DescriptorManager::descriptorBufferInfo(m_meshesUBOMap[meshIndex][0]);
-                VkDescriptorImageInfo texDescriptorColor = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->colorTexture->getSampler(), renderMeshInfo.ref_material->colorTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo texDescriptorMR = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->metallic_RoughnessTexture->getSampler(), renderMeshInfo.ref_material->metallic_RoughnessTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo texDescriptorEmissive = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->emissiveTexture->getSampler(), renderMeshInfo.ref_material->emissiveTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo texDescriptorAO = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->AOTexture->getSampler(), renderMeshInfo.ref_material->AOTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo texDescriptorNormal = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->normalTexture->getSampler(), renderMeshInfo.ref_material->normalTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                
-                std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-                    // Binding 0: MVP
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferMVP),
-                    // Binding 1: Position texture target
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, &texDescriptorColor),
-                    // Binding 2: metallic & Rougness texture target
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &texDescriptorMR),
-                    // Binding 3: Emissive texture target
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &texDescriptorEmissive),
-                    // Binding 4: AO texture target
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &texDescriptorAO),
-                    // Binding 5: Normals texture target
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][scene_gbuffer], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &texDescriptorNormal),
+                std::vector<DescriptorSet::DescriptorSetWriteData> data{
+                  { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_meshesUBOMap[meshIndex][0], 0, VK_WHOLE_SIZE},
+
+                  { 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->colorTexture.sampler->getSampler(),                 renderMeshInfo.ref_material->colorTexture.image->getImageView(),                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                  { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->metallic_RoughnessTexture.sampler->getSampler(),    renderMeshInfo.ref_material->metallic_RoughnessTexture.image->getImageView(),   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                  { 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->emissiveTexture.sampler->getSampler(),              renderMeshInfo.ref_material->emissiveTexture.image->getImageView(),             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                  { 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->AOTexture.sampler->getSampler(),                    renderMeshInfo.ref_material->AOTexture.image->getImageView(),                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                  { 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->normalTexture.sampler->getSampler(),                renderMeshInfo.ref_material->normalTexture.image->getImageView(),               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
                 };
 
-                vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+                m_meshesDescriptorSetMap[meshIndex].UpdateBindingData(data);
             }
         }
     }
 
     //-------Pass onscreen -----------
     {
-        DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[composition], &m_compositionDescriptorSet);
+        DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[composition], &m_compositionDescriptorSet.get());
 
-        VkDescriptorBufferInfo uniformBufferNormal = DescriptorManager::descriptorBufferInfo(m_compositionUBO[0]);
-        VkDescriptorBufferInfo uniformBufferLights = DescriptorManager::descriptorBufferInfo(m_compositionUBO[1]);
-        VkDescriptorImageInfo texDescriptorPosition = DescriptorManager::descriptorImageInfo(   VK_NULL_HANDLE,m_colorAttachments[0]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorNormal = DescriptorManager::descriptorImageInfo(     VK_NULL_HANDLE,m_colorAttachments[1]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorAlbedo = DescriptorManager::descriptorImageInfo(     VK_NULL_HANDLE,m_colorAttachments[2]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorMR = DescriptorManager::descriptorImageInfo(         VK_NULL_HANDLE,m_colorAttachments[3]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorEmissive = DescriptorManager::descriptorImageInfo(   VK_NULL_HANDLE,m_colorAttachments[4]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo texDescriptorAO = DescriptorManager::descriptorImageInfo(         VK_NULL_HANDLE,m_colorAttachments[5]->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
-        VkDescriptorImageInfo irradianceMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.irradiance->getSampler(), getRenderResource()->m_IBLResource.irradiance->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo BRDFlut = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.brdfLUT->getSampler(), getRenderResource()->m_IBLResource.brdfLUT->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        VkDescriptorImageInfo prefilteredEnvMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.prefiltered_Env->getSampler(), getRenderResource()->m_IBLResource.prefiltered_Env->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        std::vector<DescriptorSet::DescriptorSetWriteData> data{
+                 { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_compositionUBO[0], 0, VK_WHOLE_SIZE},
+                 { 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_compositionUBO[1], 0, VK_WHOLE_SIZE},
 
-        VkDescriptorImageInfo shadowMap = DescriptorManager::descriptorImageInfo(m_shadowMap->get()->getSampler(), m_shadowMap->get()->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                 { 2, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, m_colorAttachments[0]->getImageView(),  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                 { 3, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, m_colorAttachments[1]->getImageView(),  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                 { 4, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, m_colorAttachments[2]->getImageView(),  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                 { 5, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, m_colorAttachments[3]->getImageView(),  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                 { 6, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, m_colorAttachments[4]->getImageView(),  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                 { 7, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, m_colorAttachments[5]->getImageView(),  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
 
-        std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-            // Binding 0: Normal Info
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferNormal),
-            // Binding 1: Lights
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferLights),
-            // Binding 2: Position texture target
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 2, &texDescriptorPosition),
-            // Binding 3: Normals texture target
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 3, &texDescriptorNormal),
-            // Binding 4: Albedo texture target
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 4, &texDescriptorAlbedo),
-            // Binding 5: MR texture target
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 5, &texDescriptorMR),
-            // Binding 6: Emissive texture target
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 6, &texDescriptorEmissive),
-            // Binding 7: AO texture target
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 7, &texDescriptorAO),
+                 { 8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getRenderResource()->m_IBLResource.irradiance.sampler->getSampler(),             getRenderResource()->m_IBLResource.irradiance.image->getImageView(),            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                 { 9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getRenderResource()->m_IBLResource.brdfLUT.sampler->getSampler(),                getRenderResource()->m_IBLResource.brdfLUT.image->getImageView(),               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                 { 10,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getRenderResource()->m_IBLResource.prefiltered_Env.sampler->getSampler(),        getRenderResource()->m_IBLResource.prefiltered_Env.image->getImageView(),       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
 
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, &irradianceMap),
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9, &BRDFlut),
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10, &prefilteredEnvMap),
-
-            DescriptorManager::writeDescriptorSet(m_compositionDescriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 11,&shadowMap)
-
+                 { 11,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, m_shadowMap->getSampler(),                                                       m_shadowMap->getImage()->getImageView(),                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL }
         };
+        m_compositionDescriptorSet.UpdateBindingData(data);
 
-        vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
     }
 }
 
@@ -823,9 +780,11 @@ void DeferredRenderPass::destroy()
     for (auto attachment : m_colorAttachments)
         attachment->destroy();
 
-    m_attachmentDepth->destroy();
+    m_depthAttacment->destroy();
 
-    m_BRDFlut->destroy();
+    m_BRDFlut.image->destroy();
+    m_BRDFlut.sampler->destroy();
+
     m_prefilteredEnvMap->destroy();
     m_prefilteredIrradiance->destroy();
 

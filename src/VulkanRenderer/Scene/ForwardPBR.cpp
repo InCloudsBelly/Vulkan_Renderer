@@ -3,9 +3,7 @@
 #include <iostream>
 
 #include "VulkanRenderer/Renderer.h"
-#include "VulkanRenderer/Buffer/BufferManager.h"
-#include "VulkanRenderer/Pipeline/PipelineManager.h"
-#include "VulkanRenderer/Shader/ShaderManager.h"
+
 #include "VulkanRenderer/Math/MathUtils.h"
 
 ForwardPBRPass::ForwardPBRPass() 
@@ -197,7 +195,10 @@ void ForwardPBRPass::createSecondaryFeatures()
     m_GUI = std::make_unique<GUI>();
 
     // IBL
-    loadBRDFlut();
+    std::string TextureName = "BRDF_LUT.png";
+    TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4 };
+    m_BRDFlut = loadTexture(TextureName, std::string(MODEL_DIR) + info.folderName, info.format);
+
     m_prefilteredIrradiance = std::make_shared<PrefilteredIrradiance>(Config::PREF_IRRADIANCE_DIM);
     m_prefilteredEnvMap = std::make_shared<PrefilteredEnvMap>(Config::PREF_ENV_MAP_DIM);
 
@@ -440,47 +441,29 @@ void ForwardPBRPass::createDescriptorSets()
     {
         for (uint32_t meshIndex : ptr->getMeshIndices())
         {
-            m_meshesDescriptorSetMap[meshIndex].resize(PipelineIndex::PIPELINE_NUM);
-
             {
-                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[PipelineIndex::main_pipeline], &m_meshesDescriptorSetMap[meshIndex][0]);
+                DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayouts[PipelineIndex::main_pipeline], &m_meshesDescriptorSetMap[meshIndex].get());
 
                 RenderMeshInfo& renderMeshInfo = getRenderResource()->m_meshInfoMap[meshIndex];
 
-                VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_meshesUBOMap[meshIndex][0]);
-                VkDescriptorBufferInfo uniformBufferLightsInfo = DescriptorManager::descriptorBufferInfo(m_meshesUBOMap[meshIndex][0]);
+                std::vector<DescriptorSet::DescriptorSetWriteData> data{
+                    { 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_meshesUBOMap[meshIndex][0], 0, VK_WHOLE_SIZE},
+                    { 1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, m_meshesUBOMap[meshIndex][1], 0, VK_WHOLE_SIZE},
 
-                VkDescriptorImageInfo baseColor         = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->colorTexture->getSampler(),               renderMeshInfo.ref_material->colorTexture->getImageView(),              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo metallicRoughness = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->metallic_RoughnessTexture->getSampler(),  renderMeshInfo.ref_material->metallic_RoughnessTexture->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo emissiveColor     = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->emissiveTexture->getSampler(),            renderMeshInfo.ref_material->emissiveTexture->getImageView(),           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo AO                = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->AOTexture->getSampler(),                  renderMeshInfo.ref_material->AOTexture->getImageView(),                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo normal            = DescriptorManager::descriptorImageInfo(renderMeshInfo.ref_material->normalTexture->getSampler(),              renderMeshInfo.ref_material->normalTexture->getImageView(),             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                
-                VkDescriptorImageInfo irradianceMap     = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.irradiance->getSampler(),           getRenderResource()->m_IBLResource.irradiance->getImageView(),          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo BRDFlut           = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.brdfLUT->getSampler(),              getRenderResource()->m_IBLResource.brdfLUT->getImageView(),             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-                VkDescriptorImageInfo prefilteredEnvMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_IBLResource.prefiltered_Env->getSampler(),      getRenderResource()->m_IBLResource.prefiltered_Env->getImageView(),     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->colorTexture.sampler->getSampler(),                 renderMeshInfo.ref_material->colorTexture.image->getImageView(),                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                    { 3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->metallic_RoughnessTexture.sampler->getSampler(),    renderMeshInfo.ref_material->metallic_RoughnessTexture.image->getImageView(),   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                    { 4, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->emissiveTexture.sampler->getSampler(),              renderMeshInfo.ref_material->emissiveTexture.image->getImageView(),             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                    { 5, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->AOTexture.sampler->getSampler(),                    renderMeshInfo.ref_material->AOTexture.image->getImageView(),                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                    { 6, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, renderMeshInfo.ref_material->normalTexture.sampler->getSampler(),                renderMeshInfo.ref_material->normalTexture.image->getImageView(),               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
 
-                VkDescriptorImageInfo shadowMap         = DescriptorManager::descriptorImageInfo(m_shadowMap->get()->getSampler(),                                      m_shadowMap->get()->getImageView(),                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                    { 7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getRenderResource()->m_IBLResource.irradiance.sampler->getSampler(),             getRenderResource()->m_IBLResource.irradiance.image->getImageView(),            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                    { 8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getRenderResource()->m_IBLResource.brdfLUT.sampler->getSampler(),                getRenderResource()->m_IBLResource.brdfLUT.image->getImageView(),               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
+                    { 9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, getRenderResource()->m_IBLResource.prefiltered_Env.sampler->getSampler(),        getRenderResource()->m_IBLResource.prefiltered_Env.image->getImageView(),       VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL },
 
-
-                std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, &uniformBufferLightsInfo),  
-
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2, &baseColor),
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3, &metallicRoughness),
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4, &emissiveColor),
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 5, &AO),
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 6, &normal),
-
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 7, &irradianceMap),
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 8, &BRDFlut),
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 9,&prefilteredEnvMap),
-
-                    DescriptorManager::writeDescriptorSet(m_meshesDescriptorSetMap[meshIndex][PipelineIndex::main_pipeline], VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 10,&shadowMap)
+                    { 10,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, m_shadowMap->getSampler(),                                                       m_shadowMap->getImage()->getImageView(),                                        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL }
                 };
-
-                vkUpdateDescriptorSets(getRendererPointer()->getDevice(), static_cast<uint32_t>(writeDescriptorSets.size()), writeDescriptorSets.data(), 0, nullptr);
+               
+                m_meshesDescriptorSetMap[meshIndex].UpdateBindingData(data);
             }
         }
     }
@@ -518,7 +501,10 @@ void ForwardPBRPass::destroy()
 
     // IBL
     m_BRDFcomp.destroy();
-    m_BRDFlut->destroy();
+    
+    m_BRDFlut.image->destroy();
+    m_BRDFlut.sampler->destroy();
+
     m_prefilteredIrradiance->destroy();
     m_prefilteredEnvMap->destroy();
 }
@@ -528,12 +514,4 @@ const Computation& ForwardPBRPass::getComputation() const
 {
     return m_BRDFcomp;
 }
-
-
-void ForwardPBRPass::loadBRDFlut() 
-{
-    std::string TextureName = "BRDF_LUT.png";
-    TextureToLoadInfo info = { TextureName,"/defaultTextures",VK_FORMAT_R8G8B8A8_SRGB,4 };
-
-    m_BRDFlut = std::make_shared<NormalTexture>(TextureName,std::string(MODEL_DIR) + info.folderName,info.format);
-}
+ 

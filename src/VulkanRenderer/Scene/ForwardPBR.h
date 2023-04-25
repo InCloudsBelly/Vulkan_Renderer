@@ -56,7 +56,7 @@ private:
 	// IBL
 	Computation								m_BRDFcomp;
 
-	std::shared_ptr<NormalTexture>			m_BRDFlut;
+	Texture									m_BRDFlut;
 	std::shared_ptr<PrefilteredEnvMap>		m_prefilteredEnvMap;
 	std::shared_ptr<PrefilteredIrradiance>	m_prefilteredIrradiance;
 

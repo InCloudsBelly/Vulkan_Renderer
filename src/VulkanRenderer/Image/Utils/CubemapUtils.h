@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "VulkanRenderer/Texture/Bitmap.h"
+#include "VulkanRenderer/Image/Utils/Bitmap.h"
 
 namespace cubemapUtils
 {

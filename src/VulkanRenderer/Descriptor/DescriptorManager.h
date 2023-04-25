@@ -4,7 +4,7 @@
 #include <vector>
 #include <memory>
 
-#include "VulkanRenderer/Texture/Texture.h"
+
 
 struct DescriptorInfo
 {

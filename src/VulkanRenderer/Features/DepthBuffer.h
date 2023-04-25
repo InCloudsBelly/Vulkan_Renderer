@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Texture/Texture.h"
+#include "VulkanRenderer/Image/Image.h"
 
 class DepthBuffer
 {
@@ -15,7 +15,7 @@ public:
     );
     ~DepthBuffer();
 
-    std::shared_ptr<TextureBase> getTexture(){return m_image; }
+    Image* getTexture(){return m_image; }
     const VkImageView& getImageView()const;
     const VkImage& getImage()const;
     const VkFormat& getFormat()const;
@@ -24,7 +24,7 @@ public:
 
 private:
 
-    std::shared_ptr<TextureBase> m_image;
+    Image* m_image;
     VkFormat m_format;
 
 };

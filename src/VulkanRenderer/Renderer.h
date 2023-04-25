@@ -17,7 +17,7 @@
 #include "VulkanRenderer/Features/DepthBuffer.h"
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 #include "VulkanRenderer/Device/Device.h"
-#include "VulkanRenderer/Texture/Texture.h"
+
 #include "VulkanRenderer/Camera/Camera.h"
 #include "VulkanRenderer/Features/ShadowMap.h"
 #include "VulkanRenderer/VKinstance/VKinstance.h"

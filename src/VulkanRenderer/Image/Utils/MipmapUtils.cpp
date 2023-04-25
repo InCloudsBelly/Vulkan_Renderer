@@ -1,4 +1,4 @@
-#include "VulkanRenderer/Texture/MipmapUtils.h"
+#include "VulkanRenderer/Image/Utils/MipmapUtils.h"
 
 #include <cmath>
 #include <stdexcept>

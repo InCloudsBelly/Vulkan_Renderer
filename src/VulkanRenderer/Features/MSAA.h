@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VulkanRenderer/Texture/Texture.h"
+#include "VulkanRenderer/Image/Image.h"
 
 class MSAA
 {
@@ -16,7 +16,7 @@ public:
     );
     ~MSAA();
 
-    std::shared_ptr<TextureBase> getTexture() { return m_image; }
+    Image* getTexture() { return m_image; }
     const VkSampleCountFlagBits& getSamplesCount() const;
     const VkImageView& getImageView() const;
 
@@ -24,7 +24,7 @@ public:
 
 private:
 
-    std::shared_ptr<TextureBase>    m_image;
+    Image*                          m_image;
     VkSampleCountFlagBits           m_samplesCount;
 
 };

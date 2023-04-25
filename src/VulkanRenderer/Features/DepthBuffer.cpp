@@ -25,23 +25,16 @@ DepthBuffer::DepthBuffer(
     );
 
 
-    m_image = std::make_shared<NormalTexture>("Depth");
-    m_image->getFormat() = m_format;
-    m_image->getExtent() = VkExtent2D({ swapchainExtent.width,swapchainExtent.height });
 
-    BufferManager::bufferCreateDepthResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        getRendererPointer()->getCommandPool(),
-        m_image->getExtent(),
-        m_image->getFormat(),
-        samplesCount,
-        &m_image->getImage(),
-        &m_image->getAllocation(),
-        &m_image->getImageView()
+    m_image = Image::Create2DImage(
+        swapchainExtent,
+        m_format,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
+        samplesCount
     );
-
 
 }
 

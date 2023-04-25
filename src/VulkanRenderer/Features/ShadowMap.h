@@ -10,7 +10,8 @@
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 
-#include "VulkanRenderer/Texture/Texture.h"
+
+#include "VulkanRenderer/Image/Image.h"
 
 
 class ShadowMap
@@ -31,9 +32,9 @@ public:
 
 	void draw(uint32_t imageIndex, uint32_t frameIndex);
 
-	const std::shared_ptr<TextureBase> get() const;
+	Image* getImage() const;
+	VkSampler& getSampler() const;
 	const VkImageView& getShadowMapView() const;
-	const VkSampler& getSampler() const;
 	const glm::mat4& getLightSpace() const;
 	//const VkDescriptorSet& getDescriptorSet(const uint32_t index, const uint32_t currentFrame) const;
 	const VkFramebuffer& getFramebuffer(const uint32_t imageIndex) const;
@@ -54,7 +55,8 @@ private:
 
 	std::vector<VkClearValue>		m_clearValuesShadowMap;
 
-	std::shared_ptr<TextureBase>	 m_texture;
+	Image*							 m_image;
+	ImageSampler*					 m_imageSampler;
 
 	RenderPass                       m_renderPass;
 

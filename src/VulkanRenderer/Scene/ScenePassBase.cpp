@@ -72,24 +72,14 @@ void ScenePassBase::createColorAttachments(std::vector<ColorAttachmentInfo> info
 
     for (int i = 0; i < m_colorAttachments.size(); ++i)
     {
-        m_colorAttachments[i] = std::make_shared<NormalTexture>(infos[i].name);
-        m_colorAttachments[i]->getExtent() = infos[i].extent;
-        m_colorAttachments[i]->getFormat() = infos[i].format;
-
-        BufferManager::bufferCreateOffscreenResources(
-            getRendererPointer()->getDevice(),
-            getRendererPointer()->getVmaAllocator(),
-            getRendererPointer()->getGraphicsQueue(),
-            m_colorAttachments[i]->getExtent(),
-            m_colorAttachments[i]->getFormat(),
+        m_colorAttachments[i] = Image::Create2DImage(
+            infos[i].extent,
+            infos[i].format,
             VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-            1,
-            1,
-            0,
-            infos[i].sampleCount,
-            VK_IMAGE_VIEW_TYPE_2D,
-            &m_colorAttachments[i]->getAllocation(),
-            m_colorAttachments[i]
+            VMA_MEMORY_USAGE_GPU_ONLY,
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            VK_IMAGE_TILING_OPTIMAL,
+            infos[i].sampleCount
         );
     }
 

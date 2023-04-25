@@ -8,7 +8,8 @@
 
 #include "VulkanRenderer/RenderPass/RenderPass.h"
 
-#include "VulkanRenderer/Texture/Texture.h"
+
+#include "VulkanRenderer/Image/Image.h"
 
 struct PushBlockPrefilterEnv
 {
@@ -27,7 +28,7 @@ public:
 
     void destroy();
 
-    const std::shared_ptr<TextureBase> get() const;
+    const Texture& get() const;
 
 private:
 
@@ -49,8 +50,8 @@ private:
     VkFormat                         m_format;
     uint32_t                         m_mipLevels;
 
-    std::shared_ptr<TextureBase>     m_targetImage;
-    std::shared_ptr <TextureBase>    m_offscreenImage;
+    Image*                           m_offscreenImage;
+    Texture                          m_targetTex;
 
     RenderPass                       m_renderPass;
 

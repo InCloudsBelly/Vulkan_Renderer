@@ -3,7 +3,7 @@
  * https://github.com/PacktPublishing/3D-Graphics-Rendering-Cookbook/blob/master/shared/Bitmap.h
  */
 
-#include "VulkanRenderer/Texture/Bitmap.h"
+#include "VulkanRenderer/Image/Utils/Bitmap.h"
 
 #include <string.h>
 #include <vector>

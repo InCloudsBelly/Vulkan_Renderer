@@ -207,6 +207,7 @@ void main()
     color = pow(color,vec3(1.0 / 2.2));
 
     outColor = ambient * vec4(color, 1.0);
+//    outColor =  vec4(iblInfo.specularLight, 1.0);
     
 
 }

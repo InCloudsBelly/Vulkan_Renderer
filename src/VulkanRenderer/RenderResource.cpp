@@ -75,12 +75,13 @@ void RenderResource::uploadModels(const VkQueue& graphicsQueue, const VkCommandP
 }
 
 
-void RenderResource::updateIBLResource(std::shared_ptr<TextureBase> brdfLUT, std::shared_ptr<TextureBase> Irradiance, std::shared_ptr<TextureBase> Env)
+void RenderResource::updateIBLResource(Texture brdfLUT, Texture irradiance, Texture env)
 {
     m_IBLResource.brdfLUT = brdfLUT;
-    m_IBLResource.irradiance = Irradiance;
-    m_IBLResource.prefiltered_Env = Env;
+    m_IBLResource.irradiance = irradiance;
+    m_IBLResource.prefiltered_Env = env;
 }
+
 
 
 void RenderResource::destroy()
@@ -94,20 +95,33 @@ void RenderResource::destroy()
 		//destroy materialData
 		if (meshInfo.second.ref_material != nullptr)
 		{
-			meshInfo.second.ref_material->colorTexture->destroy();
-			meshInfo.second.ref_material->metallic_RoughnessTexture->destroy();
-			meshInfo.second.ref_material->emissiveTexture->destroy();
-			meshInfo.second.ref_material->AOTexture->destroy();
-			meshInfo.second.ref_material->normalTexture->destroy();
+			meshInfo.second.ref_material->colorTexture.image->destroy();
+			meshInfo.second.ref_material->metallic_RoughnessTexture.image->destroy();
+			meshInfo.second.ref_material->emissiveTexture.image->destroy();
+			meshInfo.second.ref_material->AOTexture.image->destroy();
+			meshInfo.second.ref_material->normalTexture.image->destroy();
+
+            meshInfo.second.ref_material->colorTexture.sampler->destroy();
+            meshInfo.second.ref_material->metallic_RoughnessTexture.sampler->destroy();
+            meshInfo.second.ref_material->emissiveTexture.sampler->destroy();
+            meshInfo.second.ref_material->AOTexture.sampler->destroy();
+            meshInfo.second.ref_material->normalTexture.sampler->destroy();
 		}
 	}
 
 
-	if (m_skyboxCubeMap != nullptr)
-		m_skyboxCubeMap->destroy();
-	if (m_defaultTexture != nullptr)
-		m_defaultTexture->destroy();
+	if (m_skyboxCubeMap.image != nullptr)
+		m_skyboxCubeMap.image->destroy();
+    if (m_skyboxCubeMap.sampler != nullptr)
+        m_skyboxCubeMap.sampler->destroy();
 
-    if (m_SHBRDFlut != nullptr)
-        m_SHBRDFlut->destroy();
+    if (m_defaultTexture.image != nullptr)
+        m_defaultTexture.image->destroy();
+    if (m_defaultTexture.sampler != nullptr)
+        m_defaultTexture.sampler->destroy();
+
+    if (m_SHBRDFlut.image != nullptr)
+        m_SHBRDFlut.image->destroy();
+    if (m_SHBRDFlut.sampler != nullptr)
+        m_SHBRDFlut.sampler->destroy();
 }

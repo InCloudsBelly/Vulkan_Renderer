@@ -8,7 +8,7 @@
 #include "VulkanRenderer/Framebuffer/FramebufferManager.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
-#include "VulkanRenderer/Texture/MipmapUtils.h"
+#include "VulkanRenderer/Image/Utils/MipmapUtils.h"
 #include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/Buffer/BufferManager.h"
 #include "VulkanRenderer/Descriptor/DescriptorManager.h"
@@ -34,7 +34,7 @@ void PrefilteredEnvMap::createDescriptorSet()
 {
     DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSet);
 
-    VkDescriptorImageInfo SkyboxCubeMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_skyboxCubeMap->getSampler(), getRenderResource()->m_skyboxCubeMap->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    VkDescriptorImageInfo SkyboxCubeMap = DescriptorManager::descriptorImageInfo(getRenderResource()->m_skyboxCubeMap.sampler->getSampler(), getRenderResource()->m_skyboxCubeMap.image->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
         DescriptorManager::writeDescriptorSet(m_descriptorSet, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0,&SkyboxCubeMap)
     };
@@ -62,8 +62,8 @@ void PrefilteredEnvMap::recordCommandBuffer()
         getRendererPointer()->getDevice(),
         getRendererPointer()->getGraphicsQueue(),
         getRendererPointer()->getCommandPool(),
-        m_targetImage->getImage(),
-        m_targetImage->getFormat(),
+        m_targetTex.image->getImage(),
+        m_targetTex.image->getFormat(),
         VK_IMAGE_ASPECT_COLOR_BIT,
         m_mipLevels,
         6,
@@ -171,8 +171,8 @@ void PrefilteredEnvMap::recordCommandBuffer()
         getRendererPointer()->getDevice(),
         getRendererPointer()->getGraphicsQueue(),
         getRendererPointer()->getCommandPool(),
-        m_targetImage->getImage(),
-        m_targetImage->getFormat(),
+        m_targetTex.image->getImage(),
+        m_targetTex.image->getFormat(),
         VK_IMAGE_ASPECT_COLOR_BIT,
         m_mipLevels,
         6,
@@ -212,7 +212,7 @@ void PrefilteredEnvMap::copyRegionOfImage(
         commandBuffer,
         m_offscreenImage->getImage(),
         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        m_targetImage->getImage(),
+        m_targetTex.image->getImage(),
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1,
         &copyRegion
@@ -338,24 +338,14 @@ void PrefilteredEnvMap::createPipeline()
 void PrefilteredEnvMap::createOffscreenFramebuffer() 
 {
 
-    m_offscreenImage = std::make_shared<NormalTexture>("Offscreen");
-    m_offscreenImage->getExtent() = VkExtent2D({ m_dim ,m_dim });
-    m_offscreenImage->getFormat() = m_format;
-
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_offscreenImage->getExtent(),
-        m_offscreenImage->getFormat(),
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-        1,
-        1,
-        0,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_2D,
-        &m_offscreenImage->getAllocation(),
-        m_offscreenImage
+    m_offscreenImage = Image::Create2DImage(
+        VkExtent2D({ m_dim ,m_dim }),
+        m_format,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_SAMPLE_COUNT_1_BIT
     );
 
     BufferManager::bufferTransitionImageLayout(
@@ -483,24 +473,29 @@ void PrefilteredEnvMap::createRenderPass()
 
 void PrefilteredEnvMap::createTargetImage() 
 {
-    m_targetImage = std::make_shared<CubeMapTexture>("PreEnv");
-    m_targetImage->getExtent() = VkExtent2D({ m_dim, m_dim });
-    m_targetImage->getFormat() = m_format;
+    uint32_t mipLevel = floor(log2(m_dim)) + 1;
 
-    BufferManager::bufferCreateOffscreenResources(
-        getRendererPointer()->getDevice(),
-        getRendererPointer()->getVmaAllocator(),
-        getRendererPointer()->getGraphicsQueue(),
-        m_targetImage->getExtent(),
-        m_targetImage->getFormat(),
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        floor(log2(m_dim)) + 1,
-        6,
-        VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT,
-        VK_SAMPLE_COUNT_1_BIT,
-        VK_IMAGE_VIEW_TYPE_CUBE,
-        &m_targetImage->getAllocation(),
-        m_targetImage
+    m_targetTex.image = Image::CreateCubeImage(
+        VkExtent2D({ m_dim, m_dim }),
+        m_format,
+        VK_IMAGE_USAGE_SAMPLED_BIT,
+        VMA_MEMORY_USAGE_GPU_ONLY,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_IMAGE_TILING_OPTIMAL,
+        mipLevel,
+        VK_SAMPLE_COUNT_1_BIT
+    );
+
+    m_targetTex.sampler = new ImageSampler(
+        VK_FILTER_LINEAR,
+        VK_FILTER_LINEAR,
+        VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        16,
+        VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        mipLevel
     );
 
 }
@@ -515,16 +510,16 @@ void PrefilteredEnvMap::destroy()
     vkDestroyPipeline(getRendererPointer()->getDevice(), m_pipeline, nullptr);
     vkDestroyPipelineLayout(getRendererPointer()->getDevice(), m_pipelineLayout, nullptr);
 
-    m_targetImage->destroy();
+    m_targetTex.image->destroy();
+    m_targetTex.sampler->destroy();
+
     m_offscreenImage->destroy();
     m_renderPass.destroy();
 
     vkDestroyFramebuffer( getRendererPointer()->getDevice(), m_framebuffer, nullptr);
 }
 
-
-const std::shared_ptr<TextureBase> PrefilteredEnvMap::get() const
+const Texture& PrefilteredEnvMap::get() const
 {
-    return m_targetImage;
+    return m_targetTex;
 }
-

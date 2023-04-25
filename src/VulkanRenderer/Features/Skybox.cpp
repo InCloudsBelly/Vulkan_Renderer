@@ -126,7 +126,7 @@ void SkyBox::createDescriptorSet()
     DescriptorManager::allocDescriptorSet(getRendererPointer()->getDescriptorPool(), m_descriptorSetLayout, &m_descriptorSet);
 
     VkDescriptorBufferInfo uniformBufferInfo = DescriptorManager::descriptorBufferInfo(m_ubo);
-    VkDescriptorImageInfo skybox = DescriptorManager::descriptorImageInfo(getRenderResource()->m_skyboxCubeMap->getSampler(), getRenderResource()->m_skyboxCubeMap->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    VkDescriptorImageInfo skybox = DescriptorManager::descriptorImageInfo(getRenderResource()->m_skyboxCubeMap.sampler->getSampler(), getRenderResource()->m_skyboxCubeMap.image->getImageView(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     std::vector<VkWriteDescriptorSet> writeDescriptorSets = {
         DescriptorManager::writeDescriptorSet(m_descriptorSet, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, &uniformBufferInfo),

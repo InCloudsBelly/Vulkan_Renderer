@@ -17,6 +17,7 @@
 #include <glm/glm.hpp>
 
 #include "VulkanRenderer/Settings/Config.h"
+#include "VulkanRenderer/Command/CommandManager.h"
 #include "VulkanRenderer/SwapChain/Swapchain.h"
 #include "VulkanRenderer/RenderPass/AttachmentUtils.h"
 #include "VulkanRenderer/RenderPass/SubPassUtils.h"
